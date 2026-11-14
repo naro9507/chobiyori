@@ -558,7 +558,12 @@ Electron をやめ、Tauri v2 に移行する。バックエンドは Rust で�
 | 再描画の削減 | React Compiler | 手書きのメモ化を減らす |
 | 整形・検査 | Biome | 現行を引き継ぐ |
 
-外す依存は `react-admin`、`@mui/material`、`@mui/icons-material`、`@emotion/react`、`@emotion/styled`、`react-router-dom`。
+画面側では次の依存を外す。
+
+- `react-admin`
+- `@mui/material`、`@mui/icons-material`
+- `@emotion/react`、`@emotion/styled`
+- `react-router-dom`
 
 Rust 側で使う主なライブラリの候補は次のとおり。採用前に、日本語と Windows での動作を検証する。
 
