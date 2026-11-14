@@ -53,5 +53,24 @@
 		"light": "Light",
 		"dark": "Dark",
 		"system": "Match the OS setting"
+	},
+	"update": {
+		"sectionTitle": "Updates",
+		"sectionDescription": "When a new version is released, a notice appears at the top of the screen when you start the app.",
+		"available": "Version {version} is available",
+		"availableBody": "The app restarts after updating. Save anything you are entering first.",
+		"install": "Update now",
+		"later": "Later",
+		"downloading": "Downloading ({percent}%)",
+		"downloadingUnknown": "Downloading",
+		"restarting": "Restarting",
+		"failed": "Could not update. Please try again later.",
+		"currentVersion": "Current version: {version}",
+		"check": "Check for updates",
+		"checking": "Checking",
+		"upToDate": "You have the latest version",
+		"checkFailed": "Could not check for updates. Please check your internet connection.",
+		"browserOnly": "You can check when the app itself is running.",
+		"releaseNotes": "What's new"
 	}
 }

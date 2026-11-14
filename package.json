@@ -31,12 +31,15 @@
     "check": "biome check apps/renderer/src",
     "check:fix": "biome check --write apps/renderer/src",
     "typecheck": "tsc --noEmit -p apps/renderer && tsc --noEmit -p apps/renderer/tsconfig.node.json",
-    "prepare": "husky"
+    "prepare": "husky",
+    "version:set": "node scripts/set-version.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-router": "^1.170.46",
     "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.73.0",

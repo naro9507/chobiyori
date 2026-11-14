@@ -34,7 +34,7 @@ make dev     # アプリを起動
 |---|---|
 | `make dev` | アプリを起動する。画面の変更はすぐ反映され、Rust の変更は再ビルドされる |
 | `make dev-web` | 画面だけをブラウザで開く。Rust のコマンドは呼べない |
-| `make build` | 配布用のインストーラを作る（`src-tauri/target/release/bundle/`） |
+| `make build` | いまの OS 用のインストーラを作る（`src-tauri/target/release/bundle/`）。配布用は GitHub Actions で作る（[リリースと自動アップデート](./RELEASE.md)） |
 | `make test` | 画面（Vitest）と Rust（cargo test）のテスト |
 | `make lint` | Biome と Clippy |
 | `make format` | Biome と rustfmt で整形する |
