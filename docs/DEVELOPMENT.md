@@ -95,6 +95,27 @@ shadcn/ui の部品は `apps/renderer/src/components/ui/` に置き、自分た�
 
 配色は `apps/renderer/src/styles/globals.css` の CSS 変数だけで決める。画面では `bg-card`・`text-muted-foreground` のようなトークン名を使い、色の値を直接書かない。
 
-## Git hooks
+## 依存の安全（サプライチェーン対策）
+
+依存パッケージや GitHub Actions が乗っ取られても被害を受けにくいよう、次のようにしている。
+
+| 対象 | 対策 | 場所 |
+|---|---|---|
+| npm パッケージ | 公開から 7 日たっていない版は入れない | `pnpm-workspace.yaml` の `minimumReleaseAge` |
+| npm パッケージ | 来歴証明などの信頼の証拠が、以前の版より弱い版には上げない | 同 `trustPolicy` |
+| npm パッケージ | 依存の依存が Git や URL から取ってくることを禁じる | 同 `blockExoticSubdeps` |
+| npm パッケージ | インストール時のスクリプトは、許可したものだけ実行する（いまは許可なし） | 同 `strictDepBuilds`・`onlyBuiltDependencies` |
+| pnpm 本体 | 版とハッシュを固定する | `package.json` の `packageManager` |
+| Rust の crate | `Cargo.lock` と違う版を使わない | `--locked` を付けて実行 |
+| GitHub Actions | 版のタグではなくコミットハッシュで指定する。チェックアウトに認証情報を残さない | `.github/workflows/` |
+| 既知の脆弱性 | CI で `pnpm audit` と `cargo audit` を実行する | `.github/workflows/ci.yml`、`pnpm audit` |
+| 更新 | Dependabot が週に 1 回、公開から 7 日たった版への更新を提案する | `.github/dependabot.yml` |
+
+依存を足すときの注意:
+
+- 公開から 7 日以内の版しかない場合、`pnpm add` は失敗する。急ぐ理由がなければ待つ。どうしても必要なら `pnpm-workspace.yaml` の `minimumReleaseAgeExclude` に名前を足し、理由をコメントに書く。
+- インストール時のスクリプトが必要なパッケージは、`pnpm install` が失敗して知らせる。中身を確かめてから `onlyBuiltDependencies` に足す。
+- GitHub Actions を足すときは、`git ls-remote https://github.com/<owner>/<repo> refs/tags/<版>` でコミットハッシュを調べ、`uses: owner/repo@<ハッシュ> # <版>` の形で書く。
+
 
 `git push` の前に `.husky/pre-push` が、Biome・型チェック・Vitest・rustfmt・Clippy・cargo test を実行する。

@@ -1,0 +1,36 @@
+# 依存の更新を週に 1 回まとめて提案する。
+# 公開から 7 日たっていない版は提案しない（pnpm-workspace.yaml の minimumReleaseAge と同じ考え方）。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      cargo:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # GitHub Actions はコミットハッシュで固定している。Dependabot がハッシュと版のコメントを更新する
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
