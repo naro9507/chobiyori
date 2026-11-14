@@ -1,17 +1,15 @@
 #!/usr/bin/env sh
-# shellcheck source=./_/husky.sh
-. "$(dirname -- "$0")/_/husky.sh"
+# プッシュ前に、画面と Rust の両方を検査する
+set -e
 
-echo "🔍 Running pre-push checks..."
+echo "画面: リント・整形・型・テスト"
+pnpm check
+pnpm typecheck
+pnpm test
 
-# コード品質チェック
-echo "📋 Running lint, format, and type checks..."
-npm run lint || exit 1
-npm run format || exit 1  
-npm run typecheck || exit 1
+echo "Rust: 整形・リント・テスト"
+pnpm format:rust
+pnpm lint:rust
+pnpm test:rust
 
-# テスト実行
-echo "🧪 Running tests..."
-npm run test || exit 1
-
-echo "✅ All pre-push checks passed!"
+echo "すべての検査が通りました"

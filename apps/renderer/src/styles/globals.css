@@ -1,3 +1,138 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * 配色はデザイン案（Claude のデザインキャンバス）に合わせる。
+ * 淡いグレーの地、やわらかい黒の文字、彩度を抑えた青緑のアクセント。
+ * 色はここだけで定義し、画面では Tailwind のトークン名（bg-card など）で使う。
+ */
+:root {
+	--radius: 0.625rem;
+	--background: #f6f7f6;
+	--foreground: #22282b;
+	--card: #ffffff;
+	--card-foreground: #22282b;
+	--popover: #ffffff;
+	--popover-foreground: #22282b;
+	--primary: #2b6e66;
+	--primary-foreground: #ffffff;
+	--secondary: #eceeec;
+	--secondary-foreground: #22282b;
+	--muted: #eceeec;
+	--muted-foreground: #5f6b68;
+	--accent: #e6f1ef;
+	--accent-foreground: #1c4f49;
+	--destructive: #a3243b;
+	--success: #1c6b5e;
+	--success-background: #e3f2ec;
+	--warning: #7a5a12;
+	--warning-background: #fbf5e9;
+	--border: #d5d9d6;
+	--input: #b9c0bc;
+	--ring: #2b6e66;
+	--sidebar: #ffffff;
+	--sidebar-foreground: #22282b;
+	--sidebar-accent: #e6f1ef;
+	--sidebar-accent-foreground: #1c4f49;
+	--sidebar-border: #d5d9d6;
+}
+
+.dark {
+	--background: #161a1b;
+	--foreground: #e6e9e8;
+	--card: #1e2325;
+	--card-foreground: #e6e9e8;
+	--popover: #1e2325;
+	--popover-foreground: #e6e9e8;
+	--primary: #6fb3a8;
+	--primary-foreground: #0f1716;
+	--secondary: #262c2e;
+	--secondary-foreground: #e6e9e8;
+	--muted: #262c2e;
+	--muted-foreground: #a3adaa;
+	--accent: #22302e;
+	--accent-foreground: #cfe6e1;
+	--destructive: #f08a9a;
+	--success: #8fd0bf;
+	--success-background: #1d2f2a;
+	--warning: #e8c47a;
+	--warning-background: #2e2819;
+	--border: #333a3c;
+	--input: #4a5254;
+	--ring: #6fb3a8;
+	--sidebar: #1a1f20;
+	--sidebar-foreground: #e6e9e8;
+	--sidebar-accent: #22302e;
+	--sidebar-accent-foreground: #cfe6e1;
+	--sidebar-border: #333a3c;
+}
+
+@theme inline {
+	--font-sans:
+		"Inter Variable", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+		"Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-success: var(--success);
+	--color-success-background: var(--success-background);
+	--color-warning: var(--warning);
+	--color-warning-background: var(--warning-background);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	html,
+	body,
+	#root {
+		height: 100%;
+	}
+	body {
+		@apply bg-background font-sans text-foreground antialiased;
+		font-feature-settings: "palt" 0;
+		line-height: 1.7;
+	}
+	/* 金額や日付など、桁をそろえたい数字に使う */
+	.num {
+		font-variant-numeric: tabular-nums;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			/* biome-ignore lint/complexity/noImportantStyles: OS の「視覚効果を減らす」設定を、個別の指定より優先する */
+			animation-duration: 0.01ms !important;
+			/* biome-ignore lint/complexity/noImportantStyles: OS の「視覚効果を減らす」設定を、個別の指定より優先する */
+			transition-duration: 0.01ms !important;
+		}
+	}
+}

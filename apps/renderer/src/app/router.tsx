@@ -1,0 +1,51 @@
+import {
+	createHashHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	type RouterHistory,
+} from "@tanstack/react-router"
+import type { ReactNode } from "react"
+import { AppShell } from "@/components/layout/app-shell"
+import { HomePage } from "@/pages/home-page"
+import { PlaceholderPage } from "@/pages/placeholder-page"
+import { SettingsPage } from "@/pages/settings-page"
+import { navItems, type ScreenId } from "./navigation"
+
+const rootRoute = createRootRoute({ component: AppShell })
+
+/** 作り終えた画面。ここにない画面は「準備中」を表示する。 */
+const screens: Partial<Record<ScreenId, () => ReactNode>> = {
+	home: HomePage,
+	settings: SettingsPage,
+}
+
+const screenRoutes = navItems.map((item) => {
+	const Screen = screens[item.id]
+	return createRoute({
+		getParentRoute: () => rootRoute,
+		path: item.path,
+		component: Screen ?? (() => <PlaceholderPage screen={item.id} />),
+	})
+})
+
+const routeTree = rootRoute.addChildren(screenRoutes)
+
+/**
+ * アプリ内の画面遷移。Tauri ではページを再読み込みしても
+ * 同じ画面に戻れるよう、URL のハッシュで画面を表す。
+ */
+export function createAppRouter(history: RouterHistory = createHashHistory()) {
+	return createRouter({
+		routeTree,
+		history,
+		defaultPreload: false,
+		defaultNotFoundComponent: () => <PlaceholderPage screen="home" />,
+	})
+}
+
+declare module "@tanstack/react-router" {
+	interface Register {
+		router: ReturnType<typeof createAppRouter>
+	}
+}

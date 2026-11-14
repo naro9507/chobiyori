@@ -1,84 +1,36 @@
-# DCS会計アプリ
+# DCS 会計
 
-個人事業主向けの確定申告用会計ソフト（Electronアプリ）
+個人事業主向けの確定申告用会計ソフト。Tauri v2（Rust）と React で作るデスクトップアプリ。
 
-## 🚀 クイックスタート
+## はじめかた
 
-### macOS / Linux
+前提ソフトは [プラットフォーム対応](./docs/PLATFORM_SUPPORT.md) を参照。
+
 ```bash
-# プロジェクトのクローン
 git clone https://github.com/naro9507/dcs-accounting-app.git
 cd dcs-accounting-app
-
-# 初期セットアップ（一発で完了）
-make setup
-
-# 開発サーバー起動
-make dev
-```
-
-### Windows
-```cmd
-# プロジェクトのクローン
-git clone https://github.com/naro9507/dcs-accounting-app.git
-cd dcs-accounting-app
-
-# Option 1: Makeを使用（推奨）
 make setup
 make dev
-
-# Option 2: npmコマンド使用
-npm install && npm run prisma:generate && npm run prisma:push
-npm run dev
 ```
 
-> **Windows注意**: Makeが必要です。詳細は [プラットフォーム対応](./docs/PLATFORM_SUPPORT.md) をご確認ください。
+## 資料
 
-## 🛠️ 技術スタック
+- [仕様書](./docs/SPEC.md)
+- [開発ガイド](./docs/DEVELOPMENT.md)
+- [プラットフォーム対応](./docs/PLATFORM_SUPPORT.md)
 
-- **フレームワーク**: Electron + React (Vite, TypeScript)
-- **UI**: React Admin + Tailwind CSS
-- **データベース**: SQLite + Prisma ORM
-- **状態管理**: Zustand
-- **暗号化**: AES-256-GCM
-- **国際化**: ローカルJSON + カスタムI18n
-- **ログ**: pino
-- **テスト**: Vitest
+## 技術スタック
 
-## 📁 プロジェクト構造
+| 役割 | 技術 |
+|---|---|
+| アプリの枠 | Tauri v2 |
+| バックエンド | Rust |
+| 画面 | React 19、Vite、TypeScript |
+| UI | Tailwind CSS v4、shadcn/ui |
+| ルーティング・データ取得 | TanStack Router / Query |
+| 状態管理 | Zustand |
+| テスト | Vitest、cargo test |
 
-```
-dcs-accounting-app/
-├── Makefile              # プロジェクト操作自動化
-├── docs/                 # ドキュメント
-├── apps/
-│   ├── main/             # Electronメインプロセス
-│   └── renderer/         # Vite + React UI
-│       └── src/          # アプリソース
-├── prisma/               # データベーススキーマ
-└── build/                # ビルド設定
-```
+## 注意
 
-## 🎯 主要機能
-
-- 📊 収入・支出の記録と管理
-- 📋 確定申告書の生成
-- 📤 データのエクスポート（CSV/PDF）
-- 🔄 バックアップ・復元
-- 🌐 多言語対応（日本語・英語）
-- 🔒 データ暗号化
-- 🚀 自動アップデート
-
-## 📚 ドキュメント
-
-- [開発ガイド](./docs/DEVELOPMENT.md) - 詳細な開発手順
-- [プラットフォーム対応](./docs/PLATFORM_SUPPORT.md) - Windows開発環境
-- [プロジェクト指針](./CLAUDE.md) - 技術的な指針
-
-## 📄 ライセンス
-
-ISC
-
-## 🙋‍♂️ サポート
-
-問題や質問がある場合は、[Issues](https://github.com/naro9507/dcs-accounting-app/issues)にお気軽にご投稿ください。
+税法に関する正確性は税理士に確認すること。
