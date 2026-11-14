@@ -1,5 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router"
 import { navGroups } from "@/app/navigation"
+import { WhatsNewBanner } from "@/features/changelog/whats-new-banner"
 import { UpdateBanner } from "@/features/updater/update-banner"
 import { useTranslations } from "@/i18n/use-translations"
 
@@ -49,6 +50,7 @@ export function AppShell() {
 				))}
 			</nav>
 			<main id="main" className="min-w-0 flex-1 overflow-y-auto">
+				<WhatsNewBanner />
 				<UpdateBanner />
 				<Outlet />
 			</main>

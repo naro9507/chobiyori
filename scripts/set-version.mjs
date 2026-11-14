@@ -3,9 +3,11 @@
 //   pnpm version:set 0.2.0
 // package.json（画面とインストーラが読む）と src-tauri/Cargo.toml（Rust が読む）を書き換え、
 // Cargo.lock を合わせる。tauri.conf.json は package.json を参照している。
+// CHANGELOG.md にその版の見出しがなければ、書きかけの見出しを足す。
 import { execFileSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { extractNotes, placeholder } from "./release-notes.mjs"
 
 const root = path.resolve(import.meta.dirname, "..")
 const version = process.argv[2]
@@ -39,5 +41,22 @@ execFileSync(
 	{ stdio: "inherit" }
 )
 
+const changelogPath = path.join(root, "CHANGELOG.md")
+const changelog = readFileSync(changelogPath, "utf8")
+if (extractNotes(changelog, version) === null) {
+	const today = new Date().toISOString().slice(0, 10)
+	const heading = `## ${version} - ${today}\n\n- ${placeholder}\n\n`
+	const firstRelease = changelog.search(/^## /m)
+	writeFileSync(
+		changelogPath,
+		firstRelease === -1
+			? `${changelog.trimEnd()}\n\n${heading}`
+			: changelog.slice(0, firstRelease) + heading + changelog.slice(firstRelease)
+	)
+	console.log(`CHANGELOG.md に ${version} の見出しを足しました。変更点を書いてください。`)
+}
+
 console.log(`バージョンを ${previous} から ${version} に変えました。`)
-console.log(`次の手順: git commit → git tag v${version} → git push --follow-tags`)
+console.log(
+	`次の手順: CHANGELOG.md に変更点を書く → git commit → git tag v${version} → git push --follow-tags`
+)
