@@ -4,14 +4,17 @@
 
 個人事業主向けの確定申告用会計ソフト（Tauriアプリ）
 
-仕様は [docs/SPEC.md](./docs/SPEC.md) を参照してください。現在のコードは Electron 構成のままで、Tauri v2 + Rust への移行は未着手です。
+仕様は [docs/SPEC.md](./docs/SPEC.md) を参照してください。現在のコードは Electron + React Admin 構成のままで、下記スタックへの移行は未着手です。
+
+技術選定の基準は「軽くて速い」「メモリを使わない」「モダンで遊び心がある」の 3 つです。
 
 ## 技術スタック
 
 - **Node.js**: v24.2.0+
 - **パッケージマネージャー**: pnpm v10.0.0+
-- **フレームワーク**: Tauri v2（バックエンドは Rust）+ React (Vite, TypeScript)
-- **UI**: React Admin + Tailwind CSS
+- **フレームワーク**: Tauri v2（バックエンドは Rust）+ React 19 (Vite, TypeScript)
+- **UI**: Tailwind CSS v4 + shadcn/ui + Motion（React Admin と MUI は使わない）
+- **ルーティング・データ取得・表**: TanStack Router / Query / Table / Virtual
 - **状態管理**: Zustand
 - **データベース**: SQLite + SQLCipher（Rust 側からアクセス）
 - **テスト**: Vitest（画面）、cargo test（Rust）
