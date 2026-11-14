@@ -6,14 +6,14 @@
 
 仕様は [docs/SPEC.md](./docs/SPEC.md) を参照してください。現在のコードは Electron + React Admin 構成のままで、下記スタックへの移行は未着手です。
 
-技術選定の基準は「軽くて速い」「メモリを使わない」「モダンで遊び心がある」の 3 つです。
+技術選定の基準は「軽くて速い」「メモリを使わない」「モダンで、作っていて楽しい」の 3 つです。製品の画面は、シンプルでわかりやすく目に優しいことを優先し、装飾や演出は入れません。
 
 ## 技術スタック
 
 - **Node.js**: v24.2.0+
 - **パッケージマネージャー**: pnpm v10.0.0+
 - **フレームワーク**: Tauri v2（バックエンドは Rust）+ React 19 (Vite, TypeScript)
-- **UI**: Tailwind CSS v4 + shadcn/ui + Motion（React Admin と MUI は使わない）
+- **UI**: Tailwind CSS v4 + shadcn/ui（React Admin と MUI は使わない）
 - **ルーティング・データ取得・表**: TanStack Router / Query / Table / Virtual
 - **状態管理**: Zustand
 - **データベース**: SQLite + SQLCipher（Rust 側からアクセス）
