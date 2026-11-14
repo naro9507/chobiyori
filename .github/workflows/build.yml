@@ -28,9 +28,6 @@ jobs:
           - name: macos-apple-silicon
             os: macos-latest
             args: "--target aarch64-apple-darwin"
-          - name: macos-intel
-            os: macos-latest
-            args: "--target x86_64-apple-darwin"
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -73,8 +70,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # macOS では Apple Silicon 用と Intel 用の両方を作る
-          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          # macOS は Apple Silicon 用だけを作る
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin' || '' }}
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
