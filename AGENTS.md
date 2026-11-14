@@ -49,6 +49,7 @@ dcs-accounting-app/
 - 会計の計算は `cargo test` で検証する。
 - 文言は `i18n/messages/ja.json` と `en.json` に同じキーで置く。画面に文言を直接書かない。
 - 色は `styles/globals.css` の CSS 変数で定義し、画面ではトークン名（`bg-card` など）を使う。
+- 依存や GitHub Actions を足すときは、`docs/DEVELOPMENT.md` の「依存の安全」に従う（公開から 7 日待つ、Actions はコミットハッシュで指定する）。
 
 ## 注意事項
 
