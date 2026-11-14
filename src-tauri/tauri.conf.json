@@ -40,6 +40,19 @@
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      },
+      "wix": {
+        "language": [
+          "ja-JP",
+          "en-US"
+        ]
+      },
+      "nsis": {
+        "languages": [
+          "Japanese",
+          "English"
+        ],
+        "displayLanguageSelector": false
       }
     }
   }

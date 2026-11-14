@@ -1,0 +1,52 @@
+# プッシュとプルリクエストのたびに、画面と Rust の検査を行う
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tauri のビルドに必要な Linux のライブラリ
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 画面のビルド（Rust のビルドで必要）
+        run: pnpm build:web
+
+      - name: 画面の検査
+        run: |
+          pnpm check
+          pnpm typecheck
+          pnpm test
+
+      - name: Rust の検査
+        run: |
+          pnpm format:rust
+          pnpm lint:rust
+          pnpm test:rust
