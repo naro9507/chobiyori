@@ -8,7 +8,29 @@
 | macOS | `.dmg`、`.app` | なし |
 | Linux | `.deb`、`.AppImage` | WebKitGTK 4.1 |
 
-インストーラは、その OS の上でビルドする必要がある。Windows 用は Windows で、macOS 用は macOS でビルドする。
+インストーラは、その OS の上でビルドする必要がある。手元に各 OS の PC がなくてもよいように、GitHub Actions で 3 つの OS の分をまとめて作る。
+
+## インストーラの作り方
+
+`.github/workflows/build.yml` が、Windows・macOS（Apple Silicon と Intel）・Linux の上でそれぞれビルドする。
+
+| 方法 | 手順 | できるもの |
+|---|---|---|
+| 試しに作る | GitHub の Actions タブで「Build installers」を選び、「Run workflow」を押す | 実行結果の Artifacts に OS ごとのインストーラが保存される |
+| 公開する | `v0.1.0` のようなタグを付けてプッシュする | Release の下書きができ、インストーラが添付される。内容を確かめてから公開する |
+
+「Run workflow」は、このファイルが既定のブランチ（main）に入ってから使える。
+
+## 署名について
+
+いまのインストーラには署名がない。そのため、初回の起動で OS が警告を出す。
+
+| OS | 起こること | 回避の方法（利用者側） | 解消するには（開発者側） |
+|---|---|---|---|
+| Windows | SmartScreen が「Windows によって PC が保護されました」と表示する | 「詳細情報」→「実行」 | コード署名証明書を購入して署名する |
+| macOS | 「開発元を検証できません」と表示し、開けない | アプリを右クリック →「開く」、またはシステム設定の「プライバシーとセキュリティ」で許可する | Apple Developer Program（年額）に登録し、署名と公証（notarization）を行う |
+
+身近な人に配るだけなら、署名なしでも上の手順で使える。広く配る場合は署名を入れる。
 
 ## 開発環境
 
