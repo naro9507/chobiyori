@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "bamboo-nova-ja-tools": {
+      "source": {
+        "source": "github",
+        "repo": "bamboo-nova/meiseki"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "meiseki@bamboo-nova-ja-tools": true
+  }
+}
