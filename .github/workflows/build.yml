@@ -35,7 +35,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Tauri のビルドに必要な Linux のライブラリ
         if: runner.os == 'Linux'
@@ -45,7 +45,7 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev
 
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm

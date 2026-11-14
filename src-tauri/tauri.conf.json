@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DCS 会計",
+  "productName": "DCS Accounting",
   "version": "0.1.0",
   "identifier": "jp.dcs.accounting",
   "build": {
@@ -43,8 +43,7 @@
       },
       "wix": {
         "language": [
-          "ja-JP",
-          "en-US"
+          "ja-JP"
         ]
       },
       "nsis": {
