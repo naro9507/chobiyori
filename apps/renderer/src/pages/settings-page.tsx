@@ -8,6 +8,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
+import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
 import { useTranslations } from "@/i18n/use-translations"
 import { type Theme, useSettingsStore } from "@/stores/settings-store"
@@ -65,6 +66,7 @@ export function SettingsPage() {
 					</RadioCards>
 				</CardContent>
 			</Card>
+			<UpdateSettings />
 		</Page>
 	)
 }

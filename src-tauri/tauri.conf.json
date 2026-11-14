@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DCS Accounting",
-  "version": "0.1.0",
+  "version": "../package.json",
   "identifier": "jp.dcs.accounting",
   "build": {
     "beforeDevCommand": "pnpm dev:web",
@@ -41,17 +41,24 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       },
-      "wix": {
-        "language": [
-          "ja-JP"
-        ]
-      },
       "nsis": {
         "languages": [
           "Japanese",
           "English"
         ],
         "displayLanguageSelector": false
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFFQzA5MDUzMzc4N0NFMjYKUldRbXpvYzNVNURBcnFsTVQ1R1lKM1AxV3Ixb3lkTTRWbHNjbTdtK0NnbWk5ZHJmN0VNOFdlY1cK",
+      "endpoints": [
+        "https://github.com/naro9507/dcs-accounting-app/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

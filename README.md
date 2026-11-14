@@ -18,6 +18,7 @@ make dev
 - [仕様書](./docs/SPEC.md)
 - [開発ガイド](./docs/DEVELOPMENT.md)
 - [プラットフォーム対応](./docs/PLATFORM_SUPPORT.md)
+- [リリースと自動アップデート](./docs/RELEASE.md)
 
 ## 技術スタック
 

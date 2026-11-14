@@ -53,5 +53,24 @@
 		"light": "ライト",
 		"dark": "ダーク",
 		"system": "OS の設定に合わせる"
+	},
+	"update": {
+		"sectionTitle": "アップデート",
+		"sectionDescription": "新しいバージョンが出ると、起動したときに画面の上部でお知らせします。",
+		"available": "新しいバージョン {version} があります",
+		"availableBody": "更新すると、アプリが再起動します。入力中の内容は先に保存してください。",
+		"install": "今すぐ更新",
+		"later": "あとで",
+		"downloading": "ダウンロードしています（{percent}%）",
+		"downloadingUnknown": "ダウンロードしています",
+		"restarting": "再起動しています",
+		"failed": "更新できませんでした。時間をおいて、もう一度お試しください。",
+		"currentVersion": "いまのバージョン: {version}",
+		"check": "更新を確認",
+		"checking": "確認しています",
+		"upToDate": "最新のバージョンです",
+		"checkFailed": "更新を確認できませんでした。インターネットの接続を確かめてください。",
+		"browserOnly": "アプリとして起動したときに確認できます。",
+		"releaseNotes": "変更点"
 	}
 }
