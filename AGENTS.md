@@ -2,17 +2,19 @@
 
 ## プロジェクト概要
 
-個人事業主向けの確定申告用会計ソフト（Electronアプリ）
+個人事業主向けの確定申告用会計ソフト（Tauriアプリ）
+
+仕様は [docs/SPEC.md](./docs/SPEC.md) を参照してください。現在のコードは Electron 構成のままで、Tauri v2 + Rust への移行は未着手です。
 
 ## 技術スタック
 
 - **Node.js**: v24.2.0+
 - **パッケージマネージャー**: pnpm v10.0.0+
-- **フレームワーク**: Electron + React (Vite, TypeScript)
+- **フレームワーク**: Tauri v2（バックエンドは Rust）+ React (Vite, TypeScript)
 - **UI**: React Admin + Tailwind CSS
 - **状態管理**: Zustand
-- **データベース**: SQLite
-- **テスト**: Vitest
+- **データベース**: SQLite + SQLCipher（Rust 側からアクセス）
+- **テスト**: Vitest（画面）、cargo test（Rust）
 
 ## 開発ガイド
 
@@ -58,4 +60,5 @@ dcs-accounting-app/
 
 - 税法に関する正確性は税理士に確認
 - 個人情報の取り扱いに注意
-- オフラインで動作すること
+- インターネット接続を前提とする（レシートの読み取りに Gemini API を使う）
+- 帳簿のデータは PC 内に保存し、外部に送らない
