@@ -5,7 +5,7 @@
 | OS | 形式 | 必要なもの |
 |---|---|---|
 | Windows 10 / 11 | インストーラ（`.exe`） | WebView2。Windows 11 には標準で入っている。Windows 10 で入っていない場合は、インストーラが自動で導入する |
-| macOS（Apple Silicon、Intel） | `.dmg` | なし |
+| macOS（Apple Silicon） | `.dmg` | なし。Intel の Mac には配布しない |
 
 Linux 向けには配布しない。Linux は開発用の環境としてだけ使う。
 
@@ -13,7 +13,7 @@ Linux 向けには配布しない。Linux は開発用の環境としてだけ�
 
 ## インストーラの作り方
 
-`.github/workflows/build.yml` が、Windows と macOS（Apple Silicon と Intel）の上でそれぞれビルドする。公開と自動アップデートの手順は [リリースと自動アップデート](./RELEASE.md) を参照。
+`.github/workflows/build.yml` が、Windows と macOS（Apple Silicon）の上でそれぞれビルドする。公開と自動アップデートの手順は [リリースと自動アップデート](./RELEASE.md) を参照。
 
 | 方法 | 手順 | できるもの |
 |---|---|---|
