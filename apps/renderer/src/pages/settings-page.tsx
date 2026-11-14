@@ -8,6 +8,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
+import { ChangelogCard } from "@/features/changelog/changelog-card"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
 import { useTranslations } from "@/i18n/use-translations"
@@ -67,6 +68,7 @@ export function SettingsPage() {
 				</CardContent>
 			</Card>
 			<UpdateSettings />
+			<ChangelogCard />
 		</Page>
 	)
 }

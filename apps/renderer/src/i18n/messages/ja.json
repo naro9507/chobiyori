@@ -71,6 +71,13 @@
 		"upToDate": "最新のバージョンです",
 		"checkFailed": "更新を確認できませんでした。インターネットの接続を確かめてください。",
 		"browserOnly": "アプリとして起動したときに確認できます。",
-		"releaseNotes": "変更点"
+		"releaseNotes": "変更点",
+		"updated": "バージョン {version} に更新しました",
+		"close": "閉じる",
+		"noNotes": "このバージョンの変更点の記載はありません。",
+		"changelogTitle": "変更履歴",
+		"changelogDescription": "これまでのバージョンと、それぞれの変更点です。",
+		"versionLabel": "バージョン {version}",
+		"currentBadge": "いまのバージョン"
 	}
 }

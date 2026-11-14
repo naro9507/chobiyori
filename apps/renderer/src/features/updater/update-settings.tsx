@@ -9,6 +9,8 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
+import { parseNotes } from "@/features/changelog/changelog"
+import { ReleaseNotes } from "@/features/changelog/release-notes"
 import { useTranslations } from "@/i18n/use-translations"
 import { isTauri } from "@/lib/tauri"
 import { progressText } from "./update-banner"
@@ -75,7 +77,7 @@ export function UpdateSettings() {
 								<p className="text-muted-foreground text-xs">
 									{t("releaseNotes")}
 								</p>
-								<p className="whitespace-pre-line text-sm">{update.body}</p>
+								<ReleaseNotes items={parseNotes(update.body)} />
 							</div>
 						)}
 						<p role="status" className="text-sm">

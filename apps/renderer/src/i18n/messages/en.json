@@ -71,6 +71,13 @@
 		"upToDate": "You have the latest version",
 		"checkFailed": "Could not check for updates. Please check your internet connection.",
 		"browserOnly": "You can check when the app itself is running.",
-		"releaseNotes": "What's new"
+		"releaseNotes": "What's new",
+		"updated": "Updated to version {version}",
+		"close": "Close",
+		"noNotes": "No notes for this version.",
+		"changelogTitle": "Release history",
+		"changelogDescription": "Past versions and what changed in each. Notes are written in Japanese.",
+		"versionLabel": "Version {version}",
+		"currentBadge": "Current version"
 	}
 }

@@ -7,12 +7,15 @@ export type Theme = "light" | "dark" | "system"
 type SettingsState = {
 	locale: Locale
 	theme: Theme
+	/** 最後に起動したときのバージョン。更新後の「変更点」の表示に使う */
+	lastSeenVersion: string | null
 	setLocale: (locale: Locale) => void
 	setTheme: (theme: Theme) => void
+	setLastSeenVersion: (version: string) => void
 }
 
 /**
- * 画面の表示設定。端末ごとの好みなので、帳簿の DB ではなく
+ * 画面の表示設定と、端末ごとの小さな記録。端末ごとの好みなので、帳簿の DB ではなく
  * WebView のストレージに保存する。読めない環境では既定値で動く。
  */
 export const useSettingsStore = create<SettingsState>()(
@@ -20,13 +23,19 @@ export const useSettingsStore = create<SettingsState>()(
 		(set) => ({
 			locale: defaultLocale,
 			theme: "system",
+			lastSeenVersion: null,
 			setLocale: (locale) => set({ locale }),
 			setTheme: (theme) => set({ theme }),
+			setLastSeenVersion: (lastSeenVersion) => set({ lastSeenVersion }),
 		}),
 		{
 			name: "dcs-settings",
 			storage: createJSONStorage(() => localStorage),
-			partialize: ({ locale, theme }) => ({ locale, theme }),
+			partialize: ({ locale, theme, lastSeenVersion }) => ({
+				locale,
+				theme,
+				lastSeenVersion,
+			}),
 		}
 	)
 )

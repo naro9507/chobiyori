@@ -32,6 +32,7 @@ function wrapper({ children }: { children: ReactNode }) {
 function fakeUpdate(version = "0.2.0") {
 	return {
 		version,
+		body: "- 仕訳を入力できるようになりました。\n- 科目の検索を速くしました。",
 		currentVersion: "0.1.0",
 		downloadAndInstall: vi.fn(async (onEvent: (event: unknown) => void) => {
 			onEvent({ event: "Started", data: { contentLength: 200 } })
@@ -76,7 +77,7 @@ describe("UpdateBanner", () => {
 		expect(container).toBeEmptyDOMElement()
 	})
 
-	it("新しいバージョンがあれば知らせ、更新すると再起動する", async () => {
+	it("新しいバージョンがあれば変更点とともに知らせ、更新すると再起動する", async () => {
 		const update = fakeUpdate()
 		mocks.check.mockResolvedValue(update)
 		const user = userEvent.setup()
@@ -85,6 +86,10 @@ describe("UpdateBanner", () => {
 		expect(
 			await screen.findByText("新しいバージョン 0.2.0 があります")
 		).toBeInTheDocument()
+		expect(
+			screen.getByText("仕訳を入力できるようになりました。")
+		).toBeInTheDocument()
+		expect(screen.getByText("科目の検索を速くしました。")).toBeInTheDocument()
 
 		await user.click(screen.getByRole("button", { name: "今すぐ更新" }))
 
