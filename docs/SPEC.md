@@ -1,4 +1,4 @@
-# 個人事業主向け会計アプリ 仕様書（ドラフト v0.7）
+# 個人事業主向け会計アプリ 仕様書（ドラフト v0.8）
 
 個人事業主が業種を問わず使える会計デスクトップアプリの仕様。出発点として、実際に運用されている Excel 帳簿 2 冊（英語教室）を読み解き、そこから汎用的な要件を抽出した。
 
@@ -440,6 +440,25 @@ Visa / Mastercard / JCB は国際ブランドであり、CSV は発行会社ご�
 
 サイドバーで年度を切替。無効にした機能のメニューは表示しない。
 
+### 4.1 画面の方針（モダンで遊び心のある画面）
+
+会計ソフトの堅さをやわらげ、記帳を続けやすくする。演出は軽く保ち、入力の速さを妨げない。
+
+- 仕訳を確定すると、行が帳簿に収まる短い動きを付ける。金額の合計は数字が流れるように変わる。
+- 貸借が一致したとき、月を締めたとき、決算が終わったときに、控えめな演出（紙吹雪など）を出す。
+- ホームに「今月の記帳はあと 3 件」のように進み具合を示す。受信箱が空になったら、そのことを祝う表示を出す。
+- すべての操作をキーボードだけで行える。Ctrl+K のコマンドパレットから、画面の移動・仕訳の追加・検索を呼び出せる。
+- ライト / ダークの切り替えと、アクセントカラーの選択を用意する。
+- 空の画面には、次に何をすればよいかを短い文とイラストで示す。
+- エラーや警告の文面は、責める調子にせず、直し方を先に書く。
+
+演出には次の制約を設ける。
+
+- 1 つの動きは 0.3 秒以内に終える。入力中のキー操作を待たせない。
+- 設定で演出をオフにできる。OS の「視覚効果を減らす」設定にも従う。
+- 動きは CSS の transform と opacity を中心に作り、低スペックの PC でもコマ落ちしないようにする。
+- 金額や残高など、判断に使う数字の表示を演出で遅らせない。
+
 ---
 
 ## 5. データモデル（SQLite）
@@ -512,15 +531,34 @@ Visa / Mastercard / JCB は国際ブランドであり、CSV は発行会社ご�
 
 ### 7.1 技術構成
 
-Electron をやめ、Tauri v2 に移行する。バックエンドは Rust で書き、画面は現行の React を引き継ぐ。
+Electron をやめ、Tauri v2 に移行する。バックエンドは Rust で書く。画面は React を使い続けるが、重い React Admin と MUI は外す。選定の基準は「軽くて速いこと」「メモリを使わないこと」「モダンで遊び心のある画面を作れること」の 3 つ。
 
 | 層 | 採用技術 | 役割 |
 |---|---|---|
 | シェル | Tauri v2 | ウィンドウ、ファイルダイアログ、自動更新、インストーラ |
 | バックエンド | Rust | DB アクセス、会計の計算、取込・出力、Gemini API の呼び出し |
-| 画面 | React + Vite + TypeScript、React Admin、Tailwind CSS、Zustand | 入力と表示だけを担う |
+| 画面 | React 19 + Vite + TypeScript | 入力と表示だけを担う。ライブラリは下の表を参照 |
 | 画面とバックエンドの接続 | Tauri コマンド（`invoke`） | 型は Rust から TypeScript へ自動生成する |
 | DB | SQLite + SQLCipher（`rusqlite`） | マイグレーションは SQL ファイルで管理する |
+
+画面側のライブラリは次のとおり。部品は「必要なものだけコードとして取り込む」方式を選び、配布サイズとメモリを抑える。
+
+| 用途 | 採用 | 補足 |
+|---|---|---|
+| スタイル | Tailwind CSS v4 | CSS-in-JS（Emotion）は使わない |
+| UI 部品 | shadcn/ui | 使う部品だけをプロジェクトに取り込む。MUI は使わない |
+| アイコン | lucide-react | 使うアイコンだけがビルドに含まれる |
+| 画面遷移 | TanStack Router | 型の付いたルーティング |
+| バックエンド呼び出しとキャッシュ | TanStack Query | Tauri コマンドの結果を保持し、更新後に再取得する |
+| 表 | TanStack Table + TanStack Virtual | 見えている行だけを描画する（仕訳グリッド、元帳、受信箱） |
+| フォーム | React Hook Form + Zod | 入力の検証 |
+| 状態管理 | Zustand | 画面をまたぐ少量の状態だけに使う |
+| アニメーション | Motion | 遊び心のある動き（4.1 を参照） |
+| コマンドパレット | cmdk | キーボード操作の入口 |
+| 再描画の削減 | React Compiler | 手書きのメモ化を減らす |
+| 整形・検査 | Biome | 現行を引き継ぐ |
+
+外す依存は `react-admin`、`@mui/material`、`@mui/icons-material`、`@emotion/react`、`@emotion/styled`、`react-router-dom`。
 
 Rust 側で使う主なライブラリの候補は次のとおり。採用前に、日本語と Windows での動作を検証する。
 
@@ -547,7 +585,7 @@ dcs-accounting-app/
 │   │   ├── export/           # CSV・Excel・PDF 出力
 │   │   └── receipt/          # Gemini API 呼び出し、結果の検算
 │   └── tauri.conf.json
-└── apps/renderer/            # React（現行を引き継ぐ）
+└── apps/renderer/            # React
     └── src/features/         # 機能別の画面
 ```
 
@@ -559,6 +597,7 @@ dcs-accounting-app/
   - `electron`、`electron-builder`、`electron-updater`
   - `better-sqlite3`、`@journeyapps/sqlcipher`
   - `prisma`、`@prisma/client`
+- `pages/admin`（React Admin の画面）は廃止し、shadcn/ui と TanStack Table で作り直す。
 - 画面側の `*.service.ts` にある DB 操作とビジネスロジックを Rust に移す。画面側には、コマンドを呼ぶ薄い層と表示用の型だけを残す。
 - `features/income`（単式の収入記録）は `features/journal` に統合し、かんたん入力の 1 モードとして残す。
 - 画面側には次の feature を置く。
