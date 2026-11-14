@@ -1,48 +1,57 @@
 {
-	"common": {
-		"cancel": "Cancel",
-		"save": "Save",
-		"delete": "Delete",
-		"edit": "Edit",
-		"add": "Add",
-		"close": "Close",
-		"loading": "Loading...",
-		"error": "An error occurred",
-		"success": "Completed successfully"
-	},
 	"app": {
-		"title": "Tax Filing Accounting Software",
-		"description": "Accounting software for sole proprietors"
+		"name": "DCS Books",
+		"skipToContent": "Skip to content",
+		"fiscalYear": "FY {year}"
 	},
-	"navigation": {
-		"dashboard": "Dashboard",
-		"income": "Income",
-		"expense": "Expense",
-		"tax": "Tax Filing",
-		"export": "Export",
-		"settings": "Settings"
+	"nav": {
+		"label": "Main menu",
+		"home": "Home",
+		"transactions": "Transactions",
+		"inbox": "Inbox",
+		"ledgers": "Ledgers",
+		"reports": "Reports",
+		"receivables": "Receivables",
+		"closing": "Year-end closing",
+		"master": "Master data",
+		"data": "Import / Export",
+		"settings": "Settings",
+		"help": "Help"
 	},
-	"income": {
-		"title": "Income Management",
-		"add": "Add Income",
-		"date": "Date",
-		"amount": "Amount",
-		"description": "Description",
-		"category": "Category"
+	"descriptions": {
+		"home": "See this month's figures and what to do next.",
+		"transactions": "Record sales and payments. Switch between simple entry and the journal grid.",
+		"inbox": "Review and confirm entries suggested from receipt photos and card statements.",
+		"ledgers": "View the journal, general ledger, cash book and bank book.",
+		"reports": "View the trial balance, monthly trends and totals by partner.",
+		"receivables": "Manage recurring sales such as tuition and membership fees, and their payments.",
+		"closing": "Record depreciation and closing adjustments, and get the figures for your blue tax return.",
+		"master": "Manage accounts, descriptions, partners and business-use split rules.",
+		"data": "Import and export CSV or Excel files, and back up or restore your books.",
+		"settings": "Change the display language and color theme.",
+		"help": "How to use the app and what the accounting terms mean, for first-time users."
 	},
-	"expense": {
-		"title": "Expense Management",
-		"add": "Add Expense",
-		"date": "Date",
-		"amount": "Amount",
-		"description": "Description",
-		"category": "Category"
+	"placeholder": {
+		"title": "This screen is not ready yet",
+		"body": "When it is finished, you will be able to work here."
+	},
+	"home": {
+		"welcome": "Welcome",
+		"welcomeBody": "Your books are empty. The setup and transaction screens are being built next.",
+		"status": "App status",
+		"connected": "Connected to the backend",
+		"version": "Version {version}",
+		"checking": "Checking the connection",
+		"browserOnly": "Only the screens are open in a browser. Bookkeeping features work when you start the app itself.",
+		"connectionError": "Could not connect to the backend. Please restart the app."
 	},
 	"settings": {
-		"title": "Settings",
-		"language": "Language",
-		"theme": "Theme",
-		"backup": "Backup",
-		"restore": "Restore"
+		"language": "Display language",
+		"languageDescription": "Changes the words on menus and buttons. Account names are shown as registered in master data.",
+		"theme": "Color theme",
+		"themeDescription": "Choose the colors that are easiest on your eyes.",
+		"light": "Light",
+		"dark": "Dark",
+		"system": "Match the OS setting"
 	}
 }

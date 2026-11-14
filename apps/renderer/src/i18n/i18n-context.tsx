@@ -1,7 +1,7 @@
-import { createContext, useMemo } from "react"
 import type { ReactNode } from "react"
-import { defaultLocale, getMessages, isLocale } from "./i18n"
+import { createContext, useMemo } from "react"
 import type { Locale, Messages } from "./i18n"
+import { defaultLocale, getMessages, isLocale } from "./i18n"
 
 type I18nContextValue = {
 	locale: Locale

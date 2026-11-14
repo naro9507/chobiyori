@@ -1,157 +1,72 @@
 {
   "name": "dcs-accounting-app",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "main": "apps/main/main.js",
-  "workspaces": ["apps/*", "packages/*"],
-  "scripts": {
-    "dev": "nx run-many -t dev --projects=renderer,main --parallel=2",
-    "web-dev": "nx run renderer:dev",
-    "electron-dev": "nx run main:dev",
-    "build": "nx run renderer:build && pnpm run prisma:generate",
-    "build:web": "nx run renderer:build",
-    "build:electron": "nx run main:build",
-    "build:prod": "pnpm run build && pnpm run build:electron",
-    "dist": "pnpm run build:prod",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio",
-    "test": "nx run renderer:test",
-    "lint": "nx run renderer:lint",
-    "lint:fix": "biome lint --write ./apps/renderer/src",
-    "format": "nx run renderer:format",
-    "format:fix": "biome format --write ./apps/renderer/src",
-    "check": "biome check ./apps/renderer/src",
-    "check:fix": "biome check --write ./apps/renderer/src",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky",
-    "nx": "nx",
-    "release": "nx release"
-  },
+  "description": "個人事業主向けの確定申告用会計ソフト",
+  "license": "ISC",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/naro9507/dcs-accounting-app.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/naro9507/dcs-accounting-app/issues"
-  },
-  "homepage": "https://github.com/naro9507/dcs-accounting-app#readme",
-  "description": "",
   "engines": {
-    "node": ">=24.2.0",
+    "node": ">=22.12.0",
     "pnpm": ">=10.0.0"
   },
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:web": "vite --config apps/renderer/vite.config.ts",
+    "build": "tauri build",
+    "build:web": "vite build --config apps/renderer/vite.config.ts",
+    "tauri": "tauri",
+    "test": "vitest run --config apps/renderer/vite.config.ts",
+    "test:watch": "vitest --config apps/renderer/vite.config.ts",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "lint": "biome lint apps/renderer/src",
+    "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "format": "biome format apps/renderer/src",
+    "format:fix": "biome format --write apps/renderer/src",
+    "format:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+    "check": "biome check apps/renderer/src",
+    "check:fix": "biome check --write apps/renderer/src",
+    "typecheck": "tsc --noEmit -p apps/renderer && tsc --noEmit -p apps/renderer/tsconfig.node.json",
+    "prepare": "husky"
+  },
   "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@journeyapps/sqlcipher": "^5.3.1",
-    "@mui/icons-material": "^7.3.6",
-    "@mui/material": "^7.3.6",
-    "@prisma/client": "^7.2.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.0.3",
-    "@types/react": "^19.2.7",
-    "@types/uuid": "^11.0.0",
-    "better-sqlite3": "^12.5.0",
-    "dotenv": "^17.2.3",
-    "electron-updater": "^6.6.2",
-    "pino": "^10.1.0",
-    "pino-pretty": "^13.1.3",
-    "prisma": "^7.2.0",
-    "react": "^19.2.3",
-    "react-admin": "^5.13.4",
-    "react-dom": "^19.2.3",
-    "react-router-dom": "^7.11.0",
-    "sqlite3": "^5.1.7",
-    "typescript": "^5.9.3",
-    "uuid": "^13.0.0",
-    "zustand": "^5.0.9"
+    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-router": "^1.170.46",
+    "@tauri-apps/api": "^2.12.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.73.0",
+    "radix-ui": "^1.8.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.10",
-    "@tailwindcss/postcss": "^4.1.18",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.1",
-    "@vitejs/plugin-react": "^5.1.2",
-    "autoprefixer": "^10.4.23",
-    "concurrently": "^9.2.1",
-    "electron": "^39.2.7",
-    "electron-builder": "^26.0.12",
+    "@babel/core": "^8.1.2",
+    "@biomejs/biome": "^2.6.7",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@rolldown/plugin-babel": "^0.3.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@tauri-apps/cli": "^2.12.4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.10",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "babel-plugin-react-compiler": "^1.0.0",
     "husky": "^9.1.7",
-    "jsdom": "^27.4.0",
-    "nx": "^22.3.3",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
-    "vitest": "^4.0.16",
-    "wait-on": "^9.0.3"
-  },
-  "build": {
-    "appId": "com.example.dcs-accounting-app",
-    "productName": "DCS会計アプリ",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "apps/renderer/dist/**/*",
-      "apps/main/**/*",
-      "node_modules/@prisma/client/**/*",
-      "node_modules/.prisma/**/*",
-      "prisma/schema.prisma",
-      ".env.production",
-      "!node_modules/.cache",
-      "!**/*.map",
-      "!src",
-      "!electron.ts"
-    ],
-    "extraResources": [
-      {
-        "from": "prisma/schema.prisma",
-        "to": "prisma/schema.prisma"
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.finance",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ]
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "naro9507",
-      "repo": "dcs-accounting-app"
-    }
+    "jsdom": "^31.0.1",
+    "tailwindcss": "^4.3.5",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   }
 }

@@ -1,5 +1,5 @@
-import ja from "./messages/ja.json"
 import en from "./messages/en.json"
+import ja from "./messages/ja.json"
 
 export const locales = ["ja", "en"] as const
 export type Locale = (typeof locales)[number]

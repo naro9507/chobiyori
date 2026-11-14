@@ -1,338 +1,100 @@
 # 開発ガイド
 
-## 📋 利用可能なコマンド
+## 構成
 
-### 基本コマンド
+画面は React、バックエンドは Rust で書き、Tauri v2 で 1 つのデスクトップアプリにまとめる。
 
-```bash
-make help          # ヘルプ表示
-make setup         # 初期セットアップ
-make dev           # 開発サーバー起動
-make build         # ビルド
-make dist          # 配布パッケージ作成
-make clean         # クリーンアップ
-```
+| 層 | 場所 | 技術 |
+|---|---|---|
+| 画面 | `apps/renderer/` | React 19、Vite、TypeScript、Tailwind CSS v4、shadcn/ui、TanStack Router / Query、Zustand |
+| バックエンド | `src-tauri/` | Rust、Tauri v2 |
+| 画面とバックエンドの接続 | `apps/renderer/src/lib/tauri.ts` | Tauri コマンド（`invoke`） |
 
-### 開発コマンド
+DB アクセス・会計の計算・取込や出力は、すべて Rust 側に置く。画面側は入力と表示だけを担う。
 
-```bash
-make test          # テスト実行
-make lint          # リント実行
-make format        # コードフォーマット
-make typecheck     # 型チェック
-make check         # コード品質チェック（全て）
-```
+## 必要なもの
 
-### データベース
+- Node.js 22.12 以上（`.node-version` は 24 系）
+- pnpm 10 以上
+- Rust（stable）
+- OS ごとの Tauri の前提ソフト（[プラットフォーム対応](./PLATFORM_SUPPORT.md) を参照）
+
+## はじめかた
 
 ```bash
-make prisma-studio # データベース管理UI
-make prisma-setup  # Prismaセットアップ
-make prisma-reset  # データベースリセット
+make setup   # 依存のインストールと Git hooks の有効化
+make dev     # アプリを起動
 ```
 
-### Git Hooks
+初回の `make dev` は Rust のビルドに数分かかる。2 回目からは差分だけをビルドする。
 
-```bash
-make hooks-install # Git hooksをインストール
-make hooks-test    # Git hooksをテスト実行
-make hooks-skip    # 次回のGit操作でhooksをスキップ
-```
+## コマンド
 
-### その他
+| コマンド | 内容 |
+|---|---|
+| `make dev` | アプリを起動する。画面の変更はすぐ反映され、Rust の変更は再ビルドされる |
+| `make dev-web` | 画面だけをブラウザで開く。Rust のコマンドは呼べない |
+| `make build` | 配布用のインストーラを作る（`src-tauri/target/release/bundle/`） |
+| `make test` | 画面（Vitest）と Rust（cargo test）のテスト |
+| `make lint` | Biome と Clippy |
+| `make format` | Biome と rustfmt で整形する |
+| `make typecheck` | TypeScript の型チェック |
+| `make check` | プッシュ前と同じ検査をまとめて行う |
 
-```bash
-make info          # システム情報表示
-make release-ready # リリース準備
-make clean-all     # 完全クリーンアップ
-```
+`pnpm` のスクリプトを直接使ってもよい（`package.json` を参照）。
 
-## 🔧 開発セットアップ
+## ディレクトリ
 
-### 1. 依存関係
-
-- **Node.js**: v24.2.0以上
-- **pnpm**: v10.0.0以上
-- **Make** (Windows: [Chocolatey](https://chocolatey.org/)推奨)
-
-### 2. OS別セットアップ
-
-#### macOS / Linux
-
-```bash
-make setup
-make dev
-```
-
-#### Windows
-
-**重要**: WSL2必須（ネイティブWindows非対応）
-
-```cmd
-# Makeがある場合
-make setup
-make dev
-
-# Makeがない場合
-pnpm install
-pnpm run prisma:generate  
-pnpm run prisma:push
-pnpm run dev
-```
-
-### Node.jsバージョン管理
-
-```bash
-# miseを使用してNode.jsバージョンを固定（推奨）
-mise install     # .node-versionファイルに基づいてバージョンをインストール
-mise use         # バージョンを切り替え
-
-# nvmでも利用可能
-nvm use          # .node-versionファイルに基づいてバージョンを切り替え
-nvm install      # 必要なバージョンをインストール
-```
-
-詳細: [PLATFORM_SUPPORT.md](./PLATFORM_SUPPORT.md)
-
-## 📦 ビルド・配布
-
-### 開発ビルド
-
-```bash
-make build
-```
-
-### 配布パッケージ作成
-
-```bash
-make dist
-```
-
-作成されるパッケージ:
-
-- **macOS**: DMG, ZIP
-- **Windows**: NSIS installer, Portable
-- **Linux**: AppImage, DEB
-
-## 🗄️ データベース
-
-### 開発環境
-
-- ファイル: `./dev.db`
-- 管理: `make prisma-studio`
-
-### 本番環境
-
-- 場所: ユーザーデータディレクトリ
-- 暗号化: AES-256-GCM
-
-## 🚢 デプロイ
-
-### 自動更新
-
-- GitHub Releasesを使用
-- electron-updaterで自動更新
-- 本番環境でのみ有効
-
-### 環境変数
-
-- `.env.development`: 開発環境用設定
-- `.env.production`: 本番環境用設定
-- データベースパスは実行時に動的決定
-
-## 🤝 開発ガイド
-
-### コード品質
-
-```bash
-make check    # リント・フォーマット・型チェック
-```
-
-### テスト
-
-```bash
-make test            # 単発実行
-make test-watch      # ウォッチモード
-```
-
-### データベース操作
-
-```bash
-make prisma-studio   # 管理UI起動
-make prisma-reset    # データリセット
-```
-
-## 🏗️ プロジェクト構造
-
-```
+```text
 dcs-accounting-app/
-├── Makefile              # プロジェクト操作自動化
-├── docs/                 # ドキュメント
-├── apps/
-│   ├── main/             # Electronメインプロセス
-│   └── renderer/         # Vite + React UI
-│       └── src/          # アプリソース
-├── prisma/               # データベーススキーマ
-└── build/                # ビルド設定
+├── apps/renderer/              # 画面（React）
+│   ├── public/                 # そのまま配信するファイル
+│   └── src/
+│       ├── app/                # ルーティング、全体の Provider、メニューの定義
+│       ├── components/
+│       │   ├── layout/         # サイドメニューと画面の枠
+│       │   └── ui/             # shadcn/ui の部品
+│       ├── features/           # 機能ごとの Rust 呼び出しとフック
+│       ├── i18n/               # 日本語・英語の文言
+│       ├── lib/                # 共通の関数
+│       ├── pages/              # 画面
+│       ├── stores/             # 画面の状態（Zustand）
+│       └── styles/             # 配色とフォント
+├── src-tauri/                  # バックエンド（Rust）
+│   ├── src/
+│   │   ├── commands/           # 画面から呼ぶコマンド
+│   │   ├── lib.rs              # アプリの組み立て
+│   │   └── main.rs
+│   ├── capabilities/           # 画面に許可する操作
+│   ├── icons/                  # アプリのアイコン
+│   └── tauri.conf.json
+└── docs/                       # 仕様と開発資料
 ```
 
-## 🛠️ 技術スタック
+## 画面を足すとき
 
-- **フレームワーク**: Electron + React (Vite, TypeScript)
-- **UI**: React Admin + Tailwind CSS
-- **データベース**: SQLite
-- **状態管理**: Zustand
-- **暗号化**: AES-256-GCM
-- **国際化**: ローカルJSON + カスタムI18n
-- **ログ**: pino
-- **テスト**: Vitest
+1. `apps/renderer/src/pages/` に画面のコンポーネントを作る。
+2. `apps/renderer/src/app/router.tsx` の `screens` に登録する。登録していない画面は「準備中」と表示される。
+3. 新しいメニュー項目なら `apps/renderer/src/app/navigation.ts` に足し、`i18n/messages/ja.json` と `en.json` の `nav` と `descriptions` に文言を足す。
 
-## 📝 アーキテクチャ
+文言は日本語と英語で同じキーを持つ必要がある。そろっていないとテストが失敗する。
 
-### シンプルな機能別構成
+## Rust のコマンドを足すとき
 
-#### Feature-Based Architecture
+1. `src-tauri/src/commands/` にモジュールを作り、関数に `#[tauri::command]` を付ける。
+2. `src-tauri/src/lib.rs` の `generate_handler!` に登録する。
+3. 画面側は `apps/renderer/src/features/<機能>/` に、`callCommand` で呼ぶ関数と TanStack Query のフックを置く。
+4. 返す型は Rust 側で `#[serde(rename_all = "camelCase")]` を付け、TypeScript の型と名前をそろえる。
 
-```
-apps/renderer/src/features/[feature]/
-├── [feature].model.ts    # データ型定義・バリデーション
-├── [feature].service.ts  # ビジネスロジック・API操作
-└── hooks/
-    └── use-[feature].ts  # React カスタムフック
-```
+計算や検証のロジックは `cargo test` でテストする。
 
-#### 役割
+## UI 部品
 
-- **Model**: データの形や検証ルール
-- **Service**: データの保存・取得・更新・削除
-- **Hooks**: React での状態管理とサービス呼び出し
-- **Components**: UI コンポーネント（ページ固有）
+shadcn/ui の部品は `apps/renderer/src/components/ui/` に置き、自分たちのコードとして編集してよい。
+この環境では shadcn の CLI がレジストリに接続できないため、部品は手で追加している。手元で CLI が使える場合は `npx shadcn@latest add <部品>` でもよい。
 
-### Compound Pattern コンポーネント
+配色は `apps/renderer/src/styles/globals.css` の CSS 変数だけで決める。画面では `bg-card`・`text-muted-foreground` のようなトークン名を使い、色の値を直接書かない。
 
-```
-apps/renderer/src/shared/components/
-├── form/                 # フォーム関連（Compound Pattern）
-├── data-list/            # データ表示（Compound Pattern）
-└── index.ts              # エクスポート
-```
+## Git hooks
 
-- **構造化**された構成のため視覚的に意図がわかりやすくなるため採用
-- **再利用可能**なコンポーネント設計
-- **shared/components**で共通化
-
-### 設計の利点
-
-- **学習コストが低い**: 複雑な概念を排除
-- **ファイル数が少ない**: 迷わない構成
-- **役割が明確**: 何をどこに書くかが分かりやすい
-
-## 🪝 Git Hooks
-
-### 自動品質チェック
-
-**Pre-push Hook（プッシュ時）:**
-- 全ファイルのリントチェック
-- TypeScript型チェック
-- テスト実行
-
-### Hooks管理
-
-```bash
-# Git hooksのテスト実行
-make hooks-test
-
-# 緊急時：hooks無効化でプッシュ
-git push --no-verify
-```
-
-## 💻 開発フロー
-
-### 1. 機能追加
-
-```bash
-# 新機能ブランチ作成
-git checkout -b feature/new-feature
-
-# 開発開始
-make dev
-
-# コード品質チェック（任意）
-make check
-
-# テスト実行（任意）
-make test
-```
-
-### 2. コミット・プッシュ
-
-```bash
-# ファイルをステージング
-git add .
-
-# コミット
-git commit -m "feat: 新機能追加"
-
-# プッシュ（pre-pushフックが自動実行）
-git push origin feature/new-feature
-```
-
-> **Note**: プッシュ時にGit hooksにより、品質チェックとテストが自動実行されます
-
-### 3. リリース準備
-
-```bash
-# リリース準備（テスト・ビルド・パッケージ）
-make release-ready
-```
-
-## 🔍 デバッグ
-
-### 開発ツール
-
-- **VS Code, Cursor**: 推奨エディタ
-- **Electron DevTools**: 自動で開く（開発モード）
-- **Prisma Studio**: `make prisma-studio`
-
-### ログ確認
-
-- **開発**: コンソールに pretty print
-- **本番**: 構造化JSON形式
-
-## 🚨 トラブルシューティング
-
-### よくある問題
-
-1. **Prismaエラー**: `make prisma-reset`
-2. **依存関係エラー**: `make clean-all && make setup`
-3. **ビルドエラー**: `make clean && make build`
-
-### Windowsでの問題
-
-詳細は [PLATFORM_SUPPORT.md](./PLATFORM_SUPPORT.md) を参照
-
-## 📄 関連ドキュメント
-
-- [PLATFORM_SUPPORT.md](./PLATFORM_SUPPORT.md) - Windows開発対応
-- [AGENTS.md](../AGENTS.md) - プロジェクト概要・指針
-- [README.md](../README.md) - 基本情報
-
-## 🔐 セキュリティ
-
-### データ暗号化
-
-- **ファイル暗号化**: Node.js crypto モジュール（AES-256-GCM）
-- **データベース**: better-sqlite3 + アプリケーションレベル暗号化
-- **キー管理**: 自動生成・安全保存
-- **暗号化対象**: 機密データ（description, notes など）
-- **機能**:
-  - 暗号化データの挿入・取得（`insertEncryptedData`, `getEncryptedData`）
-  - ファイル暗号化・復号化
-  - パスワードハッシュ化・検証
-  - セキュア一時ファイル作成
-
-### セキュリティベストプラクティス
-
-- 個人情報は絶対にハードコードしない
-- 秘密鍵やAPIキーの露出・ログ出力を避ける
-- リポジトリへの秘密鍵やキーのコミットを防ぐ
+`git push` の前に `.husky/pre-push` が、Biome・型チェック・Vitest・rustfmt・Clippy・cargo test を実行する。
