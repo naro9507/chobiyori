@@ -23,6 +23,7 @@ pub fn run() {
         // 保存先と取り込むファイルを選ぶ画面。Rust 側からだけ開く
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::import::ImportState::default())
+        .manage(commands::inbox::StatementState::default())
         .setup(|app| {
             // 自動アップデート。更新の確認と適用は画面側から行う
             #[cfg(desktop)]
@@ -84,7 +85,24 @@ pub fn run() {
             commands::templates::skipped_template_months,
             commands::templates::post_template,
             commands::templates::skip_template_month,
-            commands::templates::unskip_template_month
+            commands::templates::unskip_template_month,
+            commands::inbox::list_import_formats,
+            commands::inbox::save_import_format,
+            commands::inbox::delete_import_format,
+            commands::inbox::export_import_format,
+            commands::inbox::open_import_format_file,
+            commands::inbox::open_statement,
+            commands::inbox::preview_statement,
+            commands::inbox::import_statement,
+            commands::inbox::list_inbox,
+            commands::inbox::inbox_pending_count,
+            commands::inbox::confirm_inbox_item,
+            commands::inbox::confirm_inbox_items,
+            commands::inbox::set_inbox_ignored,
+            commands::inbox::delete_inbox_items,
+            commands::inbox::list_rules,
+            commands::inbox::save_rule,
+            commands::inbox::delete_rule
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");

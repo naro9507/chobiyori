@@ -6,8 +6,11 @@
 pub mod accounts;
 pub mod allocation_rules;
 pub mod books;
+pub mod formats;
+pub mod inbox;
 pub mod partners;
 pub mod reports;
+pub mod rules;
 pub mod setup;
 pub mod sub_accounts;
 pub mod templates;
@@ -24,6 +27,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_journal.sql"),
     include_str!("migrations/0003_templates.sql"),
+    include_str!("migrations/0004_inbox.sql"),
 ];
 
 pub struct Database {
