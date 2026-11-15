@@ -29,8 +29,6 @@ export default defineConfig({
 		host: devHost || false,
 		hmr: devHost ? { protocol: "ws", host: devHost, port: 5174 } : undefined,
 		watch: { ignored: ["**/src-tauri/**"] },
-		// リポジトリ直下の CHANGELOG.md を画面に同梱するため
-		fs: { allow: [path.resolve(import.meta.dirname, "../..")] },
 	},
 	envPrefix: ["VITE_", "TAURI_ENV_"],
 	build: {

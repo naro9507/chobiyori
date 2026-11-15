@@ -24,18 +24,19 @@
 
 ```
 dcs-accounting-app/
-├── apps/renderer/              # 画面（React + Vite）
-│   └── src/
-│       ├── app/                # ルーティング、Provider、メニュー定義
-│       ├── components/
-│       │   ├── layout/         # サイドメニューと画面の枠
-│       │   └── ui/             # shadcn/ui の部品
-│       ├── features/           # 機能ごとの Rust 呼び出しとフック
-│       ├── i18n/               # 日本語・英語の文言
-│       ├── lib/                # 共通の関数（Tauri 呼び出しなど）
-│       ├── pages/              # 画面
-│       ├── stores/             # 画面の状態（Zustand）
-│       └── styles/             # 配色とフォント
+├── src/                        # 画面（React + Vite）
+│   ├── app/                    # ルーティング、Provider、メニュー定義
+│   ├── components/
+│   │   ├── layout/             # サイドメニューと画面の枠
+│   │   └── ui/                 # shadcn/ui の部品
+│   ├── features/               # 機能ごとの Rust 呼び出しとフック
+│   ├── i18n/                   # 日本語・英語の文言
+│   ├── lib/                    # 共通の関数（Tauri 呼び出しなど）
+│   ├── pages/                  # 画面
+│   ├── stores/                 # 画面の状態（Zustand）
+│   └── styles/                 # 配色とフォント
+├── public/                     # そのまま配信するファイル
+├── index.html・vite.config.ts  # 画面の入口とビルドの設定
 ├── src-tauri/                  # バックエンド（Rust + Tauri）
 │   ├── src/commands/           # 画面から呼ぶコマンド
 │   ├── src/db/                 # スキーマ（migrations/）とマスタの読み書き

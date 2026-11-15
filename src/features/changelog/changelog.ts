@@ -1,4 +1,4 @@
-import changelogText from "../../../../../CHANGELOG.md?raw"
+import changelogText from "../../../CHANGELOG.md?raw"
 
 /** 1 つのバージョンの変更点。 */
 export type Release = {

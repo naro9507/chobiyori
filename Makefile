@@ -50,5 +50,5 @@ typecheck: ## 型チェック
 	pnpm typecheck
 
 clean: ## ビルド成果物を消す
-	rm -rf apps/renderer/dist
+	rm -rf dist
 	cargo clean --manifest-path src-tauri/Cargo.toml

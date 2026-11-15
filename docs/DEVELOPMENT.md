@@ -6,9 +6,9 @@
 
 | 層 | 場所 | 技術 |
 |---|---|---|
-| 画面 | `apps/renderer/` | React 19、Vite、TypeScript、Tailwind CSS v4、shadcn/ui、TanStack Router / Query、Zustand |
+| 画面 | リポジトリ直下（`src/`・`index.html`・`vite.config.ts`） | React 19、Vite、TypeScript、Tailwind CSS v4、shadcn/ui、TanStack Router / Query、Zustand |
 | バックエンド | `src-tauri/` | Rust、Tauri v2 |
-| 画面とバックエンドの接続 | `apps/renderer/src/lib/tauri.ts` | Tauri コマンド（`invoke`） |
+| 画面とバックエンドの接続 | `src/lib/tauri.ts` | Tauri コマンド（`invoke`） |
 
 DB アクセス・会計の計算・取込や出力は、すべて Rust 側に置く。画面側は入力と表示だけを担う。
 
@@ -45,21 +45,24 @@ make dev     # アプリを起動
 
 ## ディレクトリ
 
+Tauri の標準の構成（`npm create tauri-app` で作られる形）に合わせ、画面はリポジトリ直下に、Rust は `src-tauri/` に置く。
+
 ```text
 dcs-accounting-app/
-├── apps/renderer/              # 画面（React）
-│   ├── public/                 # そのまま配信するファイル
-│   └── src/
-│       ├── app/                # ルーティング、全体の Provider、メニューの定義
-│       ├── components/
-│       │   ├── layout/         # サイドメニューと画面の枠
-│       │   └── ui/             # shadcn/ui の部品
-│       ├── features/           # 機能ごとの Rust 呼び出しとフック
-│       ├── i18n/               # 日本語・英語の文言
-│       ├── lib/                # 共通の関数
-│       ├── pages/              # 画面
-│       ├── stores/             # 画面の状態（Zustand）
-│       └── styles/             # 配色とフォント
+├── src/                        # 画面（React）
+│   ├── app/                    # ルーティング、全体の Provider、メニューの定義
+│   ├── components/
+│   │   ├── layout/             # サイドメニューと画面の枠
+│   │   └── ui/                 # shadcn/ui の部品
+│   ├── features/               # 機能ごとの Rust 呼び出しとフック
+│   ├── i18n/                   # 日本語・英語の文言
+│   ├── lib/                    # 共通の関数
+│   ├── pages/                  # 画面
+│   ├── stores/                 # 画面の状態（Zustand）
+│   └── styles/                 # 配色とフォント
+├── public/                     # そのまま配信するファイル
+├── index.html                  # 画面の入口
+├── vite.config.ts              # 画面のビルドとテストの設定
 ├── src-tauri/                  # バックエンド（Rust）
 │   ├── src/
 │   │   ├── commands/           # 画面から呼ぶコマンド
@@ -76,9 +79,9 @@ dcs-accounting-app/
 
 ## 画面を足すとき
 
-1. `apps/renderer/src/pages/` に画面のコンポーネントを作る。
-2. `apps/renderer/src/app/router.tsx` の `screens` に登録する。登録していない画面は「準備中」と表示される。
-3. 新しいメニュー項目なら `apps/renderer/src/app/navigation.ts` に足し、`i18n/messages/ja.json` と `en.json` の `nav` と `descriptions` に文言を足す。
+1. `src/pages/` に画面のコンポーネントを作る。
+2. `src/app/router.tsx` の `screens` に登録する。登録していない画面は「準備中」と表示される。
+3. 新しいメニュー項目なら `src/app/navigation.ts` に足し、`i18n/messages/ja.json` と `en.json` の `nav` と `descriptions` に文言を足す。
 
 文言は日本語と英語で同じキーを持つ必要がある。そろっていないとテストが失敗する。
 
@@ -86,7 +89,7 @@ dcs-accounting-app/
 
 1. `src-tauri/src/commands/` にモジュールを作り、関数に `#[tauri::command]` を付ける。
 2. `src-tauri/src/lib.rs` の `generate_handler!` に登録する。
-3. 画面側は `apps/renderer/src/features/<機能>/` に、`callCommand` で呼ぶ関数と TanStack Query のフックを置く。
+3. 画面側は `src/features/<機能>/` に、`callCommand` で呼ぶ関数と TanStack Query のフックを置く。
 4. 返す型は Rust 側で `#[serde(rename_all = "camelCase")]` を付け、TypeScript の型と名前をそろえる。
 
 計算や検証のロジックは `cargo test` でテストする。
@@ -109,10 +112,10 @@ dcs-accounting-app/
 
 ## UI 部品
 
-shadcn/ui の部品は `apps/renderer/src/components/ui/` に置き、自分たちのコードとして編集してよい。
+shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコードとして編集してよい。
 この環境では shadcn の CLI がレジストリに接続できないため、部品は手で追加している。手元で CLI が使える場合は `npx shadcn@latest add <部品>` でもよい。
 
-配色は `apps/renderer/src/styles/globals.css` の CSS 変数だけで決める。画面では `bg-card`・`text-muted-foreground` のようなトークン名を使い、色の値を直接書かない。
+配色は `src/styles/globals.css` の CSS 変数だけで決める。画面では `bg-card`・`text-muted-foreground` のようなトークン名を使い、色の値を直接書かない。
 
 ## 依存の安全（サプライチェーン対策）
 
