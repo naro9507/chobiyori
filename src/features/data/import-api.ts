@@ -21,6 +21,8 @@ export type IssueCode =
 	| "unmappedAccount"
 	| "inactiveMaster"
 	| "unknownPartner"
+	| "unknownSubAccount"
+	| "invalidTaxCategory"
 	| "unbalanced"
 	| "sameAccount"
 	| "missingSide"

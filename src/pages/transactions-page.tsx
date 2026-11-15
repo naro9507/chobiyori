@@ -6,16 +6,23 @@ import { type Transaction, useFiscalYear } from "@/features/journal/journal-api"
 import { JournalGrid } from "@/features/journal/journal-grid"
 import { SimpleEntry } from "@/features/journal/simple-entry"
 import { currentMonth } from "@/features/reports/reports-api"
+import { RecurringPanel } from "@/features/templates/recurring-panel"
 import { useTranslations } from "@/i18n/use-translations"
+import {
+	type TransactionTab,
+	transactionTabs,
+	useTransactionsTab,
+} from "@/stores/transactions-tab-store"
 
-const tabs = ["simple", "grid", "compound"] as const
-type Tab = (typeof tabs)[number]
+const tabs = transactionTabs
+type Tab = TransactionTab
 
 /** 取引入力。かんたん入力・仕訳グリッド・複合仕訳を切り替える。どれも同じ仕訳になる。 */
 export function TransactionsPage() {
 	const t = useTranslations("journal")
 	const fiscalYear = useFiscalYear()
-	const [tab, setTab] = useState<Tab>("simple")
+	const tab = useTransactionsTab((state) => state.tab)
+	const setTab = useTransactionsTab((state) => state.setTab)
 	const [month, setMonth] = useState(() => currentMonth(fiscalYear))
 	/** 仕訳グリッドから開いた、変更する複合仕訳 */
 	const [editing, setEditing] = useState<Transaction | undefined>(undefined)
@@ -74,6 +81,9 @@ export function TransactionsPage() {
 								: undefined
 						}
 					/>
+				</Tabs.Content>
+				<Tabs.Content value="recurring" className="outline-none">
+					<RecurringPanel fiscalYear={fiscalYear} />
 				</Tabs.Content>
 			</Tabs.Root>
 		</Page>

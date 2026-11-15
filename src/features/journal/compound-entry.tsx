@@ -9,12 +9,18 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input, NativeSelect } from "@/components/ui/input"
+import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
+import { type TaxCategory, taxCategories } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount, parseAmount } from "@/lib/amount"
 import { fieldError, isAppError, lineFieldError } from "@/lib/errors"
 import { cn } from "@/lib/utils"
-import { type Side, type Transaction, useSaveTransaction } from "./journal-api"
+import {
+	type Side,
+	type Transaction,
+	useRecordsTax,
+	useSaveTransaction,
+} from "./journal-api"
 import { useJournalErrorMessage } from "./journal-errors"
 import { MasterCombobox } from "./master-combobox"
 import { keepOf, useJournalMasters } from "./use-master-items"
@@ -26,6 +32,10 @@ type LineForm = {
 	amount: string
 	partnerId: number | null
 	memo: string
+	subAccountId: string
+	/** 空なら科目の既定の税区分 */
+	taxCategory: TaxCategory | ""
+	isQualifiedInvoice: boolean
 }
 
 let nextKey = 1
@@ -36,6 +46,9 @@ const newLine = (side: Side): LineForm => ({
 	amount: "",
 	partnerId: null,
 	memo: "",
+	subAccountId: "",
+	taxCategory: "",
+	isQualifiedInvoice: false,
 })
 
 /**
@@ -58,6 +71,9 @@ export function CompoundEntry({
 	const errorMessage = useJournalErrorMessage(fiscalYear)
 	const save = useSaveTransaction(fiscalYear)
 	const masters = useJournalMasters(keepOf(transaction))
+	const tMaster = useTranslations("master")
+	// 免税事業者の年度は、税区分とインボイスの欄を出さない（Rust 側で「対象外」にする）
+	const recordsTax = useRecordsTax(fiscalYear)
 
 	const initialDate = transaction?.date ?? defaultDate(fiscalYear, month)
 	const [date, setDate] = useState(initialDate)
@@ -71,6 +87,9 @@ export function CompoundEntry({
 					amount: String(l.amount),
 					partnerId: l.partnerId,
 					memo: l.memo,
+					subAccountId: l.subAccountId?.toString() ?? "",
+					taxCategory: l.taxCategory ?? "",
+					isQualifiedInvoice: l.isQualifiedInvoice,
 				}))
 			: [newLine("debit"), newLine("credit")]
 	)
@@ -122,6 +141,9 @@ export function CompoundEntry({
 						amount: amountForCommand(l.amount),
 						partnerId: l.partnerId,
 						memo: l.memo,
+						subAccountId: l.subAccountId ? Number(l.subAccountId) : null,
+						taxCategory: l.taxCategory || null,
+						isQualifiedInvoice: l.isQualifiedInvoice,
 					})),
 				},
 			},
@@ -195,6 +217,11 @@ export function CompoundEntry({
 									>
 										{t("amount")}
 									</th>
+									{recordsTax && (
+										<th scope="col" className="px-2 py-2 font-medium">
+											{t("taxCategory")}
+										</th>
+									)}
 									<th scope="col" className="px-2 py-2 font-medium">
 										{t("partner")}
 									</th>
@@ -225,7 +252,7 @@ export function CompoundEntry({
 													onChange={(e) =>
 														setLine(line.key, { side: e.target.value as Side })
 													}
-													className="h-9"
+													className="h-9 min-w-24"
 												>
 													<option value="debit">{t("debit")}</option>
 													<option value="credit">{t("credit")}</option>
@@ -240,11 +267,36 @@ export function CompoundEntry({
 													items={masters.accountItems}
 													value={line.accountId}
 													onChange={(accountId) =>
-														setLine(line.key, { accountId })
+														setLine(line.key, { accountId, subAccountId: "" })
 													}
 													aria-invalid={invalid("accountId")}
 													className="h-9"
 												/>
+												{masters.subAccountsOf(line.accountId).length > 0 && (
+													<NativeSelect
+														aria-label={t("lineField", {
+															n,
+															field: t("subAccount"),
+														})}
+														value={line.subAccountId}
+														onChange={(e) =>
+															setLine(line.key, {
+																subAccountId: e.target.value,
+															})
+														}
+														aria-invalid={invalid("subAccountId")}
+														className="mt-1.5 h-9"
+													>
+														<option value="">{t("noSubAccount")}</option>
+														{masters
+															.subAccountsOf(line.accountId)
+															.map((sub) => (
+																<option key={sub.id} value={sub.id}>
+																	{sub.code} {masters.subAccountLabel(sub.id)}
+																</option>
+															))}
+													</NativeSelect>
+												)}
 												{message && (
 													<p
 														role="alert"
@@ -266,6 +318,40 @@ export function CompoundEntry({
 													className="num h-9 text-right"
 												/>
 											</td>
+											{recordsTax && (
+												<td className="min-w-40 px-2 py-1.5">
+													<NativeSelect
+														aria-label={t("lineField", {
+															n,
+															field: t("taxCategory"),
+														})}
+														value={line.taxCategory}
+														onChange={(e) =>
+															setLine(line.key, {
+																taxCategory: e.target.value as TaxCategory | "",
+															})
+														}
+														className="h-9"
+													>
+														<option value="">{t("taxDefault")}</option>
+														{taxCategories.map((c) => (
+															<option key={c} value={c}>
+																{tMaster(`tax_${c}`)}
+															</option>
+														))}
+													</NativeSelect>
+													<LabeledCheckbox
+														className="mt-1.5  text-xs"
+														label={t("qualifiedInvoice")}
+														checked={line.isQualifiedInvoice}
+														onChange={(e) =>
+															setLine(line.key, {
+																isQualifiedInvoice: e.target.checked,
+															})
+														}
+													/>
+												</td>
+											)}
 											<td className="min-w-40 px-2 py-1.5">
 												<MasterCombobox
 													aria-label={t("lineField", {

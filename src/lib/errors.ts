@@ -27,6 +27,7 @@ export type ErrorCode =
 	| "fileRead"
 	| "fileWrite"
 	| "importBlocked"
+	| "alreadyRecorded"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

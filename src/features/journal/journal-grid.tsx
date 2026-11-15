@@ -337,13 +337,21 @@ function GridEditor({
 		}
 		const day = Number(form.day)
 		const amount = amountForCommand(form.amount)
-		const line = (side: "debit" | "credit", accountId: number) => ({
-			side,
-			accountId,
-			amount,
-			partnerId: form.partnerId,
-			memo: "",
-		})
+		// 変更する取引の補助科目・税区分・インボイスの印は、科目を変えなければそのまま残す
+		const line = (side: "debit" | "credit", accountId: number) => {
+			const before = transaction?.lines.find((l) => l.side === side)
+			const keep = before && before.accountId === accountId
+			return {
+				side,
+				accountId,
+				amount,
+				partnerId: form.partnerId,
+				memo: keep ? before.memo : "",
+				subAccountId: keep ? before.subAccountId : null,
+				taxCategory: keep ? before.taxCategory : null,
+				isQualifiedInvoice: keep ? before.isQualifiedInvoice : false,
+			}
+		}
 		save.mutate(
 			{
 				id: transaction?.id,

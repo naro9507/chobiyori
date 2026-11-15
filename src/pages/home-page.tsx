@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import {
 	CircleAlert,
 	CircleCheck,
@@ -17,8 +18,10 @@ import { useAppInfo } from "@/features/app-info/app-info"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { NotInTauriError } from "@/lib/tauri"
+import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function HomePage() {
 	const t = useTranslations("home")
@@ -43,6 +46,7 @@ export function HomePage() {
 					</CardContent>
 				</Card>
 			</div>
+			<PendingRecurring fiscalYear={fiscalYear} month={month} />
 			<Card>
 				<CardHeader>
 					<CardTitle>{t("balancesTitle")}</CardTitle>
@@ -56,6 +60,39 @@ export function HomePage() {
 				</CardContent>
 			</Card>
 		</Page>
+	)
+}
+
+const transactionsPath: string = "/transactions"
+
+/** 記録を待っている毎月の取引があれば、取引入力へ案内する。 */
+function PendingRecurring({
+	fiscalYear,
+	month,
+}: {
+	fiscalYear: number | null
+	month: number
+}) {
+	const t = useTranslations("home")
+	const count = useCandidates(fiscalYear, month).data?.length ?? 0
+	const setTab = useTransactionsTab((state) => state.setTab)
+	if (count === 0) return null
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>{t("recurringTitle")}</CardTitle>
+				<CardDescription>{t("recurringBody", { count })}</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<Link
+					to={transactionsPath}
+					onClick={() => setTab("recurring")}
+					className="font-medium text-primary text-sm underline-offset-4 hover:underline"
+				>
+					{t("recurringLink")}
+				</Link>
+			</CardContent>
+		</Card>
 	)
 }
 

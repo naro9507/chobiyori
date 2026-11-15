@@ -203,6 +203,10 @@ Excel 帳簿と同じ手数で高速に入力できる。
 
 よく使う取引をテンプレートとして登録できる。「毎月 N 日」などの繰り返しを設定でき、未登録分を候補として提示する（確認なしに自動記帳はしない）。過去取引のコピーも可。
 
+- 候補は「候補を出しはじめる月」から、年度のうち今月（過去の年度なら 12 月）までの各月のうち、記録も見送りもしていない月。月にない日（31 日など）は月末にする。
+- 記録するときに金額・日付を直せる（電気代のように毎月変わるもの）。按分の割合を持つ定型仕訳は、記録するときに事業分と家事分の 2 行に分ける。
+- その月を見送ることも、見送りを取り消すこともできる。
+
 **F2-6 共通ルール**
 
 - バリデーション: 日付は当該年度内、金額は 1 円以上の整数、借方 ≠ 貸方、有効なマスタのみ。
@@ -222,6 +226,8 @@ Excel 帳簿と同じ手数で高速に入力できる。
   - 対象外
 - 仕入先が適格請求書発行事業者かどうかも、明細行ごとに記録する。
 - 免税事業者は税区分欄を非表示にできる（内部では「対象外」で保存）。途中で課税事業者になった年度から表示に切替。
+- 税区分を選ばなければ、科目の既定の税区分で保存する。家事按分の家事分（事業主貸）は「対象外」にする。
+- インボイスの印は、かんたん入力と定型仕訳では、取引先に登録番号があれば支払いの行に自動で付ける。複合仕訳では行ごとに選ぶ。免税の年度は付けない。
 - v1 は税込経理で記録まで。税区分別の集計表（申告書作成の元資料）は v1.x。
 
 ### F4. 帳簿・照会
@@ -508,7 +514,8 @@ Visa / Mastercard / JCB は国際ブランドであり、CSV は発行会社ご�
 | `allocation_rules` | id, name, business_percent, rounding |
 | `transactions` | id, fiscal_year, date, kind（normal/allocation/template/depreciation/opening/closing）, entry_mode（simple/grid/compound/import/receipt/card）, memo, created_at, updated_at |
 | `journal_lines` | id, transaction_id, line_no, side（debit/credit）, account_id, sub_account_id, amount, tax_category, is_qualified_invoice, purpose_id, partner_id, target_month, memo |
-| `templates` / `template_lines` | 定型仕訳。recurrence, day_of_month |
+| `templates` | 定型仕訳。name, memo, debit_account_id, debit_sub_account_id, credit_account_id, credit_sub_account_id, amount, partner_id, allocation_percent, recurrence（none/monthly）, day_of_month, start_month, is_active（いまは借方 1 科目 / 貸方 1 科目の形。3 行以上の定型仕訳は後で `template_lines` を足す） |
+| `template_postings` | 毎月の定型仕訳をどの月まで記録したか。template_id, fiscal_year, month, transaction_id（空なら見送り。取引を消すと行も消え、その月はまた候補に出る） |
 | `recurring_plans` | id, partner_id, name, amount, cycle, start_month, end_month, status（定期売上） |
 | `opening_balances` | fiscal_year, account_id, sub_account_id, amount |
 | `fixed_assets` | id, account_id, name, acquired_on, cost, useful_life, method, business_percent, opening_book_value, disposed_on |
@@ -658,7 +665,7 @@ dcs-accounting-app/
 | 1 | DB 接続（SQLite + SQLCipher）、DB スキーマ、標準科目、マスタ管理、初期設定ウィザード（最小） | 汎用テンプレートで開始できる（完了。摘要マスタの画面、ウィザードの口座・期首残高・機能の選択は後のフェーズで足す） |
 | 2 | かんたん入力、仕訳グリッド、複合仕訳、試算表、口座残高 | 1 か月分を入力でき、貸借が常に一致する（完了。期首残高は 0 として計算し、フェーズ 7 で入力を足す。税区分・補助科目の入力と摘要マスタはフェーズ 4、TanStack Table / Virtual は件数の多い帳簿を作るフェーズ 3 で入れる） |
 | 3 | 仕訳帳・元帳・出納帳・経費帳、CSV / PDF 出力、Excel / CSV 取込 | 2014 年帳簿を取り込み年次集計が一致（完了。匿名化したフィクスチャで確認し、実物の帳簿での確認は利用者に頼む。CSV 取込はこのアプリの仕訳 CSV の形だけで、列の対応を選べる汎用の取込はフェーズ 5 の形式エディタで作る。売掛帳・買掛帳はフェーズ 9、出納帳の実残高との照合欄・金額から取引へのドリルダウン・帳簿一式の xlsx 出力は後のフェーズで足す） |
-| 4 | 家事按分、定型・繰り返し仕訳、補助科目、税区分の記録 | 毎月の定例入力が候補の確認だけで済む |
+| 4 | 家事按分、定型・繰り返し仕訳、補助科目、税区分の記録 | 毎月の定例入力が候補の確認だけで済む（完了。按分はかんたん入力の支出と定型仕訳で取引ごとに行う。期末に年間合計へ一括で按分する方式、摘要マスタの画面、定型仕訳の複合仕訳（3 行以上）・過去取引のコピー、元帳の補助科目ごとの表示と取込受信箱での補助科目は後のフェーズで足す） |
 | 5 | 取込受信箱、形式エディタ、カード明細取込（プリセットはアメックスから）、自動仕訳ルール、重複防止 | 初めて見るカード会社の CSV でも、形式を自作して取り込める |
 | 6 | レシート OCR、証憑添付、レシートとカード明細の突合 | レシートの束を読み込み、確認だけで記帳できる |
 | 7 | 期首残高、固定資産・減価償却、棚卸、決算チェックリスト、決算書金額一覧、年度繰越 | 青色申告決算書（一般用）に転記できる数字が出る |

@@ -9,7 +9,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input, NativeSelect } from "@/components/ui/input"
+import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { type AccountCategory, displayName } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
@@ -43,6 +43,9 @@ type Form = {
 	paymentAccountId: string
 	partnerId: string
 	memo: string
+	/** 家事按分する。経費の科目に按分ルールがあるときだけ選べる */
+	allocate: boolean
+	allocationPercent: string
 }
 
 function today() {
@@ -76,6 +79,8 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 		paymentAccountId: "",
 		partnerId: "",
 		memo: "",
+		allocate: false,
+		allocationPercent: "",
 	})
 	const setForm = (patch: Partial<Form>) => {
 		create.reset()
@@ -87,6 +92,23 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 	const paymentAccounts = activeAccounts.filter((a) => a.isPaymentAccount)
 	const contentAccounts = activeAccounts.filter((a) => !a.isPaymentAccount)
 	const activePartners = masters.partnerItems
+
+	// 経費の科目に按分ルールがあれば、按分の欄を出す（割合はルールのものを初めに入れる）
+	const rulePercent =
+		form.choice === "expense" && form.accountId
+			? masters.allocationPercentOf(Number(form.accountId))
+			: null
+	const onAccountChange = (accountId: string) => {
+		const percent =
+			form.choice === "expense" && accountId
+				? masters.allocationPercentOf(Number(accountId))
+				: null
+		setForm({
+			accountId,
+			allocate: percent !== null,
+			allocationPercent: percent === null ? "" : String(percent),
+		})
+	}
 
 	const kind: SimpleKind =
 		form.choice === "owner" ? form.ownerKind : form.choice
@@ -108,6 +130,10 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 				paymentAccountId: Number(form.paymentAccountId || 0),
 				partnerId: form.partnerId ? Number(form.partnerId) : null,
 				memo: form.memo,
+				allocationPercent:
+					rulePercent !== null && form.allocate
+						? amountForCommand(form.allocationPercent)
+						: null,
 			},
 			{
 				onSuccess: (transaction) => {
@@ -151,10 +177,22 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 	}
 
 	const savedSummary = (transaction: Transaction) => {
-		const [debit, credit] = transaction.lines
-		return t("recorded", {
-			entry: `${masters.accountLabel(debit.accountId)} / ${masters.accountLabel(credit.accountId)} ${formatAmount(debit.amount)}`,
-		})
+		if (transaction.lines.length === 2) {
+			const [debit, credit] = transaction.lines
+			return t("recorded", {
+				entry: `${masters.accountLabel(debit.accountId)} / ${masters.accountLabel(credit.accountId)} ${formatAmount(debit.amount)}`,
+			})
+		}
+		// 家事按分した支出は借方が 2 行になるので、行ごとの金額を書く
+		const side = (s: "debit" | "credit") =>
+			transaction.lines
+				.filter((l) => l.side === s)
+				.map(
+					(l) =>
+						`${masters.accountLabel(l.accountId)} ${formatAmount(l.amount)}`
+				)
+				.join("、")
+		return t("recordedLines", { entry: `${side("debit")} / ${side("credit")}` })
 	}
 
 	return (
@@ -240,7 +278,7 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 							>
 								<NativeSelect
 									value={form.accountId}
-									onChange={(e) => setForm({ accountId: e.target.value })}
+									onChange={(e) => onAccountChange(e.target.value)}
 								>
 									<option value="">{t("choose")}</option>
 									{accountOptions()}
@@ -291,6 +329,37 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 							/>
 						</Field>
 					</div>
+
+					{rulePercent !== null && (
+						<fieldset className="flex flex-col gap-3 rounded-lg border p-4">
+							<legend className="px-1 font-medium text-sm">
+								{t("allocationTitle")}
+							</legend>
+							<LabeledCheckbox
+								className=""
+								label={t("allocate")}
+								checked={form.allocate}
+								onChange={(e) => setForm({ allocate: e.target.checked })}
+							/>
+							{form.allocate && (
+								<Field
+									label={t("businessPercent")}
+									hint={t("businessPercentHint")}
+									error={errorFor("allocationPercent")}
+									className="w-56"
+								>
+									<Input
+										inputMode="numeric"
+										value={form.allocationPercent}
+										onChange={(e) =>
+											setForm({ allocationPercent: e.target.value })
+										}
+										className="num text-right"
+									/>
+								</Field>
+							)}
+						</fieldset>
+					)}
 
 					{create.error && !(isAppError(create.error) && create.error.field) ? (
 						<p role="alert" className="text-destructive text-sm">

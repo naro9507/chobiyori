@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { TaxCategory } from "@/features/master/master-api"
+import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { callCommand } from "@/lib/tauri"
 
 /** Rust 側 `domain::journal` と同じ文字列。 */
@@ -30,6 +32,10 @@ export type JournalLine = {
 	amount: number
 	partnerId: number | null
 	memo: string
+	subAccountId: number | null
+	/** 税区分。フェーズ 3 までに入れた行は null */
+	taxCategory: TaxCategory | null
+	isQualifiedInvoice: boolean
 }
 
 export type Transaction = {
@@ -48,6 +54,10 @@ export type LineInput = {
 	amount: number
 	partnerId: number | null
 	memo: string
+	subAccountId?: number | null
+	/** 空なら科目の既定の税区分。免税の年度は Rust 側で「対象外」にする */
+	taxCategory?: TaxCategory | null
+	isQualifiedInvoice?: boolean
 }
 
 export type TransactionInput = {
@@ -65,6 +75,17 @@ export type SimpleInput = {
 	paymentAccountId: number
 	partnerId: number | null
 	memo: string
+	/** 家事按分の事業割合（0〜100）。null なら按分しない */
+	allocationPercent?: number | null
+}
+
+/**
+ * その年度で税区分を記録するか。免税事業者の年度は記録しない（税区分の欄を出さない）。
+ */
+export function useRecordsTax(fiscalYear: number | null) {
+	const years = useFiscalYears().data
+	const year = years?.find((y) => y.year === fiscalYear)
+	return year !== undefined && year.taxStatus !== "exempt"
 }
 
 /** いま開いている年度。サイドメニューで選べる。初期設定の前は null。 */
@@ -84,13 +105,14 @@ export function useTransactions(fiscalYear: number | null, month: number) {
  * 取引を変えたら、取引の一覧・試算表・マスタ（使用中の印）を読み直す。
  * 残高などの集計は Rust 側で仕訳から計算し直す。
  */
-function useInvalidateBooks() {
+export function useInvalidateBooks() {
 	const queryClient = useQueryClient()
 	return () =>
 		Promise.all([
 			queryClient.invalidateQueries({ queryKey: ["transactions"] }),
 			queryClient.invalidateQueries({ queryKey: ["trial-balance"] }),
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
+			queryClient.invalidateQueries({ queryKey: ["templates"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }

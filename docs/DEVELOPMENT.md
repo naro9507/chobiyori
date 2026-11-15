@@ -112,6 +112,12 @@ dcs-accounting-app/
 - エラーは `error::AppError`（`code` と入力欄の `field`）で返す。画面は `i18n` の `errors` から文を選ぶ。エラーやログに個人名・金額を入れない。
 - 開発中に DB を作り直したいときは、アプリを閉じて `books.db`（と `-wal`・`-shm`）を消す。次の起動で初期設定ウィザードが出る。
 
+## 家事按分・定型仕訳・税区分
+
+- 家事按分の計算は `domain/allocation.rs`。経費の行を事業分と家事分（事業主貸）に分ける `split_line` を、かんたん入力（`db/transactions.rs`）と定型仕訳（`db/templates.rs`）で使う。端数処理は科目の按分ルールに従う。
+- 税区分は `domain::journal::validate` で決める（入力 → 科目の既定 → 対象外。免税の年度はいつも対象外）。年度の消費税の扱いは `DbMasters::load` が読む。
+- 定型仕訳の候補の月は `domain/template.rs` で計算する。候補を出すだけで、`post_template` を呼ぶまで取引は作らない。
+
 ## 帳簿の出力と取込
 
 - 帳簿（仕訳帳・総勘定元帳・出納帳・経費帳）は `db/books.rs` で仕訳から作り、残高の計算は `domain/ledger.rs` に置く。
