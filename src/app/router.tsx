@@ -6,6 +6,7 @@ import {
 	type RouterHistory,
 } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import { DataPage } from "@/pages/data-page"
 import { HomePage } from "@/pages/home-page"
 import { LedgersPage } from "@/pages/ledgers-page"
 import { MasterPage } from "@/pages/master-page"
@@ -25,6 +26,7 @@ const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	ledgers: LedgersPage,
 	reports: ReportsPage,
 	master: MasterPage,
+	data: DataPage,
 	settings: SettingsPage,
 }
 

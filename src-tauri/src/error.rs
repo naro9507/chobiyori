@@ -39,6 +39,12 @@ pub enum ErrorCode {
     YearClosed,
     /// データベースの読み書きに失敗した
     Database,
+    /// 選んだ文字コード（Shift_JIS）で書けない文字がある
+    Unencodable,
+    /// PDF に使える日本語のフォントが PC に見つからない
+    FontNotFound,
+    /// ファイルを保存できない
+    FileWrite,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

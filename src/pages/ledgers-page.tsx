@@ -9,7 +9,9 @@ import { useFiscalYear } from "@/features/journal/journal-api"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { type BookColumn, BookTable } from "@/features/ledger/book-table"
+import { ExportButtons } from "@/features/ledger/export-buttons"
 import {
+	type ExportTarget,
 	type JournalBook,
 	type Ledger,
 	type Period,
@@ -48,6 +50,17 @@ export function LedgersPage() {
 	const [cashAccount, setCashAccount] = useState<number | null>(null)
 	const ledgerId = ledgerAccount ?? ledgerAccounts[0]?.id ?? null
 	const cashId = cashAccount ?? cashAccounts[0]?.id ?? null
+
+	const target: ExportTarget | null = {
+		journal: { kind: "journal" } as const,
+		ledger:
+			ledgerId === null
+				? null
+				: { kind: "ledger" as const, accountId: ledgerId },
+		cash:
+			cashId === null ? null : { kind: "cashBook" as const, accountId: cashId },
+		expense: { kind: "expenseBook" } as const,
+	}[book]
 
 	const monthSelect = (
 		label: string,
@@ -128,6 +141,7 @@ export function LedgersPage() {
 								{book === "cash" &&
 									accountSelect(cashAccounts, cashId, setCashAccount)}
 							</div>
+							<ExportButtons target={target} period={period} />
 						</div>
 
 						<Tabs.Content value="journal" className="outline-none">

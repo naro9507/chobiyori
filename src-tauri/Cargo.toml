@@ -3,7 +3,7 @@ name = "dcs-accounting"
 version = "0.1.0"
 description = "個人事業主向けの確定申告用会計ソフト"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.92"
 license = "ISC"
 publish = false
 
@@ -24,6 +24,15 @@ tauri-plugin-process = "2"
 # （RUSTSEC-2026-0502、sqlcipher-src 420.0.0 で修正）を直すため、セキュリティ修正として例外にした。
 # 一緒に上がる sqlite-wasm-rs 0.6.3（2026-11-10 公開）は WebAssembly 向けだけで、このアプリのビルドには入らない
 rusqlite = { version = "=0.42.0", features = ["bundled-sqlcipher-vendored-openssl"] }
+# 帳簿の出力と取込（フェーズ 3）。CSV の読み書き、Shift_JIS、Excel の読み取り、PDF の作成
+csv = "1.4.0"
+encoding_rs = "0.8.44"
+calamine = { version = "0.38.0", default-features = false }
+# PDF は日本語を PC のフォント（游ゴシック・ヒラギノなど）で書き、使った文字だけを埋め込む
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text"] }
+ttf-parser = "0.25.1"
+# 保存先と取り込むファイルを選ぶ画面。Rust 側から開くので、画面に権限は渡さない
+tauri-plugin-dialog = "2.8.4"
 
 # 自動アップデートはデスクトップだけで使う
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
@@ -39,3 +48,5 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# 取込のテストで、Excel 帳簿のフィクスチャを作る
+rust_xlsxwriter = { version = "0.102.0", default-features = false }
