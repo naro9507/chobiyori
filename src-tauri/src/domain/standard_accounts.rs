@@ -40,6 +40,14 @@ const fn account(
 use AccountCategory::{Asset, Cogs, Equity, Expense, Liability, Revenue};
 use TaxCategory::{NonTaxable, OutOfScope, TaxablePurchase10, TaxableSales10};
 
+/// 口座（お金の出入りに使う科目）として使う標準の科目のコード。
+/// 現金・当座預金・定期預金・普通預金と、カード払いの未払金。
+pub const PAYMENT_ACCOUNTS: &[&str] = &["101", "102", "103", "104", "204"];
+
+/// 事業主貸・事業主借の決算書の行。かんたん入力の「事業主の出し入れ」で使う科目を探すのに使う。
+pub const OWNER_DRAWINGS_LINE: &str = "bs.owner_drawings";
+pub const OWNER_CONTRIBUTIONS_LINE: &str = "bs.owner_contributions";
+
 /// 汎用（標準）テンプレートの科目。並び順は決算書の順。
 #[rustfmt::skip]
 pub const GENERAL: &[StandardAccount] = &[
@@ -119,6 +127,17 @@ mod tests {
             assert!(codes.insert(a.code), "コードが重複: {}", a.code);
             assert!(names.insert(a.name_ja), "名前が重複: {}", a.name_ja);
             assert!(!a.name_en.is_empty() && !a.kana.is_empty());
+        }
+    }
+
+    #[test]
+    fn payment_and_owner_accounts_exist() {
+        for code in PAYMENT_ACCOUNTS {
+            let a = GENERAL.iter().find(|a| a.code == *code).unwrap();
+            assert!(matches!(a.category, Asset | Liability), "{}", a.name_ja);
+        }
+        for line in [OWNER_DRAWINGS_LINE, OWNER_CONTRIBUTIONS_LINE] {
+            assert!(GENERAL.iter().any(|a| a.statement_line == Some(line)));
         }
     }
 

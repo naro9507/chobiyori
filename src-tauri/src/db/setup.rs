@@ -123,8 +123,8 @@ fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()>
         IndustryTemplate::General => standard_accounts::GENERAL,
     };
     let mut insert = conn.prepare(
-        "INSERT INTO accounts (code, name_ja, name_en, kana, category, statement_line, default_tax_category, is_system, sort)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8)",
+        "INSERT INTO accounts (code, name_ja, name_en, kana, category, statement_line, default_tax_category, is_payment_account, is_system, sort)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9)",
     )?;
     for (index, a) in accounts.iter().enumerate() {
         insert.execute(params![
@@ -135,6 +135,7 @@ fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()>
             a.category,
             a.statement_line,
             a.default_tax_category,
+            standard_accounts::PAYMENT_ACCOUNTS.contains(&a.code),
             (index as i64 + 1) * 10
         ])?;
     }

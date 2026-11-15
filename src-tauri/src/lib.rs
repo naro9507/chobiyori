@@ -57,7 +57,13 @@ pub fn run() {
             commands::master::create_allocation_rule,
             commands::master::update_allocation_rule,
             commands::master::set_allocation_rule_active,
-            commands::master::delete_allocation_rule
+            commands::master::delete_allocation_rule,
+            commands::journal::list_transactions,
+            commands::journal::create_transaction,
+            commands::journal::create_simple_transaction,
+            commands::journal::update_transaction,
+            commands::journal::delete_transaction,
+            commands::reports::trial_balance
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");

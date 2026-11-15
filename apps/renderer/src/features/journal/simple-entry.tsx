@@ -1,0 +1,325 @@
+import { CircleCheck, Loader2 } from "lucide-react"
+import { type FormEvent, useState } from "react"
+import { Button } from "@/components/ui/button"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card"
+import { Field } from "@/components/ui/field"
+import { Input, NativeSelect } from "@/components/ui/input"
+import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
+import { type AccountCategory, displayName } from "@/features/master/master-api"
+import { useTranslations } from "@/i18n/use-translations"
+import { amountForCommand, formatAmount } from "@/lib/amount"
+import { fieldError, isAppError } from "@/lib/errors"
+import { useSettingsStore } from "@/stores/settings-store"
+import {
+	type SimpleKind,
+	type Transaction,
+	useCreateSimpleTransaction,
+} from "./journal-api"
+import { useJournalErrorMessage } from "./journal-errors"
+import { useJournalMasters } from "./use-master-items"
+
+/** 画面で選ぶ種類。事業主の出し入れは、向きを別に選ぶ。 */
+const kindChoices = ["income", "expense", "transfer", "owner"] as const
+type KindChoice = (typeof kindChoices)[number]
+
+/** 内容の科目の候補を、種類に合う区分から先に並べる。 */
+const categoryOrder: Record<"income" | "expense", AccountCategory[]> = {
+	income: ["revenue", "liability", "equity", "asset", "cogs", "expense"],
+	expense: ["expense", "cogs", "asset", "liability", "equity", "revenue"],
+}
+
+type Form = {
+	choice: KindChoice
+	ownerKind: "owner_draw" | "owner_contribution"
+	date: string
+	amount: string
+	accountId: string
+	paymentAccountId: string
+	partnerId: string
+	memo: string
+}
+
+function today() {
+	const now = new Date()
+	return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+}
+
+/**
+ * かんたん入力。借方・貸方の言葉を使わず、「何に使ったか」「どこから払ったか」で尋ねる。
+ * 保存すると Rust 側で仕訳（借方 1 行 + 貸方 1 行）になる。
+ */
+export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
+	const t = useTranslations("journal")
+	const tMaster = useTranslations("master")
+	const locale = useSettingsStore((state) => state.locale)
+	const errorMessage = useJournalErrorMessage(fiscalYear)
+	const masters = useJournalMasters()
+	const create = useCreateSimpleTransaction(fiscalYear)
+	const [saved, setSaved] = useState<Transaction | null>(null)
+
+	const initialDate =
+		fiscalYear !== null && !today().startsWith(String(fiscalYear))
+			? `${fiscalYear}-01-01`
+			: today()
+	const [form, setFormState] = useState<Form>({
+		choice: "expense",
+		ownerKind: "owner_draw",
+		date: initialDate,
+		amount: "",
+		accountId: "",
+		paymentAccountId: "",
+		partnerId: "",
+		memo: "",
+	})
+	const setForm = (patch: Partial<Form>) => {
+		create.reset()
+		setSaved(null)
+		setFormState({ ...form, ...patch })
+	}
+
+	const activeAccounts = masters.accounts.filter((a) => a.isActive)
+	const paymentAccounts = activeAccounts.filter((a) => a.isPaymentAccount)
+	const contentAccounts = activeAccounts.filter((a) => !a.isPaymentAccount)
+	const activePartners = masters.partnerItems
+
+	const kind: SimpleKind =
+		form.choice === "owner" ? form.ownerKind : form.choice
+	const errorFor = (field: string) => {
+		const e = fieldError(create.error, field)
+		return e ? errorMessage(e) : undefined
+	}
+
+	const onSubmit = (event: FormEvent) => {
+		event.preventDefault()
+		const usesAccount = form.choice !== "owner"
+		create.mutate(
+			{
+				kind,
+				date: form.date,
+				amount: amountForCommand(form.amount),
+				accountId:
+					usesAccount && form.accountId ? Number(form.accountId) : null,
+				paymentAccountId: Number(form.paymentAccountId || 0),
+				partnerId: form.partnerId ? Number(form.partnerId) : null,
+				memo: form.memo,
+			},
+			{
+				onSuccess: (transaction) => {
+					setSaved(transaction)
+					// 日付・種類・口座は続けて入力しやすいように残す
+					setFormState({ ...form, amount: "", memo: "", partnerId: "" })
+				},
+			}
+		)
+	}
+
+	const labels: Record<KindChoice, { account: string; payment: string }> = {
+		income: { account: t("incomeAccount"), payment: t("incomePayment") },
+		expense: { account: t("expenseAccount"), payment: t("expensePayment") },
+		transfer: { account: t("transferTo"), payment: t("transferFrom") },
+		owner: { account: "", payment: t("ownerPayment") },
+	}
+
+	const accountOptions = () => {
+		if (form.choice === "transfer") {
+			return paymentAccounts.map((a) => (
+				<option key={a.id} value={a.id}>
+					{a.code} {displayName(a, locale)}
+				</option>
+			))
+		}
+		const order = categoryOrder[form.choice === "income" ? "income" : "expense"]
+		return order.map((category) => {
+			const inCategory = contentAccounts.filter((a) => a.category === category)
+			if (inCategory.length === 0) return null
+			return (
+				<optgroup key={category} label={tMaster(`category_${category}`)}>
+					{inCategory.map((a) => (
+						<option key={a.id} value={a.id}>
+							{a.code} {displayName(a, locale)}
+						</option>
+					))}
+				</optgroup>
+			)
+		})
+	}
+
+	const savedSummary = (transaction: Transaction) => {
+		const [debit, credit] = transaction.lines
+		return t("recorded", {
+			entry: `${masters.accountLabel(debit.accountId)} / ${masters.accountLabel(credit.accountId)} ${formatAmount(debit.amount)}`,
+		})
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>{t("simple")}</CardTitle>
+				<CardDescription>{t("simpleDescription")}</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<form
+					onSubmit={onSubmit}
+					noValidate
+					aria-label={t("simple")}
+					className="flex flex-col gap-5"
+				>
+					<fieldset className="flex flex-col gap-2">
+						<legend className="mb-1.5 font-medium text-sm">{t("kind")}</legend>
+						<RadioCards
+							value={form.choice}
+							onValueChange={(value) =>
+								setForm({ choice: value as KindChoice, accountId: "" })
+							}
+							className="sm:grid-cols-4"
+						>
+							{kindChoices.map((choice) => (
+								<RadioCardsItem key={choice} value={choice}>
+									{t(`kind_${choice}`)}
+								</RadioCardsItem>
+							))}
+						</RadioCards>
+					</fieldset>
+
+					{paymentAccounts.length === 0 && masters.accounts.length > 0 && (
+						<p className="text-muted-foreground text-sm">
+							{t("noPaymentAccounts")}
+						</p>
+					)}
+
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{form.choice === "owner" && (
+							<Field label={t("ownerDirection")} className="lg:col-span-3">
+								<NativeSelect
+									value={form.ownerKind}
+									onChange={(e) =>
+										setForm({
+											ownerKind: e.target.value as Form["ownerKind"],
+										})
+									}
+								>
+									<option value="owner_draw">{t("owner_draw")}</option>
+									<option value="owner_contribution">
+										{t("owner_contribution")}
+									</option>
+								</NativeSelect>
+							</Field>
+						)}
+						<Field label={t("date")} error={errorFor("date")}>
+							<Input
+								type="date"
+								value={form.date}
+								min={fiscalYear ? `${fiscalYear}-01-01` : undefined}
+								max={fiscalYear ? `${fiscalYear}-12-31` : undefined}
+								onChange={(e) => setForm({ date: e.target.value })}
+								className="num"
+							/>
+						</Field>
+						<Field
+							label={t("amount")}
+							hint={t("amountHint")}
+							error={errorFor("amount")}
+						>
+							<Input
+								inputMode="numeric"
+								value={form.amount}
+								onChange={(e) => setForm({ amount: e.target.value })}
+								className="num text-right"
+							/>
+						</Field>
+						{form.choice !== "owner" && (
+							<Field
+								label={labels[form.choice].account}
+								error={errorFor("accountId")}
+							>
+								<NativeSelect
+									value={form.accountId}
+									onChange={(e) => setForm({ accountId: e.target.value })}
+								>
+									<option value="">{t("choose")}</option>
+									{accountOptions()}
+								</NativeSelect>
+							</Field>
+						)}
+						<Field
+							label={labels[form.choice].payment}
+							error={errorFor("paymentAccountId")}
+						>
+							<NativeSelect
+								value={form.paymentAccountId}
+								onChange={(e) => setForm({ paymentAccountId: e.target.value })}
+							>
+								<option value="">{t("choose")}</option>
+								{paymentAccounts.map((a) => (
+									<option key={a.id} value={a.id}>
+										{a.code} {displayName(a, locale)}
+									</option>
+								))}
+							</NativeSelect>
+						</Field>
+						<Field
+							label={t("partner")}
+							hint={t("optional")}
+							error={errorFor("partnerId")}
+						>
+							<NativeSelect
+								value={form.partnerId}
+								onChange={(e) => setForm({ partnerId: e.target.value })}
+							>
+								<option value="">{t("none")}</option>
+								{activePartners.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.code} {p.label}
+									</option>
+								))}
+							</NativeSelect>
+						</Field>
+						<Field
+							label={t("memo")}
+							hint={t("memoHint")}
+							error={errorFor("memo")}
+						>
+							<Input
+								value={form.memo}
+								onChange={(e) => setForm({ memo: e.target.value })}
+							/>
+						</Field>
+					</div>
+
+					{create.error && !(isAppError(create.error) && create.error.field) ? (
+						<p role="alert" className="text-destructive text-sm">
+							{errorMessage(create.error)}
+						</p>
+					) : null}
+					{saved && (
+						<p
+							role="status"
+							className="flex items-center gap-2 text-sm text-success"
+						>
+							<CircleCheck aria-hidden="true" className="size-4 shrink-0" />
+							{savedSummary(saved)}
+						</p>
+					)}
+
+					<div>
+						<Button
+							type="submit"
+							disabled={create.isPending || fiscalYear === null}
+						>
+							{create.isPending && (
+								<Loader2 aria-hidden="true" className="animate-spin" />
+							)}
+							{t("record")}
+						</Button>
+					</div>
+				</form>
+			</CardContent>
+		</Card>
+	)
+}

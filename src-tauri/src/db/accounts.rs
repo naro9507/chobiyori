@@ -18,6 +18,8 @@ pub struct Account {
     pub statement_line: Option<String>,
     pub default_tax_category: Option<TaxCategory>,
     pub default_allocation_rule_id: Option<i64>,
+    /// 口座（現金・預金・カードなど、お金の出入りに使う科目）
+    pub is_payment_account: bool,
     pub is_system: bool,
     pub is_active: bool,
     /// 仕訳・補助科目・摘要のどれかで使われている（削除できない）
@@ -38,6 +40,8 @@ pub struct AccountInput {
     pub default_tax_category: Option<TaxCategory>,
     #[serde(default)]
     pub default_allocation_rule_id: Option<i64>,
+    #[serde(default)]
+    pub is_payment_account: bool,
 }
 
 struct Valid {
@@ -48,6 +52,18 @@ struct Valid {
 }
 
 fn validate(input: &AccountInput) -> AppResult<Valid> {
+    // 口座になれるのは、残高を持つ資産（現金・預金）と負債（カードの未払金）だけ
+    if input.is_payment_account
+        && !matches!(
+            input.category,
+            AccountCategory::Asset | AccountCategory::Liability
+        )
+    {
+        return Err(AppError::field(
+            ErrorCode::InvalidFormat,
+            "isPaymentAccount",
+        ));
+    }
     Ok(Valid {
         code: master::code(&input.code)?,
         name_ja: master::required(&input.name_ja, NAME_MAX, "nameJa")?,
@@ -58,7 +74,8 @@ fn validate(input: &AccountInput) -> AppResult<Valid> {
 
 const SELECT: &str = "
     SELECT a.id, a.code, a.name_ja, a.name_en, a.kana, a.category, a.statement_line,
-           a.default_tax_category, a.default_allocation_rule_id, a.is_system, a.is_active,
+           a.default_tax_category, a.default_allocation_rule_id, a.is_payment_account,
+           a.is_system, a.is_active,
            EXISTS (SELECT 1 FROM journal_lines WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM sub_accounts WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM purposes WHERE default_debit_account_id = a.id OR default_credit_account_id = a.id)
@@ -82,9 +99,10 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Account> {
         statement_line: row.get(6)?,
         default_tax_category: row.get(7)?,
         default_allocation_rule_id: row.get(8)?,
-        is_system: row.get(9)?,
-        is_active: row.get(10)?,
-        in_use: row.get(11)?,
+        is_payment_account: row.get(9)?,
+        is_system: row.get(10)?,
+        is_active: row.get(11)?,
+        in_use: row.get(12)?,
     })
 }
 
@@ -119,8 +137,8 @@ pub fn create(conn: &Connection, input: &AccountInput) -> AppResult<Account> {
     let v = validate(input)?;
     ensure_rule_exists(conn, input.default_allocation_rule_id)?;
     conn.execute(
-        "INSERT INTO accounts (code, name_ja, name_en, kana, category, default_tax_category, default_allocation_rule_id, sort)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT coalesce(max(sort), 0) + 10 FROM accounts WHERE category = ?5))",
+        "INSERT INTO accounts (code, name_ja, name_en, kana, category, default_tax_category, default_allocation_rule_id, is_payment_account, sort)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, (SELECT coalesce(max(sort), 0) + 10 FROM accounts WHERE category = ?5))",
         params![
             v.code,
             v.name_ja,
@@ -128,7 +146,8 @@ pub fn create(conn: &Connection, input: &AccountInput) -> AppResult<Account> {
             v.kana,
             input.category,
             input.default_tax_category,
-            input.default_allocation_rule_id
+            input.default_allocation_rule_id,
+            flag(input.is_payment_account)
         ],
     )?;
     get(conn, conn.last_insert_rowid())
@@ -149,7 +168,7 @@ pub fn update(conn: &Connection, id: i64, input: &AccountInput) -> AppResult<Acc
     ensure_rule_exists(conn, input.default_allocation_rule_id)?;
     conn.execute(
         "UPDATE accounts SET code = ?2, name_ja = ?3, name_en = ?4, kana = ?5, category = ?6,
-                default_tax_category = ?7, default_allocation_rule_id = ?8
+                default_tax_category = ?7, default_allocation_rule_id = ?8, is_payment_account = ?9
          WHERE id = ?1",
         params![
             id,
@@ -159,7 +178,8 @@ pub fn update(conn: &Connection, id: i64, input: &AccountInput) -> AppResult<Acc
             v.kana,
             input.category,
             input.default_tax_category,
-            input.default_allocation_rule_id
+            input.default_allocation_rule_id,
+            flag(input.is_payment_account)
         ],
     )?;
     get(conn, id)
@@ -205,6 +225,7 @@ mod tests {
             category: AccountCategory::Expense,
             default_tax_category: Some(TaxCategory::TaxablePurchase10),
             default_allocation_rule_id: None,
+            is_payment_account: false,
         }
     }
 
@@ -239,6 +260,36 @@ mod tests {
         assert_eq!(created.statement_line, None);
         let accounts = list(&conn).unwrap();
         assert_eq!(accounts.last().unwrap().code, "620");
+    }
+
+    #[test]
+    fn standard_cash_deposits_and_payables_are_payment_accounts() {
+        let db = set_up_db();
+        let conn = db.conn();
+        let codes: Vec<_> = list(&conn)
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.is_payment_account)
+            .map(|a| a.code)
+            .collect();
+        assert_eq!(codes, ["101", "102", "103", "104", "204"]);
+    }
+
+    #[test]
+    fn only_assets_and_liabilities_can_be_payment_accounts() {
+        let db = set_up_db();
+        let conn = db.conn();
+        let mut card = input("210", "カード未払金");
+        card.category = AccountCategory::Liability;
+        card.is_payment_account = true;
+        assert!(create(&conn, &card).unwrap().is_payment_account);
+
+        let mut expense = input("620", "新聞図書費");
+        expense.is_payment_account = true;
+        assert_eq!(
+            create(&conn, &expense).unwrap_err(),
+            AppError::field(ErrorCode::InvalidFormat, "isPaymentAccount")
+        );
     }
 
     #[test]

@@ -25,6 +25,7 @@ const cash: Account = {
 	statementLine: "bs.cash",
 	defaultTaxCategory: null,
 	defaultAllocationRuleId: null,
+	isPaymentAccount: true,
 	isSystem: true,
 	isActive: true,
 	inUse: false,
@@ -40,6 +41,7 @@ const books: Account = {
 	category: "expense",
 	statementLine: null,
 	defaultTaxCategory: "taxable_purchase_10",
+	isPaymentAccount: false,
 	isSystem: false,
 }
 

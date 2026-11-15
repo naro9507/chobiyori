@@ -500,7 +500,7 @@ Visa / Mastercard / JCB は国際ブランドであり、CSV は発行会社ご�
 | テーブル | 主な列 |
 |---|---|
 | `fiscal_years` | year, filing_type（blue65/blue55/blue10/white）, tax_status（exempt/standard/simplified/special20）, status, closed_at |
-| `accounts` | id, code, name_ja, name_en, kana, category（asset/liability/equity/revenue/cogs/expense）, statement_line, default_tax_category, default_allocation_rule_id, is_system, is_active, sort |
+| `accounts` | id, code, name_ja, name_en, kana, category（asset/liability/equity/revenue/cogs/expense）, statement_line, default_tax_category, default_allocation_rule_id, is_payment_account（口座: 現金・預金・カードの未払金など。かんたん入力の支払・入金口座と口座残高に使う）, is_system, is_active, sort |
 | `sub_accounts` | id, account_id, code, name_ja, name_en, is_active |
 | `purposes` | id, code, name_ja, name_en, default_debit_account_id, default_credit_account_id, default_tax_category, allocation_rule_id, default_partner_id, is_active |
 | `partners` | id, code, name_ja, name_en, kana, is_customer, is_vendor, invoice_registration_no, memo, is_active |
@@ -655,7 +655,7 @@ dcs-accounting-app/
 |---|---|---|
 | 0 | Tauri v2 への移行（Rust バックエンドの土台、画面との接続、UI 部品と配色、ビルド） | 空のアプリが起動し、サイドメニューで画面を行き来できる（完了） |
 | 1 | DB 接続（SQLite + SQLCipher）、DB スキーマ、標準科目、マスタ管理、初期設定ウィザード（最小） | 汎用テンプレートで開始できる（完了。摘要マスタの画面、ウィザードの口座・期首残高・機能の選択は後のフェーズで足す） |
-| 2 | かんたん入力、仕訳グリッド、複合仕訳、試算表、口座残高 | 1 か月分を入力でき、貸借が常に一致する |
+| 2 | かんたん入力、仕訳グリッド、複合仕訳、試算表、口座残高 | 1 か月分を入力でき、貸借が常に一致する（完了。期首残高は 0 として計算し、フェーズ 7 で入力を足す。税区分・補助科目の入力と摘要マスタはフェーズ 4、TanStack Table / Virtual は件数の多い帳簿を作るフェーズ 3 で入れる） |
 | 3 | 仕訳帳・元帳・出納帳・経費帳、CSV / PDF 出力、Excel / CSV 取込 | 2014 年帳簿を取り込み年次集計が一致 |
 | 4 | 家事按分、定型・繰り返し仕訳、補助科目、税区分の記録 | 毎月の定例入力が候補の確認だけで済む |
 | 5 | 取込受信箱、形式エディタ、カード明細取込（プリセットはアメックスから）、自動仕訳ルール、重複防止 | 初めて見るカード会社の CSV でも、形式を自作して取り込める |

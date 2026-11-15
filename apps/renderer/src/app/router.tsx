@@ -9,7 +9,9 @@ import type { ReactNode } from "react"
 import { HomePage } from "@/pages/home-page"
 import { MasterPage } from "@/pages/master-page"
 import { PlaceholderPage } from "@/pages/placeholder-page"
+import { ReportsPage } from "@/pages/reports-page"
 import { SettingsPage } from "@/pages/settings-page"
+import { TransactionsPage } from "@/pages/transactions-page"
 import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
@@ -18,6 +20,8 @@ const rootRoute = createRootRoute({ component: AppRoot })
 /** 作り終えた画面。ここにない画面は「準備中」を表示する。 */
 const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
+	transactions: TransactionsPage,
+	reports: ReportsPage,
 	master: MasterPage,
 	settings: SettingsPage,
 }

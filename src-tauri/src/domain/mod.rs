@@ -1,6 +1,8 @@
 //! 会計の決まりごと（区分、入力の検証、計算）。DB や画面には依存しない。
 
 pub mod allocation;
+pub mod balance;
+pub mod journal;
 pub mod master;
 pub mod standard_accounts;
 
