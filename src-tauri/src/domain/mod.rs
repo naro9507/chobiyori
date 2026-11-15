@@ -3,6 +3,7 @@
 pub mod allocation;
 pub mod balance;
 pub mod journal;
+pub mod ledger;
 pub mod master;
 pub mod standard_accounts;
 

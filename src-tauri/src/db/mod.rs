@@ -5,6 +5,7 @@
 
 pub mod accounts;
 pub mod allocation_rules;
+pub mod books;
 pub mod partners;
 pub mod reports;
 pub mod setup;

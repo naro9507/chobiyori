@@ -63,7 +63,10 @@ pub fn run() {
             commands::journal::create_simple_transaction,
             commands::journal::update_transaction,
             commands::journal::delete_transaction,
-            commands::reports::trial_balance
+            commands::reports::trial_balance,
+            commands::books::journal_book,
+            commands::books::ledger,
+            commands::books::expense_book
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");

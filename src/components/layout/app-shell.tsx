@@ -1,7 +1,11 @@
 import { Link, Outlet } from "@tanstack/react-router"
 import { navGroups } from "@/app/navigation"
 import { WhatsNewBanner } from "@/features/changelog/whats-new-banner"
-import { useSetupStatus } from "@/features/setup/setup"
+import {
+	useFiscalYear,
+	useFiscalYears,
+	useYearStore,
+} from "@/features/setup/fiscal-years"
 import { UpdateBanner } from "@/features/updater/update-banner"
 import { useTranslations } from "@/i18n/use-translations"
 
@@ -9,8 +13,9 @@ import { useTranslations } from "@/i18n/use-translations"
 export function AppShell() {
 	const t = useTranslations("nav")
 	const tApp = useTranslations("app")
-	const { data: setup } = useSetupStatus()
-	const year = setup?.fiscalYear ?? new Date().getFullYear()
+	const year = useFiscalYear() ?? new Date().getFullYear()
+	const years = useFiscalYears().data ?? []
+	const selectYear = useYearStore((state) => state.select)
 
 	return (
 		<div className="flex h-full min-h-0">
@@ -28,9 +33,25 @@ export function AppShell() {
 					<img src="/app-icon.svg" alt="" className="size-8" />
 					<span className="font-bold text-base">{tApp("name")}</span>
 				</div>
-				<div className="rounded-lg border bg-background px-3 py-2 font-bold text-sm">
-					{tApp("fiscalYear", { year })}
-				</div>
+				{years.length > 1 ? (
+					// 取り込んだ過去の年度などがあるときは、見る年度を選べる
+					<select
+						aria-label={tApp("chooseFiscalYear")}
+						value={year}
+						onChange={(e) => selectYear(Number(e.target.value))}
+						className="h-10 rounded-lg border bg-background px-3 font-bold text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+					>
+						{years.map((y) => (
+							<option key={y.year} value={y.year}>
+								{tApp("fiscalYear", { year: y.year })}
+							</option>
+						))}
+					</select>
+				) : (
+					<div className="rounded-lg border bg-background px-3 py-2 font-bold text-sm">
+						{tApp("fiscalYear", { year })}
+					</div>
+				)}
 				{navGroups.map((group) => (
 					<ul
 						key={group[0].id}
