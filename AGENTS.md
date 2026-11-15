@@ -41,6 +41,8 @@ dcs-accounting-app/
 │   ├── src/commands/           # 画面から呼ぶコマンド
 │   ├── src/db/                 # スキーマ（migrations/）とマスタの読み書き
 │   ├── src/domain/             # 会計の決まりごと（区分・検証・按分・標準科目）
+│   ├── src/export/             # 帳簿の CSV・PDF 出力
+│   ├── src/import/             # 仕訳 CSV・Excel 帳簿の取込
 │   ├── capabilities/           # 画面に許可する操作
 │   └── tauri.conf.json
 └── docs/                       # 仕様と開発資料

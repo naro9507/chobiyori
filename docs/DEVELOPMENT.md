@@ -67,7 +67,9 @@ dcs-accounting-app/
 │   ├── src/
 │   │   ├── commands/           # 画面から呼ぶコマンド
 │   │   ├── db/                 # DB の接続、スキーマ（migrations/）、マスタの読み書き
-│   │   ├── domain/             # 会計の決まりごと（区分・入力の検証・按分・標準科目）
+│   │   ├── domain/             # 会計の決まりごと（区分・入力の検証・按分・標準科目・元帳の残高）
+│   │   ├── export/             # 帳簿の CSV・PDF 出力
+│   │   ├── import/             # 仕訳 CSV・Excel 帳簿の取込
 │   │   ├── error.rs            # 画面に返すエラー
 │   │   ├── lib.rs              # アプリの組み立て
 │   │   └── main.rs
@@ -109,6 +111,16 @@ dcs-accounting-app/
 - 暗号化: `Database::open` に鍵を渡すと SQLCipher で暗号化する（テストで確認済み）。鍵の保管（OS の資格情報ストアや起動時パスワード）はフェーズ 8 で入れる。それまでのアプリは鍵なしで開く。
 - エラーは `error::AppError`（`code` と入力欄の `field`）で返す。画面は `i18n` の `errors` から文を選ぶ。エラーやログに個人名・金額を入れない。
 - 開発中に DB を作り直したいときは、アプリを閉じて `books.db`（と `-wal`・`-shm`）を消す。次の起動で初期設定ウィザードが出る。
+
+## 帳簿の出力と取込
+
+- 帳簿（仕訳帳・総勘定元帳・出納帳・経費帳）は `db/books.rs` で仕訳から作り、残高の計算は `domain/ledger.rs` に置く。
+- 出力は `export/`。帳簿を `report.rs` の表の形（見出し・列・行・ページ割り）にし、`csv.rs` と `pdf.rs` で書く。ファイルの見出しの言葉は `labels.rs` に日本語と英語で持つ（仕訳の CSV は取込で読み戻す形なので、画面の文言とは分ける）。
+- PDF は `krilla` で作る。日本語のフォントはアプリに同梱せず、PC のフォント（Windows は游ゴシック・メイリオ・MS ゴシック、macOS はヒラギノ角ゴシック、Linux は IPA フォント・Noto Sans CJK）を探して、使った文字だけを埋め込む。見つからないときは `fontNotFound` を返す。
+- PDF の中身のテストは、日本語のフォントがない環境では飛ばす（ページ割りと繰越の計算はフォントなしで確かめる）。Linux では `sudo apt-get install -y fonts-ipafont-gothic` で入る。CI でも入れている。
+- 取込は `import/`。ファイルを下書きの取引に直し（`journal_csv.rs`・`excel_book.rs`）、`mod.rs` で科目の当てはめ・検証・重複の判定をしてから書き込む。プレビューは何も書き込まない。直すところが 1 つでも残っていれば取り込まない。
+- 保存先と取り込むファイルを選ぶ画面は、Rust 側から `tauri-plugin-dialog` で開く。画面（WebView）には dialog の権限を渡さず、取り込むファイルの場所も画面に返さない。
+- Excel 帳簿の取込のテストは、`rust_xlsxwriter`（開発用の依存）で匿名化したフィクスチャをその場で作る。実物の帳簿はリポジトリに入れない。
 
 ## UI 部品
 
