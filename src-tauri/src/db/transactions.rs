@@ -84,7 +84,7 @@ impl MasterLookup for DbMasters {
 }
 
 fn insert_lines(conn: &Connection, transaction_id: i64, valid: &ValidTransaction) -> AppResult<()> {
-    let mut insert = conn.prepare(
+    let mut insert = conn.prepare_cached(
         "INSERT INTO journal_lines (transaction_id, line_no, side, account_id, amount, partner_id, memo)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
@@ -256,6 +256,16 @@ pub fn list(conn: &Connection, year: i64, month: Option<u32>) -> AppResult<Vec<T
         Some(month) => journal::month_range(year, month)?,
         None => (format!("{year:04}-01-01"), format!("{year:04}-12-31")),
     };
+    list_between(conn, year, &from, &to)
+}
+
+/// 年度の取引のうち、日付が `from` から `to` まで（両端を含む）のもの。日付の順、同じ日は入力した順。
+pub fn list_between(
+    conn: &Connection,
+    year: i64,
+    from: &str,
+    to: &str,
+) -> AppResult<Vec<Transaction>> {
     let mut stmt = conn.prepare(&format!(
         "{SELECT} WHERE t.fiscal_year = ?1 AND t.date BETWEEN ?2 AND ?3 ORDER BY t.date, t.id, l.line_no"
     ))?;

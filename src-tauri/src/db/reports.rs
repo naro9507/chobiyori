@@ -3,8 +3,8 @@
 
 use crate::db::accounts;
 use crate::domain::balance::{self, Movement, Totals, TrialBalance};
-use crate::domain::journal::month_range;
-use crate::error::{AppError, AppResult, ErrorCode};
+use crate::domain::journal::period_range;
+use crate::error::AppResult;
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
@@ -16,11 +16,7 @@ pub fn trial_balance(
     from_month: u32,
     to_month: u32,
 ) -> AppResult<TrialBalance> {
-    let (from, _) = month_range(year, from_month)?;
-    let (_, to) = month_range(year, to_month)?;
-    if from_month > to_month {
-        return Err(AppError::field(ErrorCode::OutOfRange, "toMonth"));
-    }
+    let (from, to) = period_range(year, from_month, to_month)?;
 
     let mut stmt = conn.prepare(
         "SELECT l.account_id,
@@ -69,7 +65,7 @@ pub fn trial_balance(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::db::setup::tests::set_up_db;
     use crate::db::transactions::tests::{account, entry};
@@ -77,9 +73,10 @@ mod tests {
     use crate::domain::journal::{
         EntryMode, LineInput, Side, SimpleInput, SimpleKind, TransactionInput,
     };
+    use crate::error::{AppError, ErrorCode};
 
     /// 1 か月分（3 月）の帳簿をつける。2 月にも 1 件ある。
-    fn books() -> crate::db::Database {
+    pub(crate) fn books() -> crate::db::Database {
         let db = set_up_db();
         let conn = db.conn();
         let id = |code| account(&conn, code);

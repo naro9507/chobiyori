@@ -3,7 +3,8 @@
 		"name": "DCS Books",
 		"skipToContent": "Skip to content",
 		"fiscalYear": "FY {year}",
-		"loading": "Loading"
+		"loading": "Loading",
+		"chooseFiscalYear": "Fiscal year to view"
 	},
 	"nav": {
 		"label": "Main menu",
@@ -23,7 +24,7 @@
 		"home": "See this month's figures and what to do next.",
 		"transactions": "Record sales and payments. Switch between quick entry, the journal grid and compound entries; all of them produce the same journal entries.",
 		"inbox": "Review and confirm entries suggested from receipt photos and card statements.",
-		"ledgers": "View the journal, general ledger, cash book and bank book.",
+		"ledgers": "View the journal, general ledger, cash and bank books, and expense book.",
 		"reports": "See the trial balance and account balances. Every figure is calculated from your journal entries.",
 		"receivables": "Manage recurring sales such as tuition and membership fees, and their payments.",
 		"closing": "Record depreciation and closing adjustments, and get the figures for your blue tax return.",
@@ -317,5 +318,38 @@
 		"database": "Could not read or write your books. Please restart the app.",
 		"notInTauri": "Only the screens are shown in the browser. Your books are available when you run the app.",
 		"unknown": "Something went wrong. Please try again."
+	},
+	"ledgers": {
+		"tabsLabel": "Book",
+		"journal": "Journal",
+		"ledger": "General ledger",
+		"cash": "Cash and bank books",
+		"expense": "Expense book",
+		"journalHint": "Every transaction in date order.",
+		"ledgerHint": "Money in and out of one account, with the balance after each entry.",
+		"cashHint": "Deposits, withdrawals and the balance of each cash or bank account. Compare it with your bankbook and cash on hand.",
+		"expenseHint": "Payments listed by expense account.",
+		"fromMonth": "From",
+		"toMonth": "To",
+		"account": "Account",
+		"date": "Date",
+		"debitAccount": "Debit account",
+		"debitAmount": "Debit amount",
+		"creditAccount": "Credit account",
+		"creditAmount": "Credit amount",
+		"memo": "Description",
+		"counterAccount": "Other account",
+		"sundry": "Sundry (two or more accounts)",
+		"debit": "Debit",
+		"credit": "Credit",
+		"deposit": "In",
+		"withdrawal": "Out",
+		"balance": "Balance",
+		"total": "Total",
+		"openingCarried": "Carried from last year",
+		"monthCarried": "Carried from last month",
+		"empty": "Nothing recorded in this period yet. You can record transactions on the Transactions screen.",
+		"noCashAccounts": "There are no payment accounts. On the Master screen, mark your cash and bank accounts as payment accounts.",
+		"loading": "Loading"
 	}
 }

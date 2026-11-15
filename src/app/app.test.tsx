@@ -37,13 +37,13 @@ describe("アプリの枠", () => {
 		const router = renderApp()
 		await screen.findByRole("heading", { level: 1, name: "ホーム" })
 
-		await user.click(screen.getByRole("link", { name: "帳簿" }))
+		await user.click(screen.getByRole("link", { name: "取込受信箱" }))
 
 		expect(
-			await screen.findByRole("heading", { level: 1, name: "帳簿" })
+			await screen.findByRole("heading", { level: 1, name: "取込受信箱" })
 		).toBeInTheDocument()
 		expect(screen.getByText("この画面は準備中です")).toBeInTheDocument()
-		expect(router.state.location.pathname).toBe("/ledgers")
+		expect(router.state.location.pathname).toBe("/inbox")
 	})
 
 	it("ブラウザだけで開いたときは、その旨をホームに出す", async () => {

@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useSetupStatus } from "@/features/setup/setup"
 import { callCommand } from "@/lib/tauri"
 
 /** Rust 側 `domain::journal` と同じ文字列。 */
@@ -68,10 +67,8 @@ export type SimpleInput = {
 	memo: string
 }
 
-/** いま開いている年度。初期設定の前は null。 */
-export function useFiscalYear() {
-	return useSetupStatus().data?.fiscalYear ?? null
-}
+/** いま開いている年度。サイドメニューで選べる。初期設定の前は null。 */
+export { useFiscalYear } from "@/features/setup/fiscal-years"
 
 export function useTransactions(fiscalYear: number | null, month: number) {
 	return useQuery({
@@ -93,6 +90,7 @@ function useInvalidateBooks() {
 		Promise.all([
 			queryClient.invalidateQueries({ queryKey: ["transactions"] }),
 			queryClient.invalidateQueries({ queryKey: ["trial-balance"] }),
+			queryClient.invalidateQueries({ queryKey: ["books"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import { HomePage } from "@/pages/home-page"
+import { LedgersPage } from "@/pages/ledgers-page"
 import { MasterPage } from "@/pages/master-page"
 import { PlaceholderPage } from "@/pages/placeholder-page"
 import { ReportsPage } from "@/pages/reports-page"
@@ -21,6 +22,7 @@ const rootRoute = createRootRoute({ component: AppRoot })
 const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
 	transactions: TransactionsPage,
+	ledgers: LedgersPage,
 	reports: ReportsPage,
 	master: MasterPage,
 	settings: SettingsPage,

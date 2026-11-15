@@ -225,6 +225,16 @@ pub fn month_range(year: i64, month: u32) -> AppResult<(String, String)> {
     ))
 }
 
+/// 年度 `year` の `from_month` 月初から `to_month` 月末まで。帳簿や試算表の期間に使う。
+pub fn period_range(year: i64, from_month: u32, to_month: u32) -> AppResult<(String, String)> {
+    let (from, _) = month_range(year, from_month)?;
+    let (_, to) = month_range(year, to_month)?;
+    if from_month > to_month {
+        return Err(AppError::field(ErrorCode::OutOfRange, "toMonth"));
+    }
+    Ok((from, to))
+}
+
 /// 明細行が使うマスタの状態。呼び出し側が DB から調べて渡す。
 pub trait MasterLookup {
     /// 科目が有効なら `Some(true)`、無効なら `Some(false)`、なければ `None`。
