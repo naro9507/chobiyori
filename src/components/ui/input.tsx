@@ -1,4 +1,5 @@
 import type * as React from "react"
+import { useId } from "react"
 import { cn } from "@/lib/utils"
 
 const fieldClass =
@@ -38,4 +39,19 @@ function Checkbox({
 	)
 }
 
-export { Checkbox, Input, NativeSelect }
+/** 文言の付いたチェックボックス。文言を押しても切り替わる。 */
+function LabeledCheckbox({
+	label,
+	className,
+	...props
+}: Omit<React.ComponentProps<"input">, "type"> & { label: string }) {
+	const id = useId()
+	return (
+		<span className={cn("flex items-center gap-2 text-sm", className)}>
+			<Checkbox id={id} {...props} />
+			<label htmlFor={id}>{label}</label>
+		</span>
+	)
+}
+
+export { Checkbox, Input, LabeledCheckbox, NativeSelect }

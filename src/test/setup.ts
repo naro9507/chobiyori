@@ -17,3 +17,9 @@ afterEach(() => {
 	localStorage.clear()
 	document.documentElement.className = ""
 })
+
+// 取引入力のタブは起動している間だけ覚える。テストごとに初めに戻す
+afterEach(async () => {
+	const { useTransactionsTab } = await import("@/stores/transactions-tab-store")
+	useTransactionsTab.setState({ tab: "simple" })
+})

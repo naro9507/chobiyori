@@ -65,7 +65,18 @@ const line = (
 	side: "debit" | "credit",
 	accountId: number,
 	amount: number
-) => ({ id, lineNo: id, side, accountId, amount, partnerId: null, memo: "" })
+) => ({
+	id,
+	lineNo: id,
+	side,
+	accountId,
+	amount,
+	partnerId: null,
+	memo: "",
+	subAccountId: null,
+	taxCategory: null,
+	isQualifiedInvoice: false,
+})
 
 const transactions: Transaction[] = [
 	{
