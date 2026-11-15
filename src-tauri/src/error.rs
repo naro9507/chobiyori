@@ -43,8 +43,12 @@ pub enum ErrorCode {
     Unencodable,
     /// PDF に使える日本語のフォントが PC に見つからない
     FontNotFound,
+    /// ファイルを読めない（形式が違う、壊れている、開けない）
+    FileRead,
     /// ファイルを保存できない
     FileWrite,
+    /// 取込の内容に直すところが残っている
+    ImportBlocked,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

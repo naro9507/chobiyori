@@ -119,6 +119,32 @@ fn insert(conn: &Connection, year: i64, input: &TransactionInput) -> AppResult<T
     get(conn, id)
 }
 
+/// 取込で、たくさんの取引をまとめて保存する。呼び出し側の DB トランザクションの中で使う。
+/// マスタは 1 回だけ読む。1 件でも検証を通らなければエラーにする（呼び出し側で全部取り消す）。
+pub(crate) fn insert_many(
+    conn: &Connection,
+    year: i64,
+    inputs: &[TransactionInput],
+) -> AppResult<usize> {
+    ensure_year_open(conn, year)?;
+    let masters = DbMasters::load(conn)?;
+    let mut insert = conn.prepare(
+        "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    for input in inputs {
+        let valid = journal::validate(input, year, &masters, &AllowedInactive::default())?;
+        insert.execute(params![
+            year,
+            valid.date,
+            TransactionKind::Normal,
+            input.entry_mode,
+            valid.memo
+        ])?;
+        insert_lines(conn, conn.last_insert_rowid(), &valid)?;
+    }
+    Ok(inputs.len())
+}
+
 /// 仕訳グリッド・複合仕訳の取引を保存する。
 pub fn create(db: &Database, year: i64, input: &TransactionInput) -> AppResult<Transaction> {
     db.transaction(|tx| insert(tx, year, input))

@@ -1,4 +1,4 @@
-//! ファイルを選ぶ画面（保存先）。Rust 側から開くので、画面には権限を渡さない。
+//! ファイルを選ぶ画面（保存先・取り込むファイル）。Rust 側から開くので、画面には権限を渡さない。
 
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -16,6 +16,23 @@ pub async fn save_path(
             .set_file_name(file_name)
             .add_filter(filter.0, &[filter.1])
             .blocking_save_file()
+            .and_then(|p| p.into_path().ok())
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// 取り込むファイルを選んでもらう。やめたら `None`。
+pub async fn open_path(
+    app: AppHandle,
+    filter: (&'static str, &'static [&'static str]),
+) -> Option<PathBuf> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter(filter.0, filter.1)
+            .blocking_pick_file()
             .and_then(|p| p.into_path().ok())
     })
     .await

@@ -8,6 +8,7 @@ pub mod db;
 pub mod domain;
 pub mod error;
 pub mod export;
+pub mod import;
 
 use tauri::Manager;
 
@@ -19,8 +20,9 @@ pub fn run() {
     tauri::Builder::default()
         // 更新後にアプリを再起動するため
         .plugin(tauri_plugin_process::init())
-        // 保存先を選ぶ画面。Rust 側からだけ開く
+        // 保存先と取り込むファイルを選ぶ画面。Rust 側からだけ開く
         .plugin(tauri_plugin_dialog::init())
+        .manage(commands::import::ImportState::default())
         .setup(|app| {
             // 自動アップデート。更新の確認と適用は画面側から行う
             #[cfg(desktop)]
@@ -70,7 +72,10 @@ pub fn run() {
             commands::books::journal_book,
             commands::books::ledger,
             commands::books::expense_book,
-            commands::export::export_report
+            commands::export::export_report,
+            commands::import::choose_import_file,
+            commands::import::preview_import,
+            commands::import::run_import
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");
