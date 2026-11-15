@@ -112,6 +112,7 @@
 		"tax_standard": "課税事業者（本則課税）",
 		"tax_simplified": "課税事業者（簡易課税）",
 		"tax_special20": "課税事業者（2 割特例）",
+		"exemptWithInvoiceNo": "登録番号があると、登録した日から課税事業者になります。今年の途中で登録した場合は、このままで構いません。",
 		"yearTitle": "年度と勘定科目",
 		"yearDescription": "帳簿をつけはじめる年を選びます。個人事業の年度は 1 月から 12 月です。",
 		"fiscalYear": "年度（西暦）",
