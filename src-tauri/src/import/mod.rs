@@ -47,6 +47,10 @@ pub struct DraftLine {
     pub amount: i64,
     pub partner: Option<PartnerRef>,
     pub memo: String,
+    /// 補助科目のコード（科目の下で探す）
+    pub sub_account: Option<String>,
+    pub tax_category: Option<crate::domain::master::TaxCategory>,
+    pub is_qualified_invoice: bool,
 }
 
 /// 読んだだけの取引。まだ検証していない。
@@ -81,6 +85,10 @@ string_enum! {
         InactiveMaster => "inactiveMaster",
         /// 取引先コードが帳簿にない
         UnknownPartner => "unknownPartner",
+        /// 補助科目コードが、その科目の下にない
+        UnknownSubAccount => "unknownSubAccount",
+        /// 税区分が読めない
+        InvalidTaxCategory => "invalidTaxCategory",
         /// 借方合計と貸方合計が合わない
         Unbalanced => "unbalanced",
         /// 同じ科目が借方と貸方の両方にある
@@ -232,6 +240,7 @@ struct Plan {
 struct Masters {
     accounts: Vec<Account>,
     partners: Vec<Partner>,
+    sub_accounts: Vec<crate::db::sub_accounts::SubAccount>,
 }
 
 impl MasterLookup for Masters {
@@ -246,6 +255,12 @@ impl MasterLookup for Masters {
             .iter()
             .find(|p| p.id == id)
             .map(|p| p.is_active)
+    }
+    fn sub_account(&self, id: i64) -> Option<(i64, bool)> {
+        self.sub_accounts
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| (s.account_id, s.is_active))
     }
 }
 
@@ -357,6 +372,7 @@ fn plan(
     let masters = Masters {
         accounts: accounts::list(conn)?,
         partners: partners::list(conn)?,
+        sub_accounts: crate::db::sub_accounts::list(conn)?,
     };
     let mut issues = parsed.issues.clone();
     // 年度: 指定がなければ、最初の取引の日付の年
@@ -433,9 +449,29 @@ fn plan(
                     &mut partner_cache,
                 ))),
             };
-            match (account_id, partner) {
-                (Ok(account_id), Ok(partner)) => {
+            // 補助科目は、その科目の下でコードを探す
+            let sub_account = match (&account_id, &line.sub_account) {
+                (Ok(account_id), Some(code)) => masters
+                    .sub_accounts
+                    .iter()
+                    .find(|s| s.account_id == *account_id && &s.code == code)
+                    .map(|s| Some(s.id))
+                    .ok_or_else(|| {
+                        Issue::new(
+                            draft.sheet.as_deref(),
+                            draft.row,
+                            IssueCode::UnknownSubAccount,
+                        )
+                        .with(code.clone())
+                    }),
+                _ => Ok(None),
+            };
+            match (account_id, partner, sub_account) {
+                (Ok(account_id), Ok(partner), Ok(sub_account_id)) => {
                     lines.push(LineInput {
+                        sub_account_id,
+                        tax_category: line.tax_category,
+                        is_qualified_invoice: line.is_qualified_invoice,
                         side: line.side,
                         account_id,
                         amount: line.amount,
@@ -447,7 +483,7 @@ fn plan(
                     });
                     partner_plans.push(partner);
                 }
-                (Err(issue), _) | (_, Err(issue)) => {
+                (Err(issue), _, _) | (_, Err(issue), _) | (_, _, Err(issue)) => {
                     problem.get_or_insert(issue);
                 }
             }

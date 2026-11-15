@@ -34,6 +34,7 @@ pub struct SubAccountInput {
 const SELECT: &str = "
     SELECT s.id, s.account_id, s.code, s.name_ja, s.name_en, s.kana, s.is_active,
            EXISTS (SELECT 1 FROM journal_lines WHERE sub_account_id = s.id)
+           OR EXISTS (SELECT 1 FROM templates WHERE debit_sub_account_id = s.id OR credit_sub_account_id = s.id)
     FROM sub_accounts s";
 
 fn from_row(row: &Row<'_>) -> rusqlite::Result<SubAccount> {

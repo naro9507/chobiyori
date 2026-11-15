@@ -92,6 +92,7 @@ pub(crate) mod tests {
         );
         drop(conn);
         let simple = |kind, date: &str, amount, account_id, payment| SimpleInput {
+            allocation_percent: None,
             kind,
             date: date.into(),
             amount,
@@ -147,6 +148,9 @@ pub(crate) mod tests {
         )
         .unwrap();
         let line = |side, account_id, amount| LineInput {
+            sub_account_id: None,
+            tax_category: None,
+            is_qualified_invoice: false,
             side,
             account_id,
             amount,

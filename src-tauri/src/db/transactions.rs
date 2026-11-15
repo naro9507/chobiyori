@@ -4,10 +4,12 @@
 //! 通らない取引は保存しない。これで「取引ごとに借方合計 = 貸方合計」が常に成り立つ。
 
 use super::Database;
+use crate::domain::allocation;
 use crate::domain::journal::{
     self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput,
     TransactionInput, TransactionKind, ValidTransaction,
 };
+use crate::domain::master::{Rounding, TaxCategory, TaxStatus};
 use crate::domain::standard_accounts::{OWNER_CONTRIBUTIONS_LINE, OWNER_DRAWINGS_LINE};
 use crate::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -24,6 +26,10 @@ pub struct Line {
     pub amount: i64,
     pub partner_id: Option<i64>,
     pub memo: String,
+    pub sub_account_id: Option<i64>,
+    /// 税区分。フェーズ 3 までに入れた行は空
+    pub tax_category: Option<TaxCategory>,
+    pub is_qualified_invoice: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -54,39 +60,72 @@ fn ensure_year_open(conn: &Connection, year: i64) -> AppResult<()> {
     }
 }
 
-/// 科目と取引先の有効・無効。件数は多くても数百なので、まとめて読む。
-struct DbMasters {
-    accounts: HashMap<i64, bool>,
+/// 年度の消費税の扱いが免税事業者か。
+pub(crate) fn year_is_exempt(conn: &Connection, year: i64) -> AppResult<bool> {
+    let status: Option<TaxStatus> = conn
+        .query_row(
+            "SELECT tax_status FROM fiscal_years WHERE year = ?1",
+            [year],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(status.is_none_or(|s| s == TaxStatus::Exempt))
+}
+
+/// 科目・取引先・補助科目の有効・無効と、科目の既定の税区分。件数は多くても数百なので、まとめて読む。
+pub(crate) struct DbMasters {
+    accounts: HashMap<i64, (bool, Option<TaxCategory>)>,
     partners: HashMap<i64, bool>,
+    sub_accounts: HashMap<i64, (i64, bool)>,
+    exempt: bool,
 }
 
 impl DbMasters {
-    fn load(conn: &Connection) -> AppResult<Self> {
-        let read = |sql: &str| -> AppResult<HashMap<i64, bool>> {
-            let mut stmt = conn.prepare(sql)?;
-            let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
-            Ok(rows.collect::<Result<_, _>>()?)
-        };
+    pub(crate) fn load(conn: &Connection, year: i64) -> AppResult<Self> {
+        let mut stmt = conn.prepare("SELECT id, is_active, default_tax_category FROM accounts")?;
+        let accounts = stmt
+            .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?
+            .collect::<Result<_, _>>()?;
+        let mut stmt = conn.prepare("SELECT id, is_active FROM partners")?;
+        let partners = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<_, _>>()?;
+        let mut stmt = conn.prepare("SELECT id, account_id, is_active FROM sub_accounts")?;
+        let sub_accounts = stmt
+            .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?
+            .collect::<Result<_, _>>()?;
         Ok(Self {
-            accounts: read("SELECT id, is_active FROM accounts")?,
-            partners: read("SELECT id, is_active FROM partners")?,
+            accounts,
+            partners,
+            sub_accounts,
+            exempt: year_is_exempt(conn, year)?,
         })
     }
 }
 
 impl MasterLookup for DbMasters {
     fn account_active(&self, id: i64) -> Option<bool> {
-        self.accounts.get(&id).copied()
+        self.accounts.get(&id).map(|a| a.0)
     }
     fn partner_active(&self, id: i64) -> Option<bool> {
         self.partners.get(&id).copied()
+    }
+    fn sub_account(&self, id: i64) -> Option<(i64, bool)> {
+        self.sub_accounts.get(&id).copied()
+    }
+    fn account_tax(&self, id: i64) -> Option<TaxCategory> {
+        self.accounts.get(&id).and_then(|a| a.1)
+    }
+    fn tax_exempt(&self) -> bool {
+        self.exempt
     }
 }
 
 fn insert_lines(conn: &Connection, transaction_id: i64, valid: &ValidTransaction) -> AppResult<()> {
     let mut insert = conn.prepare_cached(
-        "INSERT INTO journal_lines (transaction_id, line_no, side, account_id, amount, partner_id, memo)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO journal_lines (transaction_id, line_no, side, account_id, amount, partner_id, memo,
+                                    sub_account_id, tax_category, is_qualified_invoice)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     )?;
     for (index, line) in valid.lines.iter().enumerate() {
         insert.execute(params![
@@ -96,23 +135,36 @@ fn insert_lines(conn: &Connection, transaction_id: i64, valid: &ValidTransaction
             line.account_id,
             line.amount,
             line.partner_id,
-            line.memo
+            line.memo,
+            line.sub_account_id,
+            line.tax_category,
+            line.is_qualified_invoice
         ])?;
     }
     Ok(())
 }
 
 fn insert(conn: &Connection, year: i64, input: &TransactionInput) -> AppResult<Transaction> {
+    insert_kind(conn, year, input, TransactionKind::Normal)
+}
+
+/// 取引を検証して保存する。定型仕訳から作るときは `kind` を `Template` にする。
+pub(crate) fn insert_kind(
+    conn: &Connection,
+    year: i64,
+    input: &TransactionInput,
+    kind: TransactionKind,
+) -> AppResult<Transaction> {
     ensure_year_open(conn, year)?;
     let valid = journal::validate(
         input,
         year,
-        &DbMasters::load(conn)?,
+        &DbMasters::load(conn, year)?,
         &AllowedInactive::default(),
     )?;
     conn.execute(
         "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![year, valid.date, TransactionKind::Normal, input.entry_mode, valid.memo],
+        params![year, valid.date, kind, input.entry_mode, valid.memo],
     )?;
     let id = conn.last_insert_rowid();
     insert_lines(conn, id, &valid)?;
@@ -127,7 +179,7 @@ pub(crate) fn insert_many(
     inputs: &[TransactionInput],
 ) -> AppResult<usize> {
     ensure_year_open(conn, year)?;
-    let masters = DbMasters::load(conn)?;
+    let masters = DbMasters::load(conn, year)?;
     let mut insert = conn.prepare(
         "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
     )?;
@@ -166,7 +218,7 @@ fn ensure_payment_account(conn: &Connection, id: i64, field: &'static str) -> Ap
     }
 }
 
-fn owner_accounts(conn: &Connection) -> AppResult<OwnerAccounts> {
+pub(crate) fn owner_accounts(conn: &Connection) -> AppResult<OwnerAccounts> {
     let find = |line: &str| -> AppResult<i64> {
         conn.query_row(
             "SELECT id FROM accounts WHERE statement_line = ?1",
@@ -191,9 +243,58 @@ pub fn create_simple(db: &Database, year: i64, input: &SimpleInput) -> AppResult
                 ensure_payment_account(tx, to, "accountId")?;
             }
         }
-        let transaction = journal::simple_to_transaction(input, owner_accounts(tx)?)?;
+        let owner = owner_accounts(tx)?;
+        let mut transaction = journal::simple_to_transaction(input, owner)?;
+        if input.kind == journal::SimpleKind::Expense {
+            // インボイス: 登録番号のある取引先からの支払いなら、印を付けておく
+            let qualified = has_invoice_no(tx, input.partner_id)?;
+            for line in transaction.lines.iter_mut() {
+                line.is_qualified_invoice = qualified && line.side == Side::Debit;
+            }
+            if let Some(percent) = input.allocation_percent {
+                if !(0..=100).contains(&percent) {
+                    return Err(AppError::field(ErrorCode::OutOfRange, "allocationPercent"));
+                }
+                let rounding = account_rounding(tx, transaction.lines[0].account_id)?;
+                transaction.lines = allocation::split_line(
+                    &transaction.lines,
+                    0,
+                    owner.drawings,
+                    percent,
+                    rounding,
+                );
+            }
+        }
         insert(tx, year, &transaction).map_err(|e| journal::simple_error(input.kind, e))
     })
+}
+
+/// 取引先に適格請求書発行事業者の登録番号があるか。
+pub(crate) fn has_invoice_no(conn: &Connection, partner_id: Option<i64>) -> AppResult<bool> {
+    let Some(id) = partner_id else {
+        return Ok(false);
+    };
+    Ok(conn
+        .query_row(
+            "SELECT invoice_registration_no IS NOT NULL FROM partners WHERE id = ?1",
+            [id],
+            |row| row.get(0),
+        )
+        .optional()?
+        .unwrap_or(false))
+}
+
+/// 科目の既定の按分ルールの端数処理。ルールがなければ切り捨て。
+pub(crate) fn account_rounding(conn: &Connection, account_id: i64) -> AppResult<Rounding> {
+    Ok(conn
+        .query_row(
+            "SELECT r.rounding FROM accounts a JOIN allocation_rules r ON r.id = a.default_allocation_rule_id
+             WHERE a.id = ?1",
+            [account_id],
+            |row| row.get(0),
+        )
+        .optional()?
+        .unwrap_or(Rounding::Floor))
 }
 
 /// 取引を変更する。年度は変えられない（日付は同じ年度の中で動かせる）。
@@ -205,8 +306,14 @@ pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Tra
         let allowed = AllowedInactive {
             accounts: current.lines.iter().map(|l| l.account_id).collect(),
             partners: current.lines.iter().filter_map(|l| l.partner_id).collect(),
+            sub_accounts: current.lines.iter().filter_map(|l| l.sub_account_id).collect(),
         };
-        let valid = journal::validate(input, current.fiscal_year, &DbMasters::load(tx)?, &allowed)?;
+        let valid = journal::validate(
+            input,
+            current.fiscal_year,
+            &DbMasters::load(tx, current.fiscal_year)?,
+            &allowed,
+        )?;
         tx.execute(
             "UPDATE transactions SET date = ?2, memo = ?3, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1",
@@ -230,7 +337,8 @@ pub fn delete(db: &Database, id: i64) -> AppResult<()> {
 
 const SELECT: &str = "
     SELECT t.id, t.fiscal_year, t.date, t.kind, t.entry_mode, t.memo,
-           l.id, l.line_no, l.side, l.account_id, l.amount, l.partner_id, l.memo
+           l.id, l.line_no, l.side, l.account_id, l.amount, l.partner_id, l.memo,
+           l.sub_account_id, l.tax_category, l.is_qualified_invoice
     FROM transactions t
     JOIN journal_lines l ON l.transaction_id = t.id";
 
@@ -263,6 +371,9 @@ fn collect(
                 amount: row.get(10)?,
                 partner_id: row.get(11)?,
                 memo: row.get(12)?,
+                sub_account_id: row.get(13)?,
+                tax_category: row.get(14)?,
+                is_qualified_invoice: row.get(15)?,
             });
         }
     }
@@ -319,6 +430,9 @@ pub(crate) mod tests {
             memo: String::new(),
             lines: vec![
                 LineInput {
+                    sub_account_id: None,
+                    tax_category: None,
+                    is_qualified_invoice: false,
                     side: Side::Debit,
                     account_id: debit,
                     amount,
@@ -326,6 +440,9 @@ pub(crate) mod tests {
                     memo: String::new(),
                 },
                 LineInput {
+                    sub_account_id: None,
+                    tax_category: None,
+                    is_qualified_invoice: false,
                     side: Side::Credit,
                     account_id: credit,
                     amount,
@@ -448,6 +565,9 @@ pub(crate) mod tests {
         compound.memo = "3 月分の給料".into();
         compound.lines[1].amount = 179_580;
         compound.lines.push(LineInput {
+            sub_account_id: None,
+            tax_category: None,
+            is_qualified_invoice: false,
             side: Side::Credit,
             account_id: withheld,
             amount: 20_420,
@@ -516,6 +636,7 @@ pub(crate) mod tests {
 
     fn simple(kind: SimpleKind, account_id: Option<i64>, payment: i64, amount: i64) -> SimpleInput {
         SimpleInput {
+            allocation_percent: None,
             kind,
             date: "2026-03-15".into(),
             amount,
@@ -524,6 +645,72 @@ pub(crate) mod tests {
             partner_id: None,
             memo: String::new(),
         }
+    }
+
+    #[test]
+    fn simple_expense_can_be_split_for_home_use_and_marks_invoices() {
+        let db = set_up_db();
+        let (bank, utilities, drawings) = {
+            let conn = db.conn();
+            // 課税事業者の年度にする（税区分とインボイスの印を残すため）
+            conn.execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
+                .unwrap();
+            conn.execute(
+                "INSERT INTO partners (code, name_ja, is_vendor, invoice_registration_no) VALUES ('E1', '電力会社', 1, 'T1234567890123')",
+                [],
+            )
+            .unwrap();
+            (
+                account(&conn, "104"),
+                account(&conn, "603"),
+                account(&conn, "199"),
+            )
+        };
+        let partner = db.conn().last_insert_rowid();
+        let mut input = simple(SimpleKind::Expense, Some(utilities), bank, 10_001);
+        input.allocation_percent = Some(50);
+        input.partner_id = Some(partner);
+        let t = create_simple(&db, 2026, &input).unwrap();
+        assert_eq!(
+            t.lines
+                .iter()
+                .map(|l| (l.side, l.account_id, l.amount))
+                .collect::<Vec<_>>(),
+            [
+                (Side::Debit, utilities, 5_000),
+                (Side::Debit, drawings, 5_001),
+                (Side::Credit, bank, 10_001)
+            ]
+        );
+        // 経費の行は科目の既定の税区分とインボイスの印、家事分は対象外
+        assert_eq!(
+            t.lines[0].tax_category,
+            Some(TaxCategory::TaxablePurchase10)
+        );
+        assert!(t.lines[0].is_qualified_invoice);
+        assert_eq!(t.lines[1].tax_category, Some(TaxCategory::OutOfScope));
+        assert!(!t.lines[1].is_qualified_invoice);
+
+        input.allocation_percent = Some(101);
+        assert_eq!(
+            create_simple(&db, 2026, &input).unwrap_err(),
+            AppError::field(ErrorCode::OutOfRange, "allocationPercent")
+        );
+    }
+
+    #[test]
+    fn exempt_years_store_out_of_scope() {
+        let db = set_up_db();
+        let (cash, supplies) = {
+            let conn = db.conn();
+            (account(&conn, "101"), account(&conn, "610"))
+        };
+        let mut input = entry("2026-03-01", supplies, cash, 100);
+        input.lines[0].tax_category = Some(TaxCategory::TaxablePurchase8);
+        input.lines[0].is_qualified_invoice = true;
+        let t = create(&db, 2026, &input).unwrap();
+        assert_eq!(t.lines[0].tax_category, Some(TaxCategory::OutOfScope));
+        assert!(!t.lines[0].is_qualified_invoice);
     }
 
     #[test]

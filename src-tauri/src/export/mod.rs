@@ -8,7 +8,7 @@ pub mod labels;
 pub mod pdf;
 pub mod report;
 
-use crate::db::{accounts, books, partners, reports, setup};
+use crate::db::{accounts, books, partners, reports, setup, sub_accounts};
 use crate::domain::journal::period_range;
 use crate::error::{AppError, AppResult, ErrorCode};
 use labels::Locale;
@@ -87,11 +87,10 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
     let (year, from_month, to_month) = (request.fiscal_year, request.from_month, request.to_month);
     let (from, to) = period_range(year, from_month, to_month)?;
     let names = || -> AppResult<Names> {
-        Ok(Names::new(
-            accounts::list(conn)?,
-            partners::list(conn)?,
-            locale,
-        ))
+        Ok(
+            Names::new(accounts::list(conn)?, partners::list(conn)?, locale)
+                .with_sub_accounts(sub_accounts::list(conn)?),
+        )
     };
     let profile = setup::profile(conn)?;
     let ctx = Context {

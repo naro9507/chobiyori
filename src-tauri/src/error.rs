@@ -49,6 +49,8 @@ pub enum ErrorCode {
     FileWrite,
     /// 取込の内容に直すところが残っている
     ImportBlocked,
+    /// 定型仕訳のその月の分は、もう記録してある（見送ってある）
+    AlreadyRecorded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

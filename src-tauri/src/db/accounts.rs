@@ -79,6 +79,7 @@ const SELECT: &str = "
            EXISTS (SELECT 1 FROM journal_lines WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM sub_accounts WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM purposes WHERE default_debit_account_id = a.id OR default_credit_account_id = a.id)
+           OR EXISTS (SELECT 1 FROM templates WHERE debit_account_id = a.id OR credit_account_id = a.id)
     FROM accounts a";
 
 /// 区分の順（資産 → 負債 → 資本 → 収益 → 売上原価 → 経費）、その中は並び順。

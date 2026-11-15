@@ -59,7 +59,7 @@ fn write(records: impl IntoIterator<Item = Vec<String>>) -> AppResult<String> {
 }
 
 /// 仕訳の CSV の列。取込でも同じ並びを使う（見出しは日本語・英語のどちらでも読む）。
-pub const JOURNAL_COLUMNS: [&l::Text; 10] = [
+pub const JOURNAL_COLUMNS: [&l::Text; 13] = [
     &l::TRANSACTION_NO,
     &l::DATE,
     &l::SIDE,
@@ -70,6 +70,9 @@ pub const JOURNAL_COLUMNS: [&l::Text; 10] = [
     &l::PARTNER_NAME,
     &l::LINE_MEMO,
     &l::TRANSACTION_MEMO,
+    &l::SUB_ACCOUNT_CODE,
+    &l::TAX_CATEGORY,
+    &l::QUALIFIED_INVOICE,
 ];
 
 /// 仕訳の CSV。取引番号は、ファイルの中で取引をまとめるための通し番号（1 から）。
@@ -100,6 +103,18 @@ pub fn journal(book: &JournalBook, names: &Names, locale: Locale) -> AppResult<S
                 names.partner_name(line.partner_id),
                 line.memo.clone(),
                 t.memo.clone(),
+                line.sub_account_id
+                    .and_then(|id| names.sub_account(id))
+                    .map(|s| s.code.clone())
+                    .unwrap_or_default(),
+                line.tax_category
+                    .map(|c| l::tax_category(c, locale).to_string())
+                    .unwrap_or_default(),
+                if line.is_qualified_invoice {
+                    l::YES.get(locale).to_string()
+                } else {
+                    String::new()
+                },
             ]);
         }
     }
