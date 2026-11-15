@@ -24,7 +24,9 @@ export type ErrorCode =
 	| "database"
 	| "unencodable"
 	| "fontNotFound"
+	| "fileRead"
 	| "fileWrite"
+	| "importBlocked"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

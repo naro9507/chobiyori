@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
+import type { AccountMapping, ImportPreview } from "@/features/data/import-api"
 import type { Account } from "@/features/master/master-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -40,6 +41,57 @@ const accounts = [
 	account(3, "401", "売上高"),
 ]
 
+const bookAccounts = [
+	{
+		number: 1,
+		nameJa: "現金",
+		nameEn: "cash",
+		suggestedAccountId: 1,
+		debit: 0,
+		credit: 1080,
+	},
+	{
+		number: 2,
+		nameJa: "普通預金",
+		nameEn: "bank",
+		suggestedAccountId: 2,
+		debit: 16000,
+		credit: 0,
+	},
+	{
+		number: 3,
+		nameJa: "授業料",
+		nameEn: "tuition",
+		suggestedAccountId: null,
+		debit: 0,
+		credit: 16000,
+	},
+]
+
+/** 対応が決まっていない番号は、直すところになる。 */
+function preview(mapping: AccountMapping[]): ImportPreview {
+	const mapped = new Set(mapping.map((m) => m.number))
+	const unmapped = bookAccounts.filter((b) => !mapped.has(b.number))
+	return {
+		fiscalYear: 2014,
+		createsFiscalYear: true,
+		ready: unmapped.length === 0 ? 3 : 0,
+		duplicates: 0,
+		issues: unmapped.map((b) => ({
+			sheet: "Jan.",
+			row: 4,
+			code: "unmappedAccount" as const,
+			value: String(b.number),
+		})),
+		issueCount: unmapped.length,
+		totalDebit: 17080,
+		totalCredit: 17080,
+		accountTotals: [],
+		bookAccounts,
+		newPartners: [{ code: "1", name: "生徒A" }],
+	}
+}
+
 function renderPage() {
 	const router = createAppRouter(
 		createMemoryHistory({ initialEntries: ["/data"] })
@@ -55,32 +107,96 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
 	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
-		switch (command) {
-			case "setup_status":
-				return { completed: true, fiscalYear: 2026 }
-			case "list_fiscal_years":
-				return [
-					{
-						year: 2026,
-						filingType: "blue65",
-						taxStatus: "exempt",
-						closed: false,
-					},
-				]
-			case "list_accounts":
-				return accounts
-			case "list_partners":
-				return []
-			case "export_report":
-				return "勘定科目.csv"
-			default:
-				throw new Error(`想定外のコマンド: ${command}`)
+	mocks.callCommand.mockImplementation(
+		async (command: string, args?: { mapping?: AccountMapping[] }) => {
+			switch (command) {
+				case "setup_status":
+					return { completed: true, fiscalYear: 2026 }
+				case "list_fiscal_years":
+					return [
+						{
+							year: 2026,
+							filingType: "blue65",
+							taxStatus: "exempt",
+							closed: false,
+						},
+					]
+				case "list_accounts":
+					return accounts
+				case "list_partners":
+					return []
+				case "choose_import_file":
+					return {
+						name: "DCS accounts for 2014.xlsx",
+						kind: "excelBook",
+						suggestedYear: 2014,
+					}
+				case "preview_import":
+					return preview(args?.mapping ?? [])
+				case "run_import":
+					return { fiscalYear: 2014, imported: 3, duplicates: 0 }
+				case "export_report":
+					return "勘定科目.csv"
+				default:
+					throw new Error(`想定外のコマンド: ${command}`)
+			}
 		}
-	})
+	)
 })
 
 describe("データ", () => {
+	it("Excel の帳簿は、科目を当てはめてから取り込み、取り込んだ年度を開く", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		const excel = (await screen.findByText("Excel の帳簿")).parentElement
+			?.parentElement
+		if (!excel) throw new Error("Excel の帳簿の欄がない")
+		await user.click(
+			within(excel).getByRole("button", { name: "ファイルを選ぶ" })
+		)
+
+		expect(
+			await screen.findByText("DCS accounts for 2014.xlsx")
+		).toBeInTheDocument()
+		// 年はファイル名から
+		expect(screen.getByLabelText("取り込む年")).toHaveValue("2014")
+		// 候補のある科目は選んである。候補のない「授業料」は選ぶまで取り込めない
+		const cash = await screen.findByLabelText("「現金 / cash」に当てる科目")
+		expect(cash).toHaveValue("1")
+		const tuition = screen.getByLabelText("「授業料 / tuition」に当てる科目")
+		expect(tuition).toHaveValue("")
+		expect(
+			await screen.findByText(/直すところが 1 件あります/)
+		).toBeInTheDocument()
+		expect(screen.getByText("Jan. の 4 行目")).toBeInTheDocument()
+		const button = screen.getByRole("button", { name: /件を取り込む/ })
+		expect(button).toBeDisabled()
+
+		await user.selectOptions(tuition, "401 売上高")
+		expect(
+			await screen.findByText("直すところはありません")
+		).toBeInTheDocument()
+		expect(
+			screen.getByText("この年度の帳簿を新しく作ります")
+		).toBeInTheDocument()
+		await user.click(screen.getByRole("button", { name: "3 件を取り込む" }))
+
+		expect(mocks.callCommand).toHaveBeenCalledWith("run_import", {
+			fiscalYear: 2014,
+			mapping: [
+				{ number: 1, accountId: 1 },
+				{ number: 2, accountId: 2 },
+				{ number: 3, accountId: 3 },
+			],
+		})
+		expect(
+			await screen.findByText(
+				"2014年度に 3 件を取り込みました。すでにあった 0 件は飛ばしました。"
+			)
+		).toBeInTheDocument()
+		expect(useYearStore.getState().selected).toBe(2014)
+	})
+
 	it("マスタは CSV で書き出し、文字コードを選べる", async () => {
 		const user = userEvent.setup()
 		renderPage()
