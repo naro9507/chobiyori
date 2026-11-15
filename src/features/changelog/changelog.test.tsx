@@ -5,7 +5,7 @@ import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { I18nProvider } from "@/i18n/i18n-context"
 import { useSettingsStore } from "@/stores/settings-store"
-import packageJson from "../../../../../package.json"
+import packageJson from "../../../package.json"
 import { findRelease, parseChangelog, parseNotes, releases } from "./changelog"
 
 const mocks = vi.hoisted(() => ({ version: "0.2.0" }))

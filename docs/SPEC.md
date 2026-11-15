@@ -621,8 +621,8 @@ dcs-accounting-app/
 │   │   ├── export/           # CSV・Excel・PDF 出力
 │   │   └── receipt/          # Gemini API 呼び出し、結果の検算
 │   └── tauri.conf.json
-└── apps/renderer/            # React
-    └── src/features/         # 機能別の画面
+└── src/                      # React（Tauri の標準の構成に合わせ、リポジトリ直下に置く）
+    └── features/             # 機能別の画面
 ```
 
 ### 7.3 移行で変わること
