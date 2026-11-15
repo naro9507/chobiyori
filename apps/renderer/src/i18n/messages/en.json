@@ -112,7 +112,7 @@
 		"tax_standard": "Taxable (general method)",
 		"tax_simplified": "Taxable (simplified method)",
 		"tax_special20": "Taxable (20% special rule)",
-		"exemptWithInvoiceNo": "With a registration number, you are taxable from the date you registered. If you registered partway through this year, you can keep this choice.",
+		"exemptWithInvoiceNo": "Once you register for invoices, you are taxable from the registration date and need to file a consumption tax return. If you are registered, choose one of the taxable options. If you became taxable because you registered, you may be able to use the 20% special rule.",
 		"yearTitle": "Year and accounts",
 		"yearDescription": "Choose the year you start your books. A sole proprietor's year runs from January to December.",
 		"fiscalYear": "Year",

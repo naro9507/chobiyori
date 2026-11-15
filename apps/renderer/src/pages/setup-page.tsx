@@ -252,7 +252,7 @@ export function SetupPage() {
 										</RadioCardsItem>
 									))}
 								</RadioCards>
-								{/* 登録すると課税事業者になる。年の途中で登録した人もいるので、止めずに案内だけ出す */}
+								{/* 登録すると課税事業者になる。選び間違いの可能性が高いので案内を出す。止めはしない */}
 								{form.taxStatus === "exempt" &&
 									form.invoiceRegistrationNo.trim() !== "" && (
 										<p
