@@ -395,6 +395,9 @@ pub fn parse(bytes: &[u8], year: i64) -> AppResult<Parsed> {
             amount,
             partner: partner.clone(),
             memo: String::new(),
+            sub_account: None,
+            tax_category: None,
+            is_qualified_invoice: false,
         };
         parsed.drafts.push(Draft {
             sheet: Some(r.sheet.clone()),

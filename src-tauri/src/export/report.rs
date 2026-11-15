@@ -6,6 +6,7 @@ use super::labels::{self as l, Locale};
 use crate::db::accounts::Account;
 use crate::db::books::JournalBook;
 use crate::db::partners::Partner;
+use crate::db::sub_accounts::SubAccount;
 use crate::domain::balance::TrialBalance;
 use crate::domain::journal::Side;
 use crate::domain::ledger::Ledger;
@@ -93,6 +94,7 @@ pub struct Context {
 pub struct Names {
     accounts: HashMap<i64, Account>,
     partners: HashMap<i64, Partner>,
+    sub_accounts: HashMap<i64, SubAccount>,
     locale: Locale,
 }
 
@@ -101,8 +103,19 @@ impl Names {
         Self {
             accounts: accounts.into_iter().map(|a| (a.id, a)).collect(),
             partners: partners.into_iter().map(|p| (p.id, p)).collect(),
+            sub_accounts: HashMap::new(),
             locale,
         }
+    }
+
+    /// 補助科目も引けるようにする。
+    pub fn with_sub_accounts(mut self, sub_accounts: Vec<SubAccount>) -> Self {
+        self.sub_accounts = sub_accounts.into_iter().map(|s| (s.id, s)).collect();
+        self
+    }
+
+    pub fn sub_account(&self, id: i64) -> Option<&SubAccount> {
+        self.sub_accounts.get(&id)
     }
 
     pub fn account(&self, id: i64) -> Option<&Account> {

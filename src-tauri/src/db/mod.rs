@@ -10,6 +10,7 @@ pub mod partners;
 pub mod reports;
 pub mod setup;
 pub mod sub_accounts;
+pub mod templates;
 pub mod transactions;
 
 use crate::error::{AppError, AppResult};
@@ -22,6 +23,7 @@ use std::sync::{Mutex, MutexGuard};
 const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_journal.sql"),
+    include_str!("migrations/0003_templates.sql"),
 ];
 
 pub struct Database {
@@ -149,6 +151,21 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
         assert_eq!(codes, ["101", "204"]);
+    }
+
+    #[test]
+    fn migration_0003_adds_templates_to_existing_books() {
+        // フェーズ 3 の版で作った帳簿（0002 まで当たっている）
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        conn.execute_batch(MIGRATIONS[1]).unwrap();
+        conn.execute_batch("PRAGMA user_version = 2;").unwrap();
+        let db = Database::init(conn).unwrap();
+        let count: i64 = db
+            .conn()
+            .query_row("SELECT count(*) FROM templates", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]

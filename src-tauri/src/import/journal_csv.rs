@@ -39,9 +39,12 @@ enum Role {
     PartnerName,
     LineMemo,
     TransactionMemo,
+    SubAccountCode,
+    TaxCategory,
+    QualifiedInvoice,
 }
 
-const ROLES: [Role; 10] = [
+const ROLES: [Role; 13] = [
     Role::TransactionNo,
     Role::Date,
     Role::Side,
@@ -52,6 +55,9 @@ const ROLES: [Role; 10] = [
     Role::PartnerName,
     Role::LineMemo,
     Role::TransactionMemo,
+    Role::SubAccountCode,
+    Role::TaxCategory,
+    Role::QualifiedInvoice,
 ];
 
 const REQUIRED: [Role; 5] = [
@@ -175,8 +181,29 @@ pub fn parse(bytes: &[u8]) -> AppResult<Parsed> {
             invalid[index] = true;
             continue;
         }
+        // 税区分は空なら科目の既定にする。書いてあって読めなければ直すところにする
+        let tax = get(Role::TaxCategory);
+        let tax_category = if tax.is_empty() {
+            None
+        } else if let Some(category) = l::parse_tax_category(tax) {
+            Some(category)
+        } else {
+            parsed
+                .issues
+                .push(issue(IssueCode::InvalidTaxCategory).with(tax.to_string()));
+            invalid[index] = true;
+            continue;
+        };
+        let qualified = get(Role::QualifiedInvoice);
+        let sub_account = get(Role::SubAccountCode);
         let partner = get(Role::PartnerCode);
         parsed.drafts[index].lines.push(DraftLine {
+            sub_account: (!sub_account.is_empty()).then(|| sub_account.to_string()),
+            tax_category,
+            is_qualified_invoice: !qualified.is_empty()
+                && [l::YES.ja, l::YES.en, "1", "true", "○"]
+                    .iter()
+                    .any(|y| y.eq_ignore_ascii_case(qualified)),
             side,
             account: AccountRef::Code(code.to_string()),
             amount,
@@ -214,7 +241,8 @@ mod tests {
             accounts::list(&conn).unwrap(),
             partners::list(&conn).unwrap(),
             locale,
-        );
+        )
+        .with_sub_accounts(crate::db::sub_accounts::list(&conn).unwrap());
         let text = csv_out::journal(&journal(&conn, 2026, 1, 12).unwrap(), &names, locale).unwrap();
         csv_out::encode(&text, encoding).unwrap()
     }
@@ -286,6 +314,77 @@ mod tests {
                 .unwrap()
                 .len(),
             0
+        );
+    }
+
+    /// 課税事業者の帳簿に、普通預金の補助科目「A銀行」（コード 1）を作る。
+    fn taxable_book_with_bank_sub_account() -> (crate::db::Database, i64) {
+        let db = set_up_db();
+        let conn = db.conn();
+        conn.execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
+            .unwrap();
+        let bank = crate::db::transactions::tests::account(&conn, "104");
+        conn.execute(
+            "INSERT INTO sub_accounts (account_id, code, name_ja) VALUES (?1, '1', 'A銀行')",
+            [bank],
+        )
+        .unwrap();
+        let sub = conn.last_insert_rowid();
+        drop(conn);
+        (db, sub)
+    }
+
+    #[test]
+    fn sub_accounts_tax_categories_and_invoices_round_trip() {
+        use crate::domain::master::TaxCategory;
+        let (source, sub) = taxable_book_with_bank_sub_account();
+        let (supplies, bank) = {
+            let conn = source.conn();
+            (
+                crate::db::transactions::tests::account(&conn, "610"),
+                crate::db::transactions::tests::account(&conn, "104"),
+            )
+        };
+        let mut input = crate::db::transactions::tests::entry("2026-04-01", supplies, bank, 540);
+        input.lines[0].tax_category = Some(TaxCategory::TaxablePurchase8);
+        input.lines[0].is_qualified_invoice = true;
+        input.lines[1].sub_account_id = Some(sub);
+        crate::db::transactions::create(&source, 2026, &input).unwrap();
+
+        for locale in [Locale::Ja, Locale::En] {
+            let bytes = exported(&source, locale, Encoding::Utf8);
+            let parsed = parse(&bytes).unwrap();
+            assert!(parsed.issues.is_empty(), "{:?}", parsed.issues);
+            let (target, target_sub) = taxable_book_with_bank_sub_account();
+            commit(&target, &parsed, None, &[]).unwrap();
+            let t = crate::db::transactions::list(&target.conn(), 2026, None).unwrap();
+            assert_eq!(
+                t[0].lines[0].tax_category,
+                Some(TaxCategory::TaxablePurchase8)
+            );
+            assert!(t[0].lines[0].is_qualified_invoice);
+            assert_eq!(t[0].lines[1].sub_account_id, Some(target_sub));
+            assert_eq!(t[0].lines[1].tax_category, Some(TaxCategory::OutOfScope));
+        }
+    }
+
+    #[test]
+    fn unknown_sub_accounts_and_tax_categories_are_reported() {
+        let (db, _) = taxable_book_with_bank_sub_account();
+        let csv = "取引番号,日付,貸借,科目コード,金額,補助科目コード,税区分\n\
+                   1,2026-03-01,借方,610,100,,消費税\n\
+                   1,2026-03-01,貸方,104,100,,\n\
+                   2,2026-03-02,借方,610,100,,課税仕入 10%\n\
+                   2,2026-03-02,貸方,104,100,9,\n";
+        let parsed = parse(csv.as_bytes()).unwrap();
+        let p = preview(&db.conn(), &parsed, None, &[]).unwrap();
+        let found: Vec<(usize, IssueCode)> = p.issues.iter().map(|i| (i.row, i.code)).collect();
+        assert_eq!(
+            found,
+            [
+                (2, IssueCode::InvalidTaxCategory),
+                (4, IssueCode::UnknownSubAccount)
+            ]
         );
     }
 

@@ -3,7 +3,7 @@
 //! 画面の文言は `i18n` に置くが、ファイルの見出しは取込で読み戻す形式でもあるので、
 //! ここで日本語と英語を固定して持つ。仕訳の CSV の見出しは取込でどちらの言語でも読める。
 
-use crate::domain::master::AccountCategory;
+use crate::domain::master::{AccountCategory, TaxCategory};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -78,6 +78,9 @@ texts! {
     PARTNER_NAME = "取引先名", "Partner name";
     LINE_MEMO = "明細のメモ", "Line memo";
     TRANSACTION_MEMO = "取引のメモ", "Transaction memo";
+    SUB_ACCOUNT_CODE = "補助科目コード", "Sub-account code";
+    TAX_CATEGORY = "税区分", "Tax category";
+    QUALIFIED_INVOICE = "インボイス", "Qualified invoice";
 
     // マスタの CSV
     CODE = "コード", "Code";
@@ -123,6 +126,59 @@ pub fn category(category: AccountCategory, locale: Locale) -> &'static str {
         },
     };
     text.get(locale)
+}
+
+/// 税区分の名前。CSV に書き、取込ではどちらの言語でも（内部の文字列でも）読む。
+pub fn tax_category(category: TaxCategory, locale: Locale) -> &'static str {
+    tax_text(category).get(locale)
+}
+
+fn tax_text(category: TaxCategory) -> Text {
+    match category {
+        TaxCategory::TaxableSales10 => Text {
+            ja: "課税売上 10%",
+            en: "Taxable sales 10%",
+        },
+        TaxCategory::TaxableSales8 => Text {
+            ja: "課税売上 軽減 8%",
+            en: "Taxable sales reduced 8%",
+        },
+        TaxCategory::ExemptSales => Text {
+            ja: "非課税売上",
+            en: "Exempt sales",
+        },
+        TaxCategory::NonTaxable => Text {
+            ja: "不課税",
+            en: "Not taxable",
+        },
+        TaxCategory::TaxablePurchase10 => Text {
+            ja: "課税仕入 10%",
+            en: "Taxable purchases 10%",
+        },
+        TaxCategory::TaxablePurchase8 => Text {
+            ja: "課税仕入 軽減 8%",
+            en: "Taxable purchases reduced 8%",
+        },
+        TaxCategory::ExemptPurchase => Text {
+            ja: "非課税仕入",
+            en: "Exempt purchases",
+        },
+        TaxCategory::OutOfScope => Text {
+            ja: "対象外",
+            en: "Out of scope",
+        },
+    }
+}
+
+/// CSV の税区分を読む。日本語・英語の名前か、内部の文字列（`taxable_purchase_10` など）。
+pub fn parse_tax_category(text: &str) -> Option<TaxCategory> {
+    let text = text.trim();
+    TaxCategory::parse(text).or_else(|| {
+        TaxCategory::ALL.iter().copied().find(|c| {
+            let t = tax_text(*c);
+            t.ja == text || t.en.eq_ignore_ascii_case(text)
+        })
+    })
 }
 
 /// 期間の表示。日本語は「2026年1月1日〜2026年3月31日」。
@@ -174,6 +230,16 @@ mod tests {
         assert_eq!(amount(999), "999");
         assert_eq!(amount(1_000), "1,000");
         assert_eq!(amount(-1_234_567), "-1,234,567");
+    }
+
+    #[test]
+    fn reads_tax_categories_in_either_language() {
+        for c in TaxCategory::ALL {
+            assert_eq!(parse_tax_category(tax_category(*c, Locale::Ja)), Some(*c));
+            assert_eq!(parse_tax_category(tax_category(*c, Locale::En)), Some(*c));
+            assert_eq!(parse_tax_category(c.as_str()), Some(*c));
+        }
+        assert_eq!(parse_tax_category("消費税"), None);
     }
 
     #[test]

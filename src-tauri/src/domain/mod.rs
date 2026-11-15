@@ -6,6 +6,7 @@ pub mod journal;
 pub mod ledger;
 pub mod master;
 pub mod standard_accounts;
+pub mod template;
 
 /// DB に文字列で保存する列挙型を作る。画面とも同じ文字列でやり取りする。
 macro_rules! string_enum {

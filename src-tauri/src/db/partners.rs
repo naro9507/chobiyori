@@ -68,6 +68,7 @@ const SELECT: &str = "
            p.invoice_registration_no, p.memo, p.is_active,
            EXISTS (SELECT 1 FROM journal_lines WHERE partner_id = p.id)
            OR EXISTS (SELECT 1 FROM purposes WHERE default_partner_id = p.id)
+           OR EXISTS (SELECT 1 FROM templates WHERE partner_id = p.id)
     FROM partners p";
 
 fn from_row(row: &Row<'_>) -> rusqlite::Result<Partner> {

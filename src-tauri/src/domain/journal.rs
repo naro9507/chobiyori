@@ -4,7 +4,7 @@
 //! どの入力方法（かんたん入力・仕訳グリッド・複合仕訳）でも、ここで同じ検証を通す。
 //! DB には依存しない。マスタが有効かどうかは、呼び出し側が調べて渡す。
 
-use super::master::MEMO_MAX;
+use super::master::{TaxCategory, MEMO_MAX};
 use super::string_enum;
 use crate::error::{AppError, AppResult, ErrorCode};
 use serde::Deserialize;
@@ -72,6 +72,31 @@ pub struct LineInput {
     pub partner_id: Option<i64>,
     #[serde(default)]
     pub memo: String,
+    /// 補助科目。科目の下の内訳（口座別・借入先別など）
+    #[serde(default)]
+    pub sub_account_id: Option<i64>,
+    /// 税区分。空なら科目の既定の税区分にする。免税の年度は「対象外」にする
+    #[serde(default)]
+    pub tax_category: Option<TaxCategory>,
+    /// 仕入先が適格請求書発行事業者か（インボイスがあるか）
+    #[serde(default)]
+    pub is_qualified_invoice: bool,
+}
+
+impl LineInput {
+    /// 補助科目・税区分のない明細行。
+    pub fn new(side: Side, account_id: i64, amount: i64) -> Self {
+        Self {
+            side,
+            account_id,
+            amount,
+            partner_id: None,
+            memo: String::new(),
+            sub_account_id: None,
+            tax_category: None,
+            is_qualified_invoice: false,
+        }
+    }
 }
 
 /// 仕訳グリッド・複合仕訳から保存する取引。
@@ -103,6 +128,9 @@ pub struct SimpleInput {
     pub partner_id: Option<i64>,
     #[serde(default)]
     pub memo: String,
+    /// 家事按分の事業割合（0〜100）。支出のときだけ使う。空なら按分しない
+    #[serde(default)]
+    pub allocation_percent: Option<i64>,
 }
 
 /// 事業主の出し入れに使う科目。呼び出し側が DB から探して渡す。
@@ -141,11 +169,8 @@ pub fn simple_to_transaction(
         ));
     }
     let line = |side, account_id| LineInput {
-        side,
-        account_id,
-        amount: input.amount,
         partner_id: input.partner_id,
-        memo: String::new(),
+        ..LineInput::new(side, account_id, input.amount)
     };
     Ok(TransactionInput {
         date: input.date.clone(),
@@ -240,6 +265,30 @@ pub trait MasterLookup {
     /// 科目が有効なら `Some(true)`、無効なら `Some(false)`、なければ `None`。
     fn account_active(&self, id: i64) -> Option<bool>;
     fn partner_active(&self, id: i64) -> Option<bool>;
+    /// 補助科目の親の科目と、有効かどうか。なければ `None`。
+    fn sub_account(&self, _id: i64) -> Option<(i64, bool)> {
+        None
+    }
+    /// 科目の既定の税区分。
+    fn account_tax(&self, _id: i64) -> Option<TaxCategory> {
+        None
+    }
+    /// 年度が免税事業者か。免税なら税区分は「対象外」で保存し、インボイスの印も付けない。
+    fn tax_exempt(&self) -> bool {
+        false
+    }
+}
+
+/// 明細行の税区分を決める。免税の年度は「対象外」。入力がなければ科目の既定、それもなければ「対象外」。
+pub fn resolve_tax(
+    line: Option<TaxCategory>,
+    account_default: Option<TaxCategory>,
+    exempt: bool,
+) -> TaxCategory {
+    if exempt {
+        return TaxCategory::OutOfScope;
+    }
+    line.or(account_default).unwrap_or(TaxCategory::OutOfScope)
 }
 
 /// 検証を通った取引。
@@ -297,10 +346,30 @@ pub fn validate(
                 Some(_) => {}
             }
         }
+        if let Some(sub) = line.sub_account_id {
+            match masters.sub_account(sub) {
+                // 別の科目の補助科目は使えない
+                Some((parent, _)) if parent != line.account_id => {
+                    return Err(AppError::line(ErrorCode::NotFound, index, "subAccountId"))
+                }
+                None => return Err(AppError::line(ErrorCode::NotFound, index, "subAccountId")),
+                Some((_, false)) if !allowed_inactive.sub_accounts.contains(&sub) => {
+                    return Err(AppError::line(ErrorCode::Inactive, index, "subAccountId"))
+                }
+                Some(_) => {}
+            }
+        }
         let line_memo = super::master::optional(&line.memo, MEMO_MAX, "memo")
             .map_err(|e| AppError::line(e.code, index, "memo"))?;
+        let exempt = masters.tax_exempt();
         lines.push(LineInput {
             memo: line_memo,
+            tax_category: Some(resolve_tax(
+                line.tax_category,
+                masters.account_tax(line.account_id),
+                exempt,
+            )),
+            is_qualified_invoice: line.is_qualified_invoice && !exempt,
             ..line.clone()
         });
     }
@@ -342,6 +411,7 @@ pub fn total(lines: &[LineInput], side: Side) -> i64 {
 pub struct AllowedInactive {
     pub accounts: Vec<i64>,
     pub partners: Vec<i64>,
+    pub sub_accounts: Vec<i64>,
 }
 
 #[cfg(test)]
@@ -377,6 +447,9 @@ mod tests {
 
     fn line(side: Side, account_id: i64, amount: i64) -> LineInput {
         LineInput {
+            sub_account_id: None,
+            tax_category: None,
+            is_qualified_invoice: false,
             side,
             account_id,
             amount,
@@ -509,8 +582,116 @@ mod tests {
         let allowed = AllowedInactive {
             accounts: vec![10],
             partners: vec![2],
+            sub_accounts: vec![],
         };
         validate(&input(lines), 2026, &Masters::new(), &allowed).unwrap();
+    }
+
+    /// 補助科目と税区分を持つマスタ。科目 10（消耗品費・課税仕入）・20（現金）、補助科目 5 は 20 の下。
+    struct TaxMasters {
+        exempt: bool,
+    }
+
+    impl MasterLookup for TaxMasters {
+        fn account_active(&self, id: i64) -> Option<bool> {
+            [10, 20].contains(&id).then_some(true)
+        }
+        fn partner_active(&self, _id: i64) -> Option<bool> {
+            None
+        }
+        fn sub_account(&self, id: i64) -> Option<(i64, bool)> {
+            match id {
+                5 => Some((20, true)),
+                6 => Some((20, false)),
+                _ => None,
+            }
+        }
+        fn account_tax(&self, id: i64) -> Option<TaxCategory> {
+            (id == 10).then_some(TaxCategory::TaxablePurchase10)
+        }
+        fn tax_exempt(&self) -> bool {
+            self.exempt
+        }
+    }
+
+    #[test]
+    fn tax_category_defaults_to_the_account_and_is_out_of_scope_when_exempt() {
+        let mut debit = line(Side::Debit, 10, 100);
+        debit.is_qualified_invoice = true;
+        let lines = vec![debit, line(Side::Credit, 20, 100)];
+        let taxable = validate(
+            &input(lines.clone()),
+            2026,
+            &TaxMasters { exempt: false },
+            &AllowedInactive::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            taxable.lines[0].tax_category,
+            Some(TaxCategory::TaxablePurchase10)
+        );
+        assert!(taxable.lines[0].is_qualified_invoice);
+        // 既定のない科目は対象外
+        assert_eq!(taxable.lines[1].tax_category, Some(TaxCategory::OutOfScope));
+
+        let mut chosen = lines.clone();
+        chosen[0].tax_category = Some(TaxCategory::TaxablePurchase8);
+        let chosen = validate(
+            &input(chosen),
+            2026,
+            &TaxMasters { exempt: false },
+            &AllowedInactive::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            chosen.lines[0].tax_category,
+            Some(TaxCategory::TaxablePurchase8)
+        );
+
+        // 免税の年度は、選んでいても対象外で、インボイスの印も付けない
+        let exempt = validate(
+            &input(lines),
+            2026,
+            &TaxMasters { exempt: true },
+            &AllowedInactive::default(),
+        )
+        .unwrap();
+        assert_eq!(exempt.lines[0].tax_category, Some(TaxCategory::OutOfScope));
+        assert!(!exempt.lines[0].is_qualified_invoice);
+    }
+
+    #[test]
+    fn sub_accounts_must_belong_to_the_line_account() {
+        let m = TaxMasters { exempt: true };
+        let with_sub = |account, sub| {
+            let mut credit = line(Side::Credit, account, 100);
+            credit.sub_account_id = Some(sub);
+            input(vec![
+                line(Side::Debit, if account == 10 { 20 } else { 10 }, 100),
+                credit,
+            ])
+        };
+        let ok = validate(&with_sub(20, 5), 2026, &m, &AllowedInactive::default()).unwrap();
+        assert_eq!(ok.lines[1].sub_account_id, Some(5));
+        // 別の科目の補助科目
+        assert_eq!(
+            validate(&with_sub(10, 5), 2026, &m, &AllowedInactive::default()).unwrap_err(),
+            AppError::line(ErrorCode::NotFound, 1, "subAccountId")
+        );
+        assert_eq!(
+            validate(&with_sub(20, 9), 2026, &m, &AllowedInactive::default()).unwrap_err(),
+            AppError::line(ErrorCode::NotFound, 1, "subAccountId")
+        );
+        // 使わない設定にした補助科目は、変更前の取引が使っていたときだけ
+        assert_eq!(
+            validate(&with_sub(20, 6), 2026, &m, &AllowedInactive::default()).unwrap_err(),
+            AppError::line(ErrorCode::Inactive, 1, "subAccountId")
+        );
+        let allowed = AllowedInactive {
+            sub_accounts: vec![6],
+            ..AllowedInactive::default()
+        };
+        validate(&with_sub(20, 6), 2026, &m, &allowed).unwrap();
     }
 
     #[test]
@@ -530,6 +711,7 @@ mod tests {
 
     fn simple(kind: SimpleKind, account_id: Option<i64>, payment: i64) -> SimpleInput {
         SimpleInput {
+            allocation_percent: None,
             kind,
             date: "2026-03-15".into(),
             amount: 1200,

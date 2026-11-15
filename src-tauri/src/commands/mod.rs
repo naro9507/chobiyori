@@ -10,3 +10,4 @@ pub mod journal;
 pub mod master;
 pub mod reports;
 pub mod setup;
+pub mod templates;

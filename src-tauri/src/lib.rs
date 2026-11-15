@@ -75,7 +75,16 @@ pub fn run() {
             commands::export::export_report,
             commands::import::choose_import_file,
             commands::import::preview_import,
-            commands::import::run_import
+            commands::import::run_import,
+            commands::templates::list_templates,
+            commands::templates::create_template,
+            commands::templates::update_template,
+            commands::templates::delete_template,
+            commands::templates::template_candidates,
+            commands::templates::skipped_template_months,
+            commands::templates::post_template,
+            commands::templates::skip_template_month,
+            commands::templates::unskip_template_month
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");
