@@ -119,10 +119,12 @@ type AccountForm = {
 	category: AccountCategory
 	defaultTaxCategory: string
 	defaultAllocationRuleId: string
+	isPaymentAccount: boolean
 }
 
 function AccountsSection() {
 	const t = useTranslations("master")
+	const paymentId = useId()
 	const locale = useSettingsStore((state) => state.locale)
 	const rules = useMasterList(allocationRuleKind)
 
@@ -140,6 +142,7 @@ function AccountsSection() {
 						<span className="flex items-center gap-2">
 							{displayName(a, locale)}
 							{a.isSystem && <Badge variant="outline">{t("standard")}</Badge>}
+							{a.isPaymentAccount && <Badge>{t("paymentBadge")}</Badge>}
 						</span>
 					),
 				},
@@ -158,6 +161,7 @@ function AccountsSection() {
 				category: "expense",
 				defaultTaxCategory: "",
 				defaultAllocationRuleId: "",
+				isPaymentAccount: false,
 			})}
 			toForm={(a) => ({
 				code: a.code,
@@ -167,6 +171,7 @@ function AccountsSection() {
 				category: a.category,
 				defaultTaxCategory: a.defaultTaxCategory ?? "",
 				defaultAllocationRuleId: a.defaultAllocationRuleId?.toString() ?? "",
+				isPaymentAccount: a.isPaymentAccount,
 			})}
 			toInput={(f) => ({
 				code: f.code,
@@ -179,6 +184,7 @@ function AccountsSection() {
 				defaultAllocationRuleId: f.defaultAllocationRuleId
 					? Number(f.defaultAllocationRuleId)
 					: null,
+				isPaymentAccount: f.isPaymentAccount,
 			})}
 			renderFields={(form, setForm, errorFor, editing) => (
 				<>
@@ -243,6 +249,33 @@ function AccountsSection() {
 							))}
 						</NativeSelect>
 					</Field>
+					<div className="flex flex-col gap-1.5">
+						<div className="flex items-center gap-2 pt-7">
+							<Checkbox
+								id={paymentId}
+								checked={form.isPaymentAccount}
+								onChange={(e) =>
+									setForm({ isPaymentAccount: e.target.checked })
+								}
+								aria-describedby={`${paymentId}-hint`}
+								aria-invalid={errorFor("isPaymentAccount") ? true : undefined}
+							/>
+							<label htmlFor={paymentId} className="font-medium text-sm">
+								{t("paymentAccount")}
+							</label>
+						</div>
+						<p
+							id={`${paymentId}-hint`}
+							className="text-muted-foreground text-xs"
+						>
+							{t("paymentAccountHint")}
+						</p>
+						{errorFor("isPaymentAccount") && (
+							<p className="text-destructive text-xs">
+								{errorFor("isPaymentAccount")}
+							</p>
+						)}
+					</div>
 				</>
 			)}
 		/>

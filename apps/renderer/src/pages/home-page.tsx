@@ -14,11 +14,16 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
+import { useFiscalYear } from "@/features/journal/journal-api"
+import { AccountBalances } from "@/features/reports/account-balances"
+import { currentMonth } from "@/features/reports/reports-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { NotInTauriError } from "@/lib/tauri"
 
 export function HomePage() {
 	const t = useTranslations("home")
+	const fiscalYear = useFiscalYear()
+	const month = currentMonth(fiscalYear)
 
 	return (
 		<Page screen="home">
@@ -38,6 +43,18 @@ export function HomePage() {
 					</CardContent>
 				</Card>
 			</div>
+			<Card>
+				<CardHeader>
+					<CardTitle>{t("balancesTitle")}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<AccountBalances
+						fiscalYear={fiscalYear}
+						month={month}
+						title={t("balancesAsOf", { month })}
+					/>
+				</CardContent>
+			</Card>
 		</Page>
 	)
 }

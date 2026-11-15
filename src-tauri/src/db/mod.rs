@@ -6,8 +6,10 @@
 pub mod accounts;
 pub mod allocation_rules;
 pub mod partners;
+pub mod reports;
 pub mod setup;
 pub mod sub_accounts;
+pub mod transactions;
 
 use crate::error::{AppError, AppResult};
 use rusqlite::Connection;
@@ -16,7 +18,10 @@ use std::sync::{Mutex, MutexGuard};
 
 /// スキーマの変更。番号順に 1 回だけ当てる。適用済みの番号は `PRAGMA user_version` に持つ。
 /// 一度配布したファイルは書き換えず、変更は新しいファイルとして足す。
-const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_init.sql"),
+    include_str!("migrations/0002_journal.sql"),
+];
 
 pub struct Database {
     conn: Mutex<Connection>,
@@ -116,6 +121,33 @@ mod tests {
             )
             .unwrap();
         assert_eq!(tables, 3);
+    }
+
+    #[test]
+    fn migration_0002_marks_standard_cash_accounts_in_existing_books() {
+        // フェーズ 1 の版で作った帳簿（0001 だけ当たっている）
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        conn.execute_batch(
+            "PRAGMA user_version = 1;
+             INSERT INTO accounts (code, name_ja, category, is_system) VALUES
+                 ('101', '現金', 'asset', 1),
+                 ('610', '消耗品費', 'expense', 1),
+                 ('204', '未払金', 'liability', 1),
+                 ('900', '自分で足した科目', 'asset', 0);",
+        )
+        .unwrap();
+        let db = Database::init(conn).unwrap();
+        let conn = db.conn();
+        let mut stmt = conn
+            .prepare("SELECT code FROM accounts WHERE is_payment_account = 1 ORDER BY code")
+            .unwrap();
+        let codes: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(codes, ["101", "204"]);
     }
 
     #[test]

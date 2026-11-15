@@ -44,6 +44,8 @@ export type Account = MasterRecord & {
 	statementLine: string | null
 	defaultTaxCategory: TaxCategory | null
 	defaultAllocationRuleId: number | null
+	/** 口座（現金・預金・カードなど、お金の出入りに使う科目） */
+	isPaymentAccount: boolean
 	isSystem: boolean
 }
 
@@ -55,6 +57,7 @@ export type AccountInput = {
 	category: AccountCategory
 	defaultTaxCategory: TaxCategory | null
 	defaultAllocationRuleId: number | null
+	isPaymentAccount: boolean
 }
 
 export type SubAccount = MasterRecord & { accountId: number; kana: string }

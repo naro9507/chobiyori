@@ -2,6 +2,8 @@
 export type AppError = {
 	code: ErrorCode
 	field?: string
+	/** 仕訳の明細行のエラーのとき、その行（0 から数える） */
+	line?: number
 }
 
 export type ErrorCode =
@@ -15,6 +17,10 @@ export type ErrorCode =
 	| "systemAccount"
 	| "alreadySetUp"
 	| "notSetUp"
+	| "inactive"
+	| "unbalanced"
+	| "sameAccount"
+	| "yearClosed"
 	| "database"
 
 export function isAppError(error: unknown): error is AppError {
@@ -26,7 +32,16 @@ export function isAppError(error: unknown): error is AppError {
 	)
 }
 
-/** 入力欄 `field` に出すエラー。その欄のエラーでなければ undefined。 */
+/** 入力欄 `field` に出すエラー。その欄のエラーでなければ undefined。明細行のエラーは含めない。 */
 export function fieldError(error: unknown, field: string) {
-	return isAppError(error) && error.field === field ? error : undefined
+	return isAppError(error) && error.field === field && error.line === undefined
+		? error
+		: undefined
+}
+
+/** 明細行 `line` の入力欄 `field` に出すエラー。 */
+export function lineFieldError(error: unknown, line: number, field: string) {
+	return isAppError(error) && error.line === line && error.field === field
+		? error
+		: undefined
 }

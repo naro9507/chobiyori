@@ -2,5 +2,7 @@
 //! 機能ごとにモジュールを分ける。
 
 pub mod app;
+pub mod journal;
 pub mod master;
+pub mod reports;
 pub mod setup;
