@@ -63,6 +63,9 @@ dcs-accounting-app/
 ├── src-tauri/                  # バックエンド（Rust）
 │   ├── src/
 │   │   ├── commands/           # 画面から呼ぶコマンド
+│   │   ├── db/                 # DB の接続、スキーマ（migrations/）、マスタの読み書き
+│   │   ├── domain/             # 会計の決まりごと（区分・入力の検証・按分・標準科目）
+│   │   ├── error.rs            # 画面に返すエラー
 │   │   ├── lib.rs              # アプリの組み立て
 │   │   └── main.rs
 │   ├── capabilities/           # 画面に許可する操作
@@ -87,6 +90,22 @@ dcs-accounting-app/
 4. 返す型は Rust 側で `#[serde(rename_all = "camelCase")]` を付け、TypeScript の型と名前をそろえる。
 
 計算や検証のロジックは `cargo test` でテストする。
+
+## データベース
+
+帳簿は SQLite（SQLCipher 入り）に保存する。ファイルは OS ごとのアプリのデータフォルダにある `books.db`。
+
+| OS | 場所 |
+|---|---|
+| Windows | `%APPDATA%\jp.dcs.accounting\books.db` |
+| macOS | `~/Library/Application Support/jp.dcs.accounting/books.db` |
+
+- 接続は 1 本だけ持ち、`Database::transaction` で書き込みをまとめる。
+- スキーマの変更は `src-tauri/src/db/migrations/` に番号付きの SQL を足し、`db/mod.rs` の `MIGRATIONS` に登録する。配布した SQL は書き換えない。適用済みの番号は `PRAGMA user_version` に入る。
+- 金額は円単位の整数。集計値は保存せず、仕訳から計算する。
+- 暗号化: `Database::open` に鍵を渡すと SQLCipher で暗号化する（テストで確認済み）。鍵の保管（OS の資格情報ストアや起動時パスワード）はフェーズ 8 で入れる。それまでのアプリは鍵なしで開く。
+- エラーは `error::AppError`（`code` と入力欄の `field`）で返す。画面は `i18n` の `errors` から文を選ぶ。エラーやログに個人名・金額を入れない。
+- 開発中に DB を作り直したいときは、アプリを閉じて `books.db`（と `-wal`・`-shm`）を消す。次の起動で初期設定ウィザードが出る。
 
 ## UI 部品
 

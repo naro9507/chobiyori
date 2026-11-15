@@ -1,6 +1,7 @@
 import { Link, Outlet } from "@tanstack/react-router"
 import { navGroups } from "@/app/navigation"
 import { WhatsNewBanner } from "@/features/changelog/whats-new-banner"
+import { useSetupStatus } from "@/features/setup/setup"
 import { UpdateBanner } from "@/features/updater/update-banner"
 import { useTranslations } from "@/i18n/use-translations"
 
@@ -8,7 +9,8 @@ import { useTranslations } from "@/i18n/use-translations"
 export function AppShell() {
 	const t = useTranslations("nav")
 	const tApp = useTranslations("app")
-	const year = new Date().getFullYear()
+	const { data: setup } = useSetupStatus()
+	const year = setup?.fiscalYear ?? new Date().getFullYear()
 
 	return (
 		<div className="flex h-full min-h-0">
