@@ -6,17 +6,19 @@ import {
 	type RouterHistory,
 } from "@tanstack/react-router"
 import type { ReactNode } from "react"
-import { AppShell } from "@/components/layout/app-shell"
 import { HomePage } from "@/pages/home-page"
+import { MasterPage } from "@/pages/master-page"
 import { PlaceholderPage } from "@/pages/placeholder-page"
 import { SettingsPage } from "@/pages/settings-page"
+import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
-const rootRoute = createRootRoute({ component: AppShell })
+const rootRoute = createRootRoute({ component: AppRoot })
 
 /** 作り終えた画面。ここにない画面は「準備中」を表示する。 */
 const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
+	master: MasterPage,
 	settings: SettingsPage,
 }
 

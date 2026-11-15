@@ -16,7 +16,7 @@
 - **UI**: Tailwind CSS v4 + shadcn/ui（React Admin と MUI は使わない）
 - **ルーティング・データ取得・表**: TanStack Router / Query / Table / Virtual
 - **状態管理**: Zustand
-- **データベース**: SQLite + SQLCipher（Rust 側からアクセス。未実装）
+- **データベース**: SQLite + SQLCipher（`rusqlite`。Rust 側からだけアクセスする）
 - **テスト**: Vitest（画面）、cargo test（Rust）
 - **リント・整形**: Biome（画面）、Clippy・rustfmt（Rust）
 
@@ -38,6 +38,8 @@ dcs-accounting-app/
 │       └── styles/             # 配色とフォント
 ├── src-tauri/                  # バックエンド（Rust + Tauri）
 │   ├── src/commands/           # 画面から呼ぶコマンド
+│   ├── src/db/                 # スキーマ（migrations/）とマスタの読み書き
+│   ├── src/domain/             # 会計の決まりごと（区分・検証・按分・標準科目）
 │   ├── capabilities/           # 画面に許可する操作
 │   └── tauri.conf.json
 └── docs/                       # 仕様と開発資料

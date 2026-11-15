@@ -2,3 +2,5 @@
 //! 機能ごとにモジュールを分ける。
 
 pub mod app;
+pub mod master;
+pub mod setup;

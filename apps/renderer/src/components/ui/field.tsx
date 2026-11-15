@@ -1,0 +1,49 @@
+import { cloneElement, type ReactElement, useId } from "react"
+import { cn } from "@/lib/utils"
+
+/**
+ * ラベル・入力欄・補足・エラーをひとまとめにする。
+ * 子の入力欄に id と aria の属性を付ける。
+ */
+export function Field({
+	label,
+	hint,
+	error,
+	className,
+	children,
+}: {
+	label: string
+	hint?: string
+	error?: string
+	className?: string
+	children: ReactElement<Record<string, unknown>>
+}) {
+	const id = useId()
+	const hintId = `${id}-hint`
+	const errorId = `${id}-error`
+	const describedBy =
+		[hint && hintId, error && errorId].filter(Boolean).join(" ") || undefined
+
+	return (
+		<div className={cn("flex flex-col gap-1.5", className)}>
+			<label htmlFor={id} className="font-medium text-sm">
+				{label}
+			</label>
+			{cloneElement(children, {
+				id,
+				"aria-describedby": describedBy,
+				"aria-invalid": error ? true : undefined,
+			})}
+			{hint && (
+				<p id={hintId} className="text-muted-foreground text-xs">
+					{hint}
+				</p>
+			)}
+			{error && (
+				<p id={errorId} className="text-destructive text-xs">
+					{error}
+				</p>
+			)}
+		</div>
+	)
+}
