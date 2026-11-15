@@ -12,6 +12,7 @@
 
 pub mod excel_book;
 pub mod journal_csv;
+pub mod statement_file;
 
 use crate::db::accounts::{self, Account};
 use crate::db::partners::{self, Partner};

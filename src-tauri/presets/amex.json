@@ -1,0 +1,16 @@
+{
+  "app": "dcs-accounting",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "アメリカン・エキスプレス",
+  "sourceKind": "card",
+  "definition": {
+    "encoding": "shiftJis",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": ["date", "ignore", "merchant", "user", "amount", "foreignAmount"],
+    "sign": "spendPositive",
+    "skipUnreadableDates": true,
+    "header": ["ご利用日", "データ処理日", "ご利用内容", "ご利用者", "金額", "現地通貨額"]
+  }
+}

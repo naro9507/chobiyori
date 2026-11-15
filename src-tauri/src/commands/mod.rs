@@ -6,6 +6,7 @@ pub mod books;
 pub mod export;
 mod files;
 pub mod import;
+pub mod inbox;
 pub mod journal;
 pub mod master;
 pub mod reports;
