@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, Info, Loader2 } from "lucide-react"
 import { type FormEvent, useId, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -252,6 +252,20 @@ export function SetupPage() {
 										</RadioCardsItem>
 									))}
 								</RadioCards>
+								{/* 登録すると課税事業者になる。年の途中で登録した人もいるので、止めずに案内だけ出す */}
+								{form.taxStatus === "exempt" &&
+									form.invoiceRegistrationNo.trim() !== "" && (
+										<p
+											role="status"
+											className="mt-3 flex items-start gap-2 rounded-lg bg-warning-background px-3 py-2 text-sm text-warning"
+										>
+											<Info
+												aria-hidden="true"
+												className="mt-0.5 size-4 shrink-0"
+											/>
+											{t("exemptWithInvoiceNo")}
+										</p>
+									)}
 							</CardContent>
 						</Card>
 					</>

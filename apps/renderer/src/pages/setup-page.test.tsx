@@ -128,4 +128,39 @@ describe("初期設定ウィザード", () => {
 			"true"
 		)
 	})
+
+	it("免税事業者で登録番号があるときは案内を出し、課税を選ぶと消す", async () => {
+		const user = userEvent.setup()
+		renderApp()
+
+		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
+		await user.type(
+			screen.getByLabelText("インボイスの登録番号"),
+			"T1234567890123"
+		)
+		await user.click(screen.getByRole("button", { name: "次へ" }))
+
+		const notice = /登録した日から課税事業者になります/
+		expect(screen.getByText(notice)).toBeInTheDocument()
+
+		await user.click(
+			screen.getByRole("radio", { name: "課税事業者（2 割特例）" })
+		)
+		expect(screen.queryByText(notice)).not.toBeInTheDocument()
+
+		// 案内が出ていても先に進める
+		await user.click(screen.getByRole("radio", { name: "免税事業者" }))
+		await user.click(screen.getByRole("button", { name: "次へ" }))
+		expect(screen.getByLabelText("年度（西暦）")).toBeInTheDocument()
+	})
+
+	it("登録番号がなければ案内は出さない", async () => {
+		const user = userEvent.setup()
+		renderApp()
+		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
+		await user.click(screen.getByRole("button", { name: "次へ" }))
+		expect(
+			screen.queryByText(/登録した日から課税事業者になります/)
+		).not.toBeInTheDocument()
+	})
 })
