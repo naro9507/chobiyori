@@ -24,12 +24,12 @@
 		"home": "今月の数字と、次にやることをまとめて表示します。",
 		"transactions": "売上や支払いを記録します。かんたん入力・仕訳グリッド・複合仕訳を切り替えられ、どれで入力しても同じ仕訳になります。",
 		"inbox": "レシートの写真やカード明細から作った仕訳の候補を確認して、確定します。",
-		"ledgers": "仕訳帳・総勘定元帳・現金出納帳と預金出納帳・経費帳を見られます。",
+		"ledgers": "仕訳帳・総勘定元帳・現金出納帳と預金出納帳・経費帳を見て、CSV や PDF で保存できます。",
 		"reports": "試算表と口座の残高を見られます。数字はすべて仕訳から計算します。",
 		"receivables": "月謝や会費など、毎月決まった売上と入金を管理します。",
 		"closing": "減価償却や決算整理を行い、青色申告決算書に転記する金額を出します。",
 		"master": "勘定科目・摘要・取引先・家事按分のルールを管理します。",
-		"data": "CSV や Excel の取り込みと書き出し、バックアップと復元を行います。",
+		"data": "帳簿を CSV や PDF で書き出します。",
 		"settings": "事業者情報、表示する言語、配色を変えられます。",
 		"help": "会計がはじめての方に向けて、使い方とことばの意味をまとめます。"
 	},
@@ -317,7 +317,10 @@
 		"yearClosed": "締めた年度の帳簿は変更できません。",
 		"database": "帳簿の読み書きに失敗しました。アプリを起動し直してください。",
 		"notInTauri": "ブラウザで画面だけを表示しています。帳簿の機能は、アプリとして起動したときに使えます。",
-		"unknown": "うまくいきませんでした。もう一度お試しください。"
+		"unknown": "うまくいきませんでした。もう一度お試しください。",
+		"unencodable": "Shift_JIS では書けない文字（絵文字など）があります。文字コードを UTF-8 にして保存してください。",
+		"fontNotFound": "PDF に使える日本語のフォントが PC に見つかりません。CSV で保存するか、游ゴシック（Windows）やヒラギノ（Mac）のあるパソコンでお試しください。",
+		"fileWrite": "ファイルを保存できませんでした。保存する場所を変えてお試しください。"
 	},
 	"ledgers": {
 		"tabsLabel": "帳簿の種類",
@@ -350,6 +353,29 @@
 		"monthCarried": "前の月からの繰越",
 		"empty": "この期間の記録はまだありません。取引入力の画面から記録できます。",
 		"noCashAccounts": "口座がありません。マスタ画面で、現金や預金の科目を「口座として使う」にしてください。",
-		"loading": "読み込んでいます"
+		"loading": "読み込んでいます",
+		"saveCsv": "CSV で保存",
+		"savePdf": "PDF で保存",
+		"saved": "「{name}」を保存しました。"
+	},
+	"data": {
+		"exportTitle": "帳簿を書き出す",
+		"exportDescription": "{year}年度の 1 年分を書き出します。税理士さんへ渡すときや、ほかのソフトへ移すときに使います。",
+		"encoding": "CSV の文字コード",
+		"encodingHint": "ふつうは UTF-8 のままで Excel で開けます。古い会計ソフトに渡すときは Shift_JIS にしてください。",
+		"encodingUtf8": "UTF-8（おすすめ）",
+		"encodingShiftJis": "Shift_JIS",
+		"exportJournal": "仕訳帳",
+		"exportJournalHint": "CSV は、このアプリやほかのソフトに取り込める形です。",
+		"exportAllLedgers": "総勘定元帳（すべての科目）",
+		"exportAllLedgersHint": "動きのあった科目を、科目ごとにまとめます。",
+		"exportExpenseBook": "経費帳",
+		"exportExpenseBookHint": "経費の科目ごとの支払いです。",
+		"exportTrialBalance": "合計残高試算表",
+		"exportTrialBalanceHint": "科目ごとの合計と残高です。",
+		"exportAccounts": "勘定科目の一覧",
+		"exportAccountsHint": "コード・名前・区分です。",
+		"exportPartners": "取引先の一覧",
+		"exportPartnersHint": "コード・名前・登録番号です。"
 	}
 }

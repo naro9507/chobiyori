@@ -22,6 +22,9 @@ export type ErrorCode =
 	| "sameAccount"
 	| "yearClosed"
 	| "database"
+	| "unencodable"
+	| "fontNotFound"
+	| "fileWrite"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

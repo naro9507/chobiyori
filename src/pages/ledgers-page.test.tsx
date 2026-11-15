@@ -196,6 +196,8 @@ beforeEach(() => {
 				return cashLedger
 			case "expense_book":
 				return [wagesLedger]
+			case "export_report":
+				return "仕訳帳_2014_01-12.pdf"
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}
@@ -273,5 +275,48 @@ describe("帳簿", () => {
 		expect(
 			within(table).getByText("諸口（2 つ以上の科目）")
 		).toBeInTheDocument()
+	})
+
+	it("PDF で保存すると、選んだ帳簿と期間を Rust に渡し、保存したファイル名を出す", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		await screen.findByRole("table", { name: "仕訳帳" })
+		await user.click(screen.getByRole("button", { name: "PDF で保存" }))
+
+		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			request: {
+				target: { kind: "journal" },
+				format: "pdf",
+				encoding: "utf8",
+				locale: "ja",
+				fiscalYear: 2014,
+				fromMonth: 1,
+				toMonth: 12,
+			},
+		})
+		expect(
+			await screen.findByText("「仕訳帳_2014_01-12.pdf」を保存しました。")
+		).toBeInTheDocument()
+	})
+
+	it("PDF のフォントがないときは、直し方を出す", async () => {
+		const user = userEvent.setup()
+		mocks.callCommand.mockImplementation(async (command: string) => {
+			if (command === "export_report") throw { code: "fontNotFound" }
+			if (command === "setup_status")
+				return { completed: true, fiscalYear: 2026 }
+			if (command === "list_accounts") return accounts
+			if (command === "journal_book")
+				return { transactions: [], totalDebit: 0, totalCredit: 0 }
+			return []
+		})
+		renderPage()
+		expect(
+			await screen.findByText(/この期間の記録はまだありません/)
+		).toBeInTheDocument()
+		await user.click(screen.getByRole("button", { name: "PDF で保存" }))
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"CSV で保存するか"
+		)
 	})
 })

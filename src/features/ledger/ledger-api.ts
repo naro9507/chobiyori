@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import type { Transaction } from "@/features/journal/journal-api"
 import type { AccountCategory } from "@/features/master/master-api"
+import type { Locale } from "@/i18n/i18n"
 import { callCommand } from "@/lib/tauri"
 
 /** Rust 側 `db::books::JournalBook` と同じ形。 */
@@ -68,5 +69,37 @@ export function useExpenseBook(period: Period) {
 		queryFn: () => callCommand<Ledger[]>("expense_book", period),
 		enabled: enabled(period),
 		retry: false,
+	})
+}
+
+/** Rust 側 `export::ExportTarget` と同じ形。 */
+export type ExportTarget =
+	| { kind: "journal" }
+	| { kind: "ledger"; accountId: number }
+	| { kind: "allLedgers" }
+	| { kind: "cashBook"; accountId: number }
+	| { kind: "expenseBook" }
+	| { kind: "trialBalance" }
+	| { kind: "accounts" }
+	| { kind: "partners" }
+
+export type ExportFormat = "csv" | "pdf"
+export type CsvEncoding = "utf8" | "shiftJis"
+
+export type ExportRequest = {
+	target: ExportTarget
+	format: ExportFormat
+	encoding: CsvEncoding
+	locale: Locale
+	fiscalYear: number
+	fromMonth: number
+	toMonth: number
+}
+
+/** 帳簿を CSV か PDF で保存する。保存先を選ぶ画面は Rust 側で開く。やめたら null。 */
+export function useExport() {
+	return useMutation({
+		mutationFn: (request: ExportRequest) =>
+			callCommand<string | null>("export_report", { request }),
 	})
 }

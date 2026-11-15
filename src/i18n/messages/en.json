@@ -24,12 +24,12 @@
 		"home": "See this month's figures and what to do next.",
 		"transactions": "Record sales and payments. Switch between quick entry, the journal grid and compound entries; all of them produce the same journal entries.",
 		"inbox": "Review and confirm entries suggested from receipt photos and card statements.",
-		"ledgers": "View the journal, general ledger, cash and bank books, and expense book.",
+		"ledgers": "View the journal, general ledger, cash and bank books, and expense book, and save them as CSV or PDF.",
 		"reports": "See the trial balance and account balances. Every figure is calculated from your journal entries.",
 		"receivables": "Manage recurring sales such as tuition and membership fees, and their payments.",
 		"closing": "Record depreciation and closing adjustments, and get the figures for your blue tax return.",
 		"master": "Manage accounts, descriptions, partners and business-use split rules.",
-		"data": "Import and export CSV or Excel files, and back up or restore your books.",
+		"data": "Save your books as CSV or PDF.",
 		"settings": "Change your business details, display language and color theme.",
 		"help": "How to use the app and what the accounting terms mean, for first-time users."
 	},
@@ -317,7 +317,10 @@
 		"yearClosed": "The books for a closed year cannot be changed.",
 		"database": "Could not read or write your books. Please restart the app.",
 		"notInTauri": "Only the screens are shown in the browser. Your books are available when you run the app.",
-		"unknown": "Something went wrong. Please try again."
+		"unknown": "Something went wrong. Please try again.",
+		"unencodable": "Some characters (such as emoji) cannot be written in Shift_JIS. Save with UTF-8 instead.",
+		"fontNotFound": "No Japanese font for PDF was found on this computer. Save as CSV, or try on a computer with Yu Gothic (Windows) or Hiragino (Mac).",
+		"fileWrite": "The file could not be saved. Try a different folder."
 	},
 	"ledgers": {
 		"tabsLabel": "Book",
@@ -350,6 +353,29 @@
 		"monthCarried": "Carried from last month",
 		"empty": "Nothing recorded in this period yet. You can record transactions on the Transactions screen.",
 		"noCashAccounts": "There are no payment accounts. On the Master screen, mark your cash and bank accounts as payment accounts.",
-		"loading": "Loading"
+		"loading": "Loading",
+		"saveCsv": "Save as CSV",
+		"savePdf": "Save as PDF",
+		"saved": "Saved \"{name}\"."
+	},
+	"data": {
+		"exportTitle": "Export books",
+		"exportDescription": "Exports the whole of FY {year}. Use this to hand your books to a tax accountant or move to other software.",
+		"encoding": "CSV character encoding",
+		"encodingHint": "UTF-8 opens in Excel as is. Choose Shift_JIS for older accounting software.",
+		"encodingUtf8": "UTF-8 (recommended)",
+		"encodingShiftJis": "Shift_JIS",
+		"exportJournal": "Journal",
+		"exportJournalHint": "The CSV can be imported into this app or other software.",
+		"exportAllLedgers": "General ledger (all accounts)",
+		"exportAllLedgersHint": "Every account with entries, one section per account.",
+		"exportExpenseBook": "Expense book",
+		"exportExpenseBookHint": "Payments by expense account.",
+		"exportTrialBalance": "Trial balance",
+		"exportTrialBalanceHint": "Totals and balances by account.",
+		"exportAccounts": "Account list",
+		"exportAccountsHint": "Codes, names and categories.",
+		"exportPartners": "Partner list",
+		"exportPartnersHint": "Codes, names and registration numbers."
 	}
 }
