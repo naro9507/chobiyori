@@ -140,7 +140,7 @@ describe("初期設定ウィザード", () => {
 		)
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
-		const notice = /登録した日から課税事業者になります/
+		const notice = /登録した日から課税事業者になり/
 		expect(screen.getByText(notice)).toBeInTheDocument()
 
 		await user.click(
@@ -160,7 +160,7 @@ describe("初期設定ウィザード", () => {
 		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		expect(
-			screen.queryByText(/登録した日から課税事業者になります/)
+			screen.queryByText(/登録した日から課税事業者になり/)
 		).not.toBeInTheDocument()
 	})
 })
