@@ -107,7 +107,7 @@
 		"filing_blue10": "Blue return (100,000 yen, simple bookkeeping)",
 		"filing_white": "White return",
 		"taxTitle": "Consumption tax",
-		"taxDescription": "If your sales two years ago were 10 million yen or less and you are not invoice-registered, you are tax-exempt.",
+		"taxDescription": "If your sales two years ago were 10 million yen or less and you are not invoice-registered, you are usually tax-exempt. If you are unsure, check with a tax accountant or the tax office.",
 		"tax_exempt": "Tax-exempt",
 		"tax_standard": "Taxable (general method)",
 		"tax_simplified": "Taxable (simplified method)",
