@@ -24,8 +24,13 @@ import {
 	useConfirmInboxItem,
 	useConfirmInboxItems,
 	useInbox,
+	useLinkInboxItem,
+	useReceipts,
 	useSetInboxIgnored,
+	useUnlinkInboxItem,
 } from "./inbox-api"
+import { ReceiptFieldsForm } from "./receipt-fields-form"
+import { ReceiptImage } from "./receipt-image"
 
 const statuses: InboxStatus[] = ["pending", "posted", "ignored"]
 
@@ -74,6 +79,12 @@ export function ReviewPanel() {
 			header: t("date"),
 			className: "w-28",
 			cell: (item) => item.date,
+		},
+		{
+			id: "source",
+			header: t("source"),
+			className: "w-24",
+			cell: (item) => t(`from_${item.source}`),
 		},
 		{
 			id: "merchant",
@@ -209,6 +220,9 @@ export function ReviewPanel() {
 						}
 						onRowClick={(item) => setSelectedId(item.id)}
 					/>
+					{selected && selected.status === "posted" && (
+						<PostedDetail key={selected.id} item={selected} />
+					)}
 					{selected && selected.status === "pending" && (
 						<ConfirmForm
 							// 候補が変わったら、フォームを作り直す
@@ -242,6 +256,7 @@ function SuggestionLabel({ item }: { item: InboxItem }) {
 				</>
 			)}
 			{item.status === "posted" && t("status_posted")}
+			{item.paired && <Badge variant="success">{t("paired")}</Badge>}
 			{item.possibleDuplicateId !== null && (
 				<Badge variant="warning">
 					<CircleAlert aria-hidden="true" />
@@ -288,6 +303,9 @@ function ConfirmForm({
 		item.suggestion === null && item.merchant !== ""
 	)
 	const subAccounts = masters.subAccountsOf(accountId)
+	const link = useLinkInboxItem()
+	const receipt = useReceipts().data?.find((r) => r.id === item.receiptId)
+	const [fixing, setFixing] = useState(false)
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
@@ -306,12 +324,52 @@ function ConfirmForm({
 		confirm.mutate({ id: item.id, input }, { onSuccess: onDone })
 	}
 
+	if (receipt && fixing) {
+		return (
+			<div className="flex flex-col gap-3 rounded-lg border p-4">
+				<ReceiptImage
+					attachmentId={receipt.attachment.id}
+					label={t("receiptImage")}
+				/>
+				<ReceiptFieldsForm receipt={receipt} onDone={() => setFixing(false)} />
+				<Button
+					type="button"
+					variant="ghost"
+					className="w-fit"
+					onClick={() => setFixing(false)}
+				>
+					{t("cancel")}
+				</Button>
+			</div>
+		)
+	}
+
 	return (
 		<form
 			onSubmit={submit}
 			aria-label={t("formLabel")}
 			className="flex flex-col gap-3 rounded-lg border p-4"
 		>
+			{receipt && (
+				<>
+					<ReceiptImage
+						attachmentId={receipt.attachment.id}
+						label={t("receiptImage")}
+					/>
+					{receipt.checks.length > 0 && (
+						<p className="text-sm text-warning">{t("receiptChecks")}</p>
+					)}
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						className="w-fit"
+						onClick={() => setFixing(true)}
+					>
+						{t("fixReading")}
+					</Button>
+				</>
+			)}
 			<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
 				<dt className="text-muted-foreground">{t("date")}</dt>
 				<dd>{item.date}</dd>
@@ -331,7 +389,28 @@ function ConfirmForm({
 				)}
 			</dl>
 			{item.possibleDuplicateId !== null && (
-				<p className="text-sm text-warning">{t("possibleDuplicateHint")}</p>
+				<div className="flex flex-col gap-2 rounded-md border border-warning/40 p-3">
+					<p className="text-sm text-warning">{t("possibleDuplicateHint")}</p>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						className="w-fit"
+						disabled={link.isPending}
+						onClick={() => {
+							const transactionId = item.possibleDuplicateId
+							if (transactionId === null) return
+							link.mutate({ id: item.id, transactionId }, { onSuccess: onDone })
+						}}
+					>
+						{t("linkToExisting")}
+					</Button>
+					{link.error && (
+						<p role="alert" className="text-destructive text-sm">
+							{errorMessage(link.error)}
+						</p>
+					)}
+				</div>
 			)}
 			<Field label={item.spend > 0 ? t("accountSpend") : t("accountBack")}>
 				<MasterCombobox
@@ -437,5 +516,46 @@ function ConfirmForm({
 			</div>
 			<p className="text-muted-foreground text-xs">{t("enterHint")}</p>
 		</form>
+	)
+}
+
+/** 確定済みの候補。紐付けたものは外せる。レシートなら画像を出す。 */
+function PostedDetail({ item }: { item: InboxItem }) {
+	const t = useTranslations("inbox")
+	const errorMessage = useErrorMessage()
+	const unlink = useUnlinkInboxItem()
+	const receipt = useReceipts().data?.find((r) => r.id === item.receiptId)
+	return (
+		<div className="flex flex-col gap-3 rounded-lg border p-4 text-sm">
+			{receipt && (
+				<ReceiptImage
+					attachmentId={receipt.attachment.id}
+					label={t("receiptImage")}
+				/>
+			)}
+			<p>
+				{item.paired
+					? t("pairedHint")
+					: item.linked
+						? t("linkedHint")
+						: t("postedHint")}
+			</p>
+			{item.linked && (
+				<Button
+					size="sm"
+					variant="outline"
+					className="w-fit"
+					disabled={unlink.isPending}
+					onClick={() => unlink.mutate(item.id)}
+				>
+					{t("unlink")}
+				</Button>
+			)}
+			{unlink.error && (
+				<p role="alert" className="text-destructive text-sm">
+					{errorMessage(unlink.error)}
+				</p>
+			)}
+		</div>
 	)
 }

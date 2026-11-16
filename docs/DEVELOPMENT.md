@@ -70,6 +70,7 @@ dcs-accounting-app/
 │   │   ├── domain/             # 会計の決まりごと（区分・入力の検証・按分・標準科目・元帳の残高）
 │   │   ├── export/             # 帳簿の CSV・PDF 出力
 │   │   ├── import/             # 仕訳 CSV・Excel 帳簿・カードや口座の明細の取込
+│   │   ├── receipt/            # レシートの読み取り（Gemini API）と API キーの保管
 │   │   ├── error.rs            # 画面に返すエラー
 │   │   ├── lib.rs              # アプリの組み立て
 │   │   └── main.rs
@@ -135,6 +136,14 @@ dcs-accounting-app/
 - 受信箱（`db/inbox.rs`）は候補をためるだけで、確定したときに初めて取引を作る。状態（確認待ち・確定済み・対象外）は保存した値から決め、確定した取引を消すと確認待ちに戻る。
 - 自動仕訳ルールは `domain/rules.rs`（店名をそろえる・照合する）と `db/rules.rs`。ルールがないときは、前に同じ店で確定した取引から候補を出す。
 - プリセットを足すときは、実物の明細（個人情報を伏せたもの）で確かめ、匿名化したフィクスチャのテストを足す。
+
+## レシートの読み取りと証憑
+
+- 読み取りは `src-tauri/src/receipt/`。外の AI を呼ぶ部分は `ReceiptReader` の向こうに置き、Gemini の実装は `gemini.rs`。テストでは本物の API を呼ばず、決まった返事を返す偽物を使う（`commands/receipts.rs` のテスト）。
+- 返ってきた値の読み直しと自己検算は `domain/receipt.rs`（AI に頼む JSON の形もここ）。返事は信じず、合わない項目は `Check` として画面に出す。
+- API キーは `receipt/secret.rs` で OS の資格情報ストア（`keyring`。Windows の資格情報マネージャー、macOS のキーチェーン、Linux の keyutils）に置く。DB・ファイル・ログに書かず、画面には「登録済みかどうか」だけを返す。テストではメモリの中の偽物を使う。
+- HTTP は `reqwest`（自動アップデートと同じ版・機能。TLS は rustls と ring）。送るのはレシートの画像と固定の指示の文だけ。ログに画像・キー・金額・名前を出さない。
+- 証憑（画像・PDF）は `db/attachments.rs`。中身は DB の BLOB に置く（帳簿と一緒に暗号化される）。レシートの状態は `db/receipts.rs`、受信箱との紐付けと突合は `db/inbox.rs`。
 
 ## UI 部品
 
