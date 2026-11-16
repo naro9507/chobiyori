@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
+import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
@@ -30,6 +31,7 @@ export function SettingsPage() {
 	return (
 		<Page screen="settings">
 			<BusinessProfileCard />
+			<ReceiptSettingsCard />
 			<Card>
 				<CardHeader>
 					<CardTitle id={languageId}>{t("language")}</CardTitle>
