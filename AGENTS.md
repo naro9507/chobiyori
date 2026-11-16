@@ -43,6 +43,7 @@ dcs-accounting-app/
 │   ├── src/domain/             # 会計の決まりごと（区分・検証・按分・標準科目）
 │   ├── src/export/             # 帳簿の CSV・PDF 出力
 │   ├── src/import/             # 仕訳 CSV・Excel 帳簿・カードや口座の明細の取込
+│   ├── src/receipt/            # レシートの読み取り（Gemini API）と API キーの保管
 │   ├── capabilities/           # 画面に許可する操作
 │   └── tauri.conf.json
 └── docs/                       # 仕様と開発資料

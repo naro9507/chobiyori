@@ -28,6 +28,13 @@ export type ErrorCode =
 	| "fileWrite"
 	| "importBlocked"
 	| "alreadyRecorded"
+	| "secretStore"
+	| "noApiKey"
+	| "badApiKey"
+	| "offline"
+	| "rateLimited"
+	| "readFailed"
+	| "consentRequired"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

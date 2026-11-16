@@ -3,15 +3,24 @@ import { useState } from "react"
 import { Page } from "@/components/layout/page"
 import { Card, CardContent } from "@/components/ui/card"
 import { FormatsPanel } from "@/features/inbox/formats-panel"
+import { ReceiptsPanel } from "@/features/inbox/receipts-panel"
+import { ReconcilePanel } from "@/features/inbox/reconcile-panel"
 import { ReviewPanel } from "@/features/inbox/review-panel"
 import { RulesPanel } from "@/features/inbox/rules-panel"
 import { StatementPanel } from "@/features/inbox/statement-panel"
 import { useTranslations } from "@/i18n/use-translations"
 
-const tabs = ["review", "statement", "formats", "rules"] as const
+const tabs = [
+	"review",
+	"receipts",
+	"statement",
+	"reconcile",
+	"formats",
+	"rules",
+] as const
 type Tab = (typeof tabs)[number]
 
-/** 取込受信箱。明細から作った仕訳の候補を確認して確定する。確認なしに記帳はしない。 */
+/** 取込受信箱。レシートと明細から作った仕訳の候補を確認して確定する。確認なしに記帳はしない。 */
 export function InboxPage() {
 	const t = useTranslations("inbox")
 	const [tab, setTab] = useState<Tab>("review")
@@ -41,6 +50,12 @@ export function InboxPage() {
 					<CardContent>
 						<Tabs.Content value="review" className="outline-none">
 							<ReviewPanel />
+						</Tabs.Content>
+						<Tabs.Content value="receipts" className="outline-none">
+							<ReceiptsPanel />
+						</Tabs.Content>
+						<Tabs.Content value="reconcile" className="outline-none">
+							<ReconcilePanel />
 						</Tabs.Content>
 						<Tabs.Content value="statement" className="outline-none">
 							<StatementPanel />

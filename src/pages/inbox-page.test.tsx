@@ -71,6 +71,10 @@ function item(
 ): InboxItem {
 	return {
 		id,
+		source: "statement",
+		receiptId: null,
+		linked: false,
+		paired: false,
 		formatId: 1,
 		fileName: "10月.csv",
 		fileRow: id + 1,

@@ -1,13 +1,16 @@
-import { Loader2 } from "lucide-react"
+import { Loader2, Paperclip } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { type ReactNode, useState } from "react"
 import { Page } from "@/components/layout/page"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/input"
+import { useAttachmentCounts } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useJournalMasters } from "@/features/journal/use-master-items"
+import { AttachmentsPanel } from "@/features/ledger/attachments-panel"
 import { type BookColumn, BookTable } from "@/features/ledger/book-table"
 import { ExportButtons } from "@/features/ledger/export-buttons"
 import {
@@ -230,6 +233,9 @@ function amountOrBlank(value: number | undefined) {
 
 type JournalRow = {
 	key: string
+	transactionId: number
+	/** 取引の最初の行 */
+	first: boolean
 	date: string | null
 	debitAccount: number | null
 	debit: number | undefined
@@ -260,6 +266,8 @@ function journalRows(
 			].filter((part, n, all) => part !== "" && all.indexOf(part) === n)
 			rows.push({
 				key: `${t.id}-${i}`,
+				transactionId: t.id,
+				first: i === 0,
 				date: i === 0 ? t.date : null,
 				debitAccount: d?.accountId ?? null,
 				debit: d?.amount,
@@ -277,6 +285,10 @@ function JournalView({ period }: { period: Period }) {
 	const t = useTranslations("ledgers")
 	const masters = useJournalMasters()
 	const query = useJournalBook(period)
+	const counts = useAttachmentCounts(period.fiscalYear).data
+	const [opened, setOpened] = useState<{ id: number; title: string } | null>(
+		null
+	)
 	const label = (id: number | null) =>
 		id === null ? "" : masters.accountLabel(id)
 	const columns: BookColumn<JournalRow>[] = [
@@ -309,6 +321,31 @@ function JournalView({ period }: { period: Period }) {
 			numeric: true,
 		},
 		{ id: "memo", header: t("memo"), cell: (r) => r.memo },
+		{
+			id: "attachments",
+			header: t("attachments"),
+			className: "w-20",
+			cell: (r) =>
+				r.first ? (
+					<Button
+						size="sm"
+						variant="ghost"
+						aria-label={t("attachmentsOf", {
+							date: r.date ? formatDate(r.date) : "",
+							memo: r.memo,
+						})}
+						onClick={() =>
+							setOpened({
+								id: r.transactionId,
+								title: `${r.date ? formatDate(r.date) : ""} ${r.memo}`,
+							})
+						}
+					>
+						<Paperclip aria-hidden="true" />
+						{counts?.get(r.transactionId) ?? 0}
+					</Button>
+				) : null,
+		},
 	]
 	return (
 		<QueryState
@@ -317,28 +354,39 @@ function JournalView({ period }: { period: Period }) {
 			isEmpty={(b) => b.transactions.length === 0}
 		>
 			{(book) => (
-				<BookTable
-					label={t("journal")}
-					rows={journalRows(book, masters.partnerLabel)}
-					columns={columns}
-					rowKey={(r) => r.key}
-					rowClassName={(r) => (r.odd ? "bg-muted/30" : undefined)}
-					footer={
-						<tr>
-							<th scope="row" className="px-3 py-2.5 text-left" colSpan={2}>
-								{t("total")}
-							</th>
-							<td className="num px-3 py-2.5 text-right">
-								{formatAmount(book.totalDebit)}
-							</td>
-							<td />
-							<td className="num px-3 py-2.5 text-right">
-								{formatAmount(book.totalCredit)}
-							</td>
-							<td />
-						</tr>
-					}
-				/>
+				<div className="flex flex-col gap-4">
+					<BookTable
+						label={t("journal")}
+						rows={journalRows(book, masters.partnerLabel)}
+						columns={columns}
+						rowKey={(r) => r.key}
+						rowClassName={(r) => (r.odd ? "bg-muted/30" : undefined)}
+						footer={
+							<tr>
+								<th scope="row" className="px-3 py-2.5 text-left" colSpan={2}>
+									{t("total")}
+								</th>
+								<td className="num px-3 py-2.5 text-right">
+									{formatAmount(book.totalDebit)}
+								</td>
+								<td />
+								<td className="num px-3 py-2.5 text-right">
+									{formatAmount(book.totalCredit)}
+								</td>
+								<td />
+								<td />
+							</tr>
+						}
+					/>
+					{opened && (
+						<AttachmentsPanel
+							key={opened.id}
+							transactionId={opened.id}
+							title={opened.title}
+							onClose={() => setOpened(null)}
+						/>
+					)}
+				</div>
 			)}
 		</QueryState>
 	)

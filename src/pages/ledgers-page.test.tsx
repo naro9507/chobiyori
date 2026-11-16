@@ -207,6 +207,33 @@ beforeEach(() => {
 				return cashLedger
 			case "expense_book":
 				return [wagesLedger]
+			case "attachment_counts":
+				return [[1, 2]]
+			case "list_attachments":
+				return [
+					{
+						id: 7,
+						transactionId: 1,
+						fileName: "receipt.heic",
+						mime: "image/heic",
+						size: 100,
+						sha256: "ab",
+						addedAt: "2014-03-06T00:00:00Z",
+					},
+				]
+			case "attachment_content":
+				return {
+					attachment: {
+						id: 7,
+						transactionId: 1,
+						fileName: "receipt.heic",
+						mime: "image/heic",
+						size: 100,
+						sha256: "ab",
+						addedAt: "2014-03-06T00:00:00Z",
+					},
+					data: "AA==",
+				}
 			case "export_report":
 				return "仕訳帳_2014_01-12.pdf"
 			default:
@@ -226,12 +253,21 @@ describe("帳簿", () => {
 			within(rows[1])
 				.getAllByRole("cell")
 				.map((c) => c.textContent)
-		).toEqual(["3/05", "104 普通預金", "8,000", "401 売上高", "8,000", "月謝"])
+		).toEqual([
+			"3/05",
+			"104 普通預金",
+			"8,000",
+			"401 売上高",
+			"8,000",
+			"月謝",
+			// 証憑の数
+			"2",
+		])
 		expect(
 			within(rows[3])
 				.getAllByRole("cell")
 				.map((c) => c.textContent)
-		).toEqual(["", "", "", "206 預り金", "5,000", ""])
+		).toEqual(["", "", "", "206 預り金", "5,000", "", ""])
 		expect(rows[4]).toHaveTextContent("108,000")
 		// サイドメニューで選んだ年度で読む
 		expect(mocks.callCommand).toHaveBeenCalledWith("journal_book", {
@@ -240,6 +276,25 @@ describe("帳簿", () => {
 			toMonth: 12,
 		})
 		expect(screen.getByLabelText("見る年度")).toHaveValue("2014")
+	})
+
+	it("取引の証憑を開き、画面に出せない形式は保存して開くよう案内する", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		await screen.findByRole("table", { name: "仕訳帳" })
+		await user.click(screen.getByRole("button", { name: "3/05 月謝 の証憑" }))
+		const panel = await screen.findByRole("region", { name: "証憑: 3/05 月謝" })
+		await user.click(
+			await within(panel).findByRole("button", { name: "receipt.heic" })
+		)
+		expect(
+			await within(panel).findByText(
+				/この形式（HEIC・PDF など）は画面に出せません/
+			)
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("list_attachments", {
+			transactionId: 1,
+		})
 	})
 
 	it("出納帳は口座を選び、繰越・入金・出金・残高を出す", async () => {
