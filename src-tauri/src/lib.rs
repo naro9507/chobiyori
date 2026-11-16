@@ -9,6 +9,7 @@ pub mod domain;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod receipt;
 
 use tauri::Manager;
 
@@ -102,7 +103,28 @@ pub fn run() {
             commands::inbox::delete_inbox_items,
             commands::inbox::list_rules,
             commands::inbox::save_rule,
-            commands::inbox::delete_rule
+            commands::inbox::delete_rule,
+            commands::receipts::receipt_settings,
+            commands::receipts::save_receipt_settings,
+            commands::receipts::set_gemini_key,
+            commands::receipts::delete_gemini_key,
+            commands::receipts::choose_receipt_files,
+            commands::receipts::choose_receipt_folder,
+            commands::receipts::list_receipts,
+            commands::receipts::read_next_receipt,
+            commands::receipts::save_receipt_fields,
+            commands::receipts::set_receipt_send_allowed,
+            commands::receipts::retry_receipt,
+            commands::receipts::delete_receipt,
+            commands::receipts::attachment_content,
+            commands::receipts::save_attachment_copy,
+            commands::receipts::list_attachments,
+            commands::receipts::attachment_counts,
+            commands::receipts::attach_files,
+            commands::receipts::delete_attachment,
+            commands::receipts::link_inbox_item,
+            commands::receipts::unlink_inbox_item,
+            commands::receipts::reconciliation
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");

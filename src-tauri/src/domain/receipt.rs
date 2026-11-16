@@ -1,0 +1,353 @@
+//! レシートの読み取り結果の扱い（読み直し・自己検算・税率ごとの分け方）。
+//!
+//! 読み取りは外の AI（Gemini）に頼むが、返ってきた値はそのまま信じない。
+//! ここで日付・金額を読み直し、「合計 = 税率ごとの対象額の合計」「税額が税率と合う」
+//! 「日付が暦にあり、未来でない」を確かめ、合わないところを `Check` として返す。
+//! 合わないところがあっても候補は作るが、画面でその項目を必ず見てもらう。
+
+use super::master::TaxCategory;
+use super::statement::{parse_amount, parse_date};
+use super::string_enum;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+string_enum! {
+    /// 支払方法。貸方の口座を決めるのに使う。
+    pub enum PaymentMethod {
+        Cash => "cash",
+        Card => "card",
+        EMoney => "eMoney",
+        Unknown => "unknown",
+    }
+}
+
+/// 税率ごとの対象額（税込）と税額。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaxPart {
+    /// 税率（8 か 10）
+    pub rate: i64,
+    /// 対象額（税込）
+    pub amount: i64,
+    /// 税額（書いてなければ None）
+    pub tax: Option<i64>,
+}
+
+/// 読み取った内容。読めなかった項目は空。
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptReading {
+    /// `YYYY-MM-DD`
+    pub date: Option<String>,
+    /// 合計（税込）
+    pub total: Option<i64>,
+    pub merchant: String,
+    pub phone: String,
+    /// 適格請求書発行事業者の登録番号（T + 13 桁）
+    pub invoice_no: Option<String>,
+    pub tax_parts: Vec<TaxPart>,
+    pub payment: Option<PaymentMethod>,
+}
+
+string_enum! {
+    /// 自己検算で引っかかったところ。画面はこれを見て、その項目を目立たせる。
+    pub enum Check {
+        /// 日付が読めない
+        MissingDate => "missingDate",
+        /// 日付が未来か、古すぎる
+        UnlikelyDate => "unlikelyDate",
+        /// 合計が読めない
+        MissingTotal => "missingTotal",
+        /// 合計と、税率ごとの対象額の合計が合わない
+        TotalMismatch => "totalMismatch",
+        /// 税額が税率と合わない
+        TaxMismatch => "taxMismatch",
+        /// 登録番号の形が違う（T + 13 桁でない）
+        InvalidInvoiceNo => "invalidInvoiceNo",
+        /// 店名が読めない
+        MissingMerchant => "missingMerchant",
+    }
+}
+
+/// AI に頼む返事の形（JSON Schema）。読み取りの方式を差し替えても、この形にそろえる。
+pub fn response_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "date": { "type": "string", "description": "利用日。印字のまま（和暦でもよい）" },
+            "total": { "type": "string", "description": "支払った合計（税込）" },
+            "merchant": { "type": "string", "description": "店名" },
+            "phone": { "type": "string" },
+            "invoiceNo": { "type": "string", "description": "登録番号（T で始まる 13 桁の数字）" },
+            "taxParts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "rate": { "type": "integer", "description": "税率（8 か 10）" },
+                        "amount": { "type": "string", "description": "その税率の対象額（税込）" },
+                        "tax": { "type": "string", "description": "その税率の消費税額" }
+                    },
+                    "required": ["rate", "amount"]
+                }
+            },
+            "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] }
+        },
+        "required": ["date", "total", "merchant", "payment"]
+    })
+}
+
+/// AI に送る指示。帳簿や取引先の情報は送らない（画像とこの文だけ）。
+pub const PROMPT: &str = "これは日本のレシートまたは領収書の画像です。印字されている内容だけを読み取り、指定の JSON で返してください。\
+読めない項目は空の文字列にしてください。推測で値を作らないでください。\
+taxParts には「10%対象」「8%対象（軽減税率）」などの税率ごとの対象額（税込）と消費税額を入れてください。\
+payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。";
+
+fn text_of(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::String(s)) => s.trim().to_string(),
+        Some(Value::Number(n)) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn amount_of(value: Option<&Value>) -> Option<i64> {
+    let text = text_of(value);
+    if text.is_empty() {
+        return None;
+    }
+    parse_amount(&text).map(i64::abs).filter(|a| *a > 0)
+}
+
+/// 登録番号を「T + 13 桁」にそろえる。形が違えば None。
+pub fn normalize_invoice_no(text: &str) -> Option<String> {
+    let cleaned: String = text
+        .chars()
+        .map(super::statement::to_half_width)
+        .filter(|c| !matches!(c, ' ' | '-' | '　'))
+        .collect();
+    let digits = cleaned
+        .strip_prefix('T')
+        .or_else(|| cleaned.strip_prefix('t'))
+        .unwrap_or(&cleaned);
+    (digits.len() == 13 && digits.bytes().all(|b| b.is_ascii_digit())).then(|| format!("T{digits}"))
+}
+
+/// AI の返事（JSON の文字列）を読む。形が違えば None。
+pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
+    let value: Value = serde_json::from_str(text.trim()).ok()?;
+    let object = value.as_object()?;
+    let invoice_text = text_of(object.get("invoiceNo"));
+    let invoice_no = normalize_invoice_no(&invoice_text);
+    let tax_parts = object
+        .get("taxParts")
+        .and_then(Value::as_array)
+        .map(|parts| {
+            parts
+                .iter()
+                .filter_map(|p| {
+                    let rate = p.get("rate").and_then(Value::as_i64)?;
+                    let amount = amount_of(p.get("amount"))?;
+                    Some(TaxPart {
+                        rate,
+                        amount,
+                        tax: amount_of(p.get("tax")),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let payment = PaymentMethod::parse(&text_of(object.get("payment")));
+    let date_text = text_of(object.get("date"));
+    let reading = ReceiptReading {
+        date: if date_text.is_empty() {
+            None
+        } else {
+            parse_date(&date_text)
+        },
+        total: amount_of(object.get("total")),
+        merchant: text_of(object.get("merchant")).chars().take(100).collect(),
+        phone: text_of(object.get("phone")).chars().take(30).collect(),
+        invoice_no,
+        tax_parts,
+        payment,
+    };
+    // 登録番号らしいものが書いてあるのに形が違う
+    let bad_invoice = !invoice_text.is_empty() && reading.invoice_no.is_none();
+    Some((reading, bad_invoice))
+}
+
+/// 自己検算。`today` は `YYYY-MM-DD`。
+pub fn checks(reading: &ReceiptReading, bad_invoice: bool, today: &str) -> Vec<Check> {
+    let mut found = Vec::new();
+    match &reading.date {
+        None => found.push(Check::MissingDate),
+        Some(date) => {
+            // 未来の日付か、7 年（帳簿の保存期間）より前
+            let year: i64 = today.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+            let date_year: i64 = date.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+            if date.as_str() > today || date_year < year - 7 {
+                found.push(Check::UnlikelyDate);
+            }
+        }
+    }
+    if reading.merchant.trim().is_empty() {
+        found.push(Check::MissingMerchant);
+    }
+    match reading.total {
+        None => found.push(Check::MissingTotal),
+        Some(total) if !reading.tax_parts.is_empty() => {
+            let sum: i64 = reading.tax_parts.iter().map(|p| p.amount).sum();
+            if sum != total {
+                found.push(Check::TotalMismatch);
+            }
+        }
+        Some(_) => {}
+    }
+    let tax_ok = |p: &TaxPart| match p.tax {
+        None => true,
+        Some(tax) if p.rate == 8 || p.rate == 10 => {
+            // 内税: 税額 ≒ 対象額 × 税率 ÷ (100 + 税率)。端数の扱いの違いで 1 円ずれてよい
+            (tax * (100 + p.rate) - p.amount * p.rate).abs() <= 100 + p.rate
+        }
+        Some(_) => false,
+    };
+    if !reading.tax_parts.iter().all(tax_ok) {
+        found.push(Check::TaxMismatch);
+    }
+    if bad_invoice {
+        found.push(Check::InvalidInvoiceNo);
+    }
+    found
+}
+
+/// 軽減税率（8%）の対象額。税率ごとの内訳が合計と合うときだけ使う。
+pub fn reduced_amount(reading: &ReceiptReading) -> i64 {
+    let Some(total) = reading.total else { return 0 };
+    let sum: i64 = reading.tax_parts.iter().map(|p| p.amount).sum();
+    if sum != total {
+        return 0;
+    }
+    reading
+        .tax_parts
+        .iter()
+        .filter(|p| p.rate == 8)
+        .map(|p| p.amount)
+        .sum()
+}
+
+/// 経費の行を税率で分ける。`reduced` は 8% の対象額（0〜total）。
+/// 返すのは（税区分, 金額）の組。8% と 10% が混ざっていなければ 1 つ。
+pub fn split_by_rate(total: i64, reduced: i64) -> Vec<(TaxCategory, i64)> {
+    let reduced = reduced.clamp(0, total);
+    match (reduced, total - reduced) {
+        (0, standard) => vec![(TaxCategory::TaxablePurchase10, standard)],
+        (reduced, 0) => vec![(TaxCategory::TaxablePurchase8, reduced)],
+        (reduced, standard) => vec![
+            (TaxCategory::TaxablePurchase10, standard),
+            (TaxCategory::TaxablePurchase8, reduced),
+        ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const GOOD: &str = r#"{
+        "date": "令和8年3月5日", "total": "¥3,240", "merchant": "テスト商店",
+        "phone": "03-0000-0000", "invoiceNo": "T 1234567890123",
+        "taxParts": [
+            {"rate": 10, "amount": "2,160", "tax": "196"},
+            {"rate": 8, "amount": "1,080", "tax": "80"}
+        ],
+        "payment": "card"
+    }"#;
+
+    #[test]
+    fn reads_japanese_dates_amounts_and_invoice_numbers() {
+        let (r, bad) = parse_reading(GOOD).unwrap();
+        assert!(!bad);
+        assert_eq!(r.date.as_deref(), Some("2026-03-05"));
+        assert_eq!(r.total, Some(3240));
+        assert_eq!(r.invoice_no.as_deref(), Some("T1234567890123"));
+        assert_eq!(r.payment, Some(PaymentMethod::Card));
+        assert_eq!(r.tax_parts.len(), 2);
+        assert!(checks(&r, bad, "2026-11-16").is_empty());
+        assert_eq!(reduced_amount(&r), 1080);
+    }
+
+    #[test]
+    fn self_checks_catch_inconsistent_readings() {
+        let (mut r, _) = parse_reading(GOOD).unwrap();
+        r.total = Some(3000);
+        assert_eq!(checks(&r, false, "2026-11-16"), [Check::TotalMismatch]);
+        // 合わないときは、軽減税率で分けない
+        assert_eq!(reduced_amount(&r), 0);
+
+        let (mut r, _) = parse_reading(GOOD).unwrap();
+        r.tax_parts[0].tax = Some(500);
+        assert_eq!(checks(&r, false, "2026-11-16"), [Check::TaxMismatch]);
+
+        let (r, _) = parse_reading(GOOD).unwrap();
+        // 未来の日付
+        assert_eq!(checks(&r, false, "2026-01-01"), [Check::UnlikelyDate]);
+    }
+
+    #[test]
+    fn missing_or_broken_values_are_reported_not_invented() {
+        let (r, bad) = parse_reading(
+            r#"{"date": "", "total": "", "merchant": "", "payment": "", "invoiceNo": "T12"}"#,
+        )
+        .unwrap();
+        assert!(bad);
+        assert_eq!(r.payment, None);
+        assert_eq!(
+            checks(&r, bad, "2026-11-16"),
+            [
+                Check::MissingDate,
+                Check::MissingMerchant,
+                Check::MissingTotal,
+                Check::InvalidInvoiceNo
+            ]
+        );
+        assert!(parse_reading("こんにちは").is_none());
+        assert!(parse_reading("[1, 2]").is_none());
+    }
+
+    #[test]
+    fn splits_expense_by_tax_rate() {
+        assert_eq!(
+            split_by_rate(3240, 1080),
+            [
+                (TaxCategory::TaxablePurchase10, 2160),
+                (TaxCategory::TaxablePurchase8, 1080)
+            ]
+        );
+        assert_eq!(
+            split_by_rate(500, 0),
+            [(TaxCategory::TaxablePurchase10, 500)]
+        );
+        assert_eq!(
+            split_by_rate(500, 500),
+            [(TaxCategory::TaxablePurchase8, 500)]
+        );
+        assert_eq!(
+            split_by_rate(500, 900),
+            [(TaxCategory::TaxablePurchase8, 500)]
+        );
+    }
+
+    #[test]
+    fn invoice_numbers_are_normalized() {
+        assert_eq!(
+            normalize_invoice_no("Ｔ１２３４５６７８９０１２３").as_deref(),
+            Some("T1234567890123")
+        );
+        assert_eq!(
+            normalize_invoice_no("1234567890123").as_deref(),
+            Some("T1234567890123")
+        );
+        assert_eq!(normalize_invoice_no("T123"), None);
+    }
+}

@@ -10,6 +10,7 @@ use super::{rules, Database};
 use crate::domain::allocation;
 use crate::domain::journal::{self, EntryMode, LineInput, Side, TransactionInput, TransactionKind};
 use crate::domain::master::{self, TaxCategory, MEMO_MAX};
+use crate::domain::receipt;
 use crate::domain::rules::{normalize, Rule, RuleResult};
 use crate::domain::statement::{self, StatementRow};
 use crate::domain::string_enum;
@@ -27,6 +28,16 @@ string_enum! {
         Posted => "posted",
         /// 対象外（私用など）
         Ignored => "ignored",
+    }
+}
+
+string_enum! {
+    /// 候補のもと。
+    pub enum InboxSource {
+        /// カード・銀行・電子マネーの明細
+        Statement => "statement",
+        /// レシート
+        Receipt => "receipt",
     }
 }
 
@@ -52,6 +63,9 @@ pub struct Suggestion {
 #[serde(rename_all = "camelCase")]
 pub struct InboxItem {
     pub id: i64,
+    pub source: InboxSource,
+    /// レシートから作った候補なら、そのレシート
+    pub receipt_id: Option<i64>,
     pub format_id: Option<i64>,
     pub file_name: String,
     pub file_row: i64,
@@ -66,8 +80,13 @@ pub struct InboxItem {
     pub transaction_id: Option<i64>,
     /// 推し量った科目など（確認待ちのときだけ）
     pub suggestion: Option<Suggestion>,
-    /// 同じ口座・同じ金額・近い日付（前後 3 日）の取引がすでにある（手で入力した分など）
+    /// 同じ口座・同じ金額・近い日付（前後 3 日）の取引がすでにある（手で入力した分や、
+    /// 同じ買い物のレシート・明細から作った取引）。新しく作らず、この取引に紐付けられる
     pub possible_duplicate_id: Option<i64>,
+    /// 新しい取引を作らず、既存の取引に紐付けた
+    pub linked: bool,
+    /// 取引に、レシートと明細の両方がある（突合できている）
+    pub paired: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -180,9 +199,12 @@ const SELECT: &str = "
                WHERE l.account_id = i.payment_account_id AND l.amount = abs(i.spend)
                  AND l.side = CASE WHEN i.spend > 0 THEN 'credit' ELSE 'debit' END
                  AND abs(julianday(t.date) - julianday(i.date)) <= 3
-                 AND NOT EXISTS (SELECT 1 FROM inbox_items o WHERE o.transaction_id = t.id)
+                 AND NOT EXISTS (SELECT 1 FROM inbox_items o WHERE o.transaction_id = t.id AND o.source = i.source)
                ORDER BY abs(julianday(t.date) - julianday(i.date)) LIMIT 1)
-           END
+           END,
+           i.source, (SELECT r.id FROM receipts r WHERE r.inbox_item_id = i.id), i.linked,
+           i.transaction_id IS NOT NULL AND EXISTS (
+               SELECT 1 FROM inbox_items o WHERE o.transaction_id = i.transaction_id AND o.source <> i.source)
     FROM inbox_items i";
 
 fn read_items(
@@ -196,6 +218,10 @@ fn read_items(
         let transaction_id: Option<i64> = r.get(11)?;
         Ok(InboxItem {
             id: r.get(0)?,
+            source: r.get(13)?,
+            receipt_id: r.get(14)?,
+            linked: r.get(15)?,
+            paired: r.get(16)?,
             format_id: r.get(1)?,
             file_name: r.get(2)?,
             file_row: r.get(3)?,
@@ -307,18 +333,46 @@ fn to_transaction(
         return Err(AppError::field(ErrorCode::InvalidFormat, "date"));
     };
     let amount = item.spend.abs();
+    // レシートの税率ごとの内訳と登録番号
+    let (reduced, receipt_invoice) = match item.receipt_id {
+        Some(id) => conn.query_row(
+            "SELECT reduced_amount, invoice_no IS NOT NULL FROM receipts WHERE id = ?1",
+            [id],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, bool>(1)?)),
+        )?,
+        None => (0, false),
+    };
     let mut counter = LineInput {
         partner_id: input.partner_id,
         sub_account_id: input.sub_account_id,
         tax_category: input.tax_category,
-        is_qualified_invoice: transactions::has_invoice_no(conn, input.partner_id)?,
+        is_qualified_invoice: receipt_invoice
+            || transactions::has_invoice_no(conn, input.partner_id)?,
         ..LineInput::new(Side::Debit, input.account_id, amount)
     };
     let mut payment = LineInput {
         sub_account_id: item.payment_sub_account_id,
         ..LineInput::new(Side::Credit, item.payment_account_id, amount)
     };
-    let mut lines = if item.spend > 0 {
+    // 軽減税率（8%）と標準税率（10%）が混ざったレシートは、経費の行を税率ごとに分ける
+    let split_rates = item.spend > 0
+        && reduced > 0
+        && matches!(
+            input.tax_category,
+            None | Some(TaxCategory::TaxablePurchase8 | TaxCategory::TaxablePurchase10)
+        );
+    let mut lines = if split_rates {
+        let mut lines: Vec<LineInput> = receipt::split_by_rate(amount, reduced)
+            .into_iter()
+            .map(|(category, part)| LineInput {
+                tax_category: Some(category),
+                amount: part,
+                ..counter.clone()
+            })
+            .collect();
+        lines.push(payment);
+        lines
+    } else if item.spend > 0 {
         vec![counter, payment]
     } else {
         counter.side = Side::Credit;
@@ -332,7 +386,11 @@ fn to_transaction(
             }
             let drawings = transactions::owner_accounts(conn)?.drawings;
             let rounding = transactions::account_rounding(conn, input.account_id)?;
-            lines = allocation::split_line(&lines, 0, drawings, percent, rounding);
+            // 経費の行（口座の行より前）を後ろから分ける
+            let expense_lines = lines.len() - 1;
+            for index in (0..expense_lines).rev() {
+                lines = allocation::split_line(&lines, index, drawings, percent, rounding);
+            }
         }
     }
     let memo = master::optional(&input.memo, MEMO_MAX, "memo")?;
@@ -340,7 +398,10 @@ fn to_transaction(
         year,
         TransactionInput {
             date,
-            entry_mode: EntryMode::Card,
+            entry_mode: match item.source {
+                InboxSource::Statement => EntryMode::Card,
+                InboxSource::Receipt => EntryMode::Receipt,
+            },
             memo: if memo.is_empty() {
                 item.merchant.chars().take(MEMO_MAX).collect()
             } else {
@@ -360,9 +421,10 @@ fn confirm_in(conn: &Connection, id: i64, input: &ConfirmInput) -> AppResult<Tra
     let (year, transaction) = to_transaction(conn, &item, input)?;
     let saved = transactions::insert_kind(conn, year, &transaction, TransactionKind::Normal)?;
     conn.execute(
-        "UPDATE inbox_items SET transaction_id = ?2, ignored = 0 WHERE id = ?1",
+        "UPDATE inbox_items SET transaction_id = ?2, ignored = 0, linked = 0 WHERE id = ?1",
         params![id, saved.id],
     )?;
+    attach_receipt(conn, &item, saved.id)?;
     if input.save_rule && !item.merchant.trim().is_empty() {
         rules::learn(
             conn,
@@ -379,6 +441,129 @@ fn confirm_in(conn: &Connection, id: i64, input: &ConfirmInput) -> AppResult<Tra
         )?;
     }
     Ok(saved)
+}
+
+/// レシートの画像を、証憑として取引に付ける。
+fn attach_receipt(conn: &Connection, item: &InboxItem, transaction_id: i64) -> AppResult<()> {
+    if let Some(receipt) = item.receipt_id {
+        conn.execute(
+            "UPDATE attachments SET transaction_id = ?2
+             WHERE id = (SELECT attachment_id FROM receipts WHERE id = ?1)",
+            params![receipt, transaction_id],
+        )?;
+    }
+    Ok(())
+}
+
+/// 新しい取引を作らず、既存の取引に紐付ける（同じ買い物のレシートと明細、手で入力した取引）。
+/// 取引には、候補と同じ口座・同じ金額・同じ向きの行がなければならない。日付は前後 7 日まで。
+pub fn link(db: &Database, id: i64, transaction_id: i64) -> AppResult<InboxItem> {
+    db.transaction(|tx| {
+        let item = get(tx, id)?;
+        if item.status == InboxStatus::Posted {
+            return Err(AppError::new(ErrorCode::AlreadyRecorded));
+        }
+        let side = if item.spend > 0 {
+            Side::Credit
+        } else {
+            Side::Debit
+        };
+        let fits: bool = tx.query_row(
+            "SELECT EXISTS (
+                 SELECT 1 FROM transactions t JOIN journal_lines l ON l.transaction_id = t.id
+                 WHERE t.id = ?1 AND l.account_id = ?2 AND l.amount = ?3 AND l.side = ?4
+                   AND abs(julianday(t.date) - julianday(?5)) <= 7)",
+            params![
+                transaction_id,
+                item.payment_account_id,
+                item.spend.abs(),
+                side,
+                item.date
+            ],
+            |r| r.get(0),
+        )?;
+        if !fits {
+            return Err(AppError::field(ErrorCode::OutOfRange, "transactionId"));
+        }
+        // 同じもと（明細どうし・レシートどうし）は 1 つの取引に 2 つ紐付けない
+        let taken: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM inbox_items WHERE transaction_id = ?1 AND source = ?2)",
+            params![transaction_id, item.source],
+            |r| r.get(0),
+        )?;
+        if taken {
+            return Err(AppError::new(ErrorCode::AlreadyRecorded));
+        }
+        tx.execute(
+            "UPDATE inbox_items SET transaction_id = ?2, ignored = 0, linked = 1 WHERE id = ?1",
+            params![id, transaction_id],
+        )?;
+        attach_receipt(tx, &item, transaction_id)?;
+        get(tx, id)
+    })
+}
+
+/// 紐付けを外して、確認待ちに戻す（紐付けたものだけ。取引は消さない）。
+pub fn unlink(conn: &Connection, id: i64) -> AppResult<InboxItem> {
+    let item = get(conn, id)?;
+    if !item.linked || item.transaction_id.is_none() {
+        return Err(AppError::new(ErrorCode::NotFound));
+    }
+    if let (Some(receipt), Some(transaction)) = (item.receipt_id, item.transaction_id) {
+        // その取引のために作った取引でなければ、証憑も外す
+        conn.execute(
+            "UPDATE attachments SET transaction_id = NULL
+             WHERE id = (SELECT attachment_id FROM receipts WHERE id = ?1) AND transaction_id = ?2",
+            params![receipt, transaction],
+        )?;
+    }
+    conn.execute(
+        "UPDATE inbox_items SET transaction_id = NULL, linked = 0 WHERE id = ?1",
+        [id],
+    )?;
+    get(conn, id)
+}
+
+/// レシートとカード明細の突合の状況（年度の中）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reconciliation {
+    /// レシートと明細の両方がある取引の数
+    pub paired: usize,
+    /// 明細から記帳したが、レシートがない
+    pub statement_only: Vec<InboxItem>,
+    /// カード・電子マネーで払ったレシートから記帳したが、明細にまだ出ていない
+    pub receipt_only: Vec<InboxItem>,
+}
+
+/// 突合の状況。現金払いのレシートは対象外（明細に出ないため）。
+/// 「カード払い」は、取込形式の取込先になっている口座で払ったもの。
+pub fn reconciliation(conn: &Connection, year: i64) -> AppResult<Reconciliation> {
+    let filter = "WHERE i.transaction_id IS NOT NULL
+          AND i.transaction_id IN (SELECT id FROM transactions WHERE fiscal_year = ?1)
+        ORDER BY i.date, i.id";
+    let posted = read_items(conn, filter, [year])?;
+    let card_accounts: Vec<i64> = {
+        let mut stmt = conn.prepare("SELECT DISTINCT payment_account_id FROM import_formats")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        rows.collect::<Result<_, _>>()?
+    };
+    let mut result = Reconciliation {
+        paired: 0,
+        statement_only: Vec::new(),
+        receipt_only: Vec::new(),
+    };
+    for item in posted {
+        match (item.source, item.paired) {
+            (InboxSource::Statement, true) => result.paired += 1,
+            (InboxSource::Statement, false) => result.statement_only.push(item),
+            (InboxSource::Receipt, false) if card_accounts.contains(&item.payment_account_id) => {
+                result.receipt_only.push(item)
+            }
+            _ => {}
+        }
+    }
+    Ok(result)
 }
 
 /// 候補を確認して確定する。
@@ -491,7 +676,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn input(account_id: i64) -> ConfirmInput {
+    pub(crate) fn input(account_id: i64) -> ConfirmInput {
         ConfirmInput {
             account_id,
             sub_account_id: None,
@@ -766,5 +951,95 @@ pub(crate) mod tests {
         let items = list(&db.conn(), None).unwrap();
         assert_eq!(items[0].possible_duplicate_id, Some(manual.id));
         assert_eq!(items[1].possible_duplicate_id, None);
+    }
+
+    #[test]
+    fn receipt_and_card_statement_of_the_same_purchase_become_one_transaction() {
+        use crate::db::receipts::{
+            self,
+            tests::{add_one, READING},
+        };
+        let db = set_up_db();
+        let (receipt_id, supplies, card) = {
+            let conn = db.conn();
+            // 課税事業者の年度（免税の年度は税区分を「対象外」にするため）
+            conn.execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
+                .unwrap();
+            let id = add_one(&conn, 1);
+            receipts::record_reading(&conn, id, READING, "2026-11-16").unwrap();
+            (id, account(&conn, "610"), account(&conn, "204"))
+        };
+        let item_id = receipts::get(&db.conn(), receipt_id)
+            .unwrap()
+            .inbox_item_id
+            .unwrap();
+        let saved = confirm(&db, item_id, &input(supplies)).unwrap();
+        // 8% と 10% に分け、登録番号があるのでインボイスの印を付ける
+        let expense: Vec<_> = saved
+            .lines
+            .iter()
+            .filter(|l| l.account_id == supplies)
+            .collect();
+        assert_eq!(
+            expense
+                .iter()
+                .map(|l| (l.amount, l.tax_category))
+                .collect::<Vec<_>>(),
+            [
+                (2160, Some(TaxCategory::TaxablePurchase10)),
+                (1080, Some(TaxCategory::TaxablePurchase8))
+            ]
+        );
+        assert!(expense.iter().all(|l| l.is_qualified_invoice));
+        assert_eq!(saved.entry_mode, EntryMode::Receipt);
+        // 画像は証憑として取引に付く
+        let files = crate::db::attachments::list_for_transaction(&db.conn(), saved.id).unwrap();
+        assert_eq!(files.len(), 1);
+
+        // 同じ買い物がカードの明細に出る（2 日後の利用日）
+        let statement_id = {
+            let conn = db.conn();
+            let format = card_format(&conn);
+            add_statement(
+                &conn,
+                &format,
+                "card.csv",
+                &[row("2026-03-07", 3240, "ﾃｽﾄｼｮｳﾃﾝ")],
+            )
+            .unwrap();
+            let items = list(&conn, Some(InboxStatus::Pending)).unwrap();
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0].possible_duplicate_id, Some(saved.id));
+            // 突合: レシートだけがある
+            let r = reconciliation(&conn, 2026).unwrap();
+            assert_eq!(
+                (r.paired, r.receipt_only.len(), r.statement_only.len()),
+                (0, 1, 0)
+            );
+            items[0].id
+        };
+        // 新しい取引を作らず、レシートの取引に紐付ける（経費が二重にならない）
+        let linked = link(&db, statement_id, saved.id).unwrap();
+        assert!(linked.linked && linked.paired);
+        let conn = db.conn();
+        assert_eq!(transactions::list(&conn, 2026, None).unwrap().len(), 1);
+        let r = reconciliation(&conn, 2026).unwrap();
+        assert_eq!(
+            (r.paired, r.receipt_only.len(), r.statement_only.len()),
+            (1, 0, 0)
+        );
+        // 外すと確認待ちに戻り、取引は残る
+        let back = unlink(&conn, statement_id).unwrap();
+        assert_eq!(back.status, InboxStatus::Pending);
+        assert_eq!(transactions::list(&conn, 2026, None).unwrap().len(), 1);
+        drop(conn);
+        // 金額が違う取引には紐付けられない
+        let other =
+            crate::db::transactions::create(&db, 2026, &entry("2026-03-07", supplies, card, 999))
+                .unwrap();
+        assert_eq!(
+            link(&db, statement_id, other.id).unwrap_err(),
+            AppError::field(ErrorCode::OutOfRange, "transactionId")
+        );
     }
 }

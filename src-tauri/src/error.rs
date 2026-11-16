@@ -51,6 +51,20 @@ pub enum ErrorCode {
     ImportBlocked,
     /// 定型仕訳のその月の分は、もう記録してある（見送ってある）
     AlreadyRecorded,
+    /// OS の資格情報ストア（API キーの保管場所）を使えない
+    SecretStore,
+    /// レシートの読み取りの API キーが登録されていない
+    NoApiKey,
+    /// API キーが正しくない
+    BadApiKey,
+    /// 読み取りのサービスに接続できない
+    Offline,
+    /// 読み取りの回数の上限に達した
+    RateLimited,
+    /// 読み取りのサービスが画像を受け付けなかった、または返事が読めなかった
+    ReadFailed,
+    /// 画像を送ることへの同意がまだない
+    ConsentRequired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -33,6 +33,15 @@ krilla = { version = "0.8.2", default-features = false, features = ["simple-text
 ttf-parser = "0.25.1"
 # 保存先と取り込むファイルを選ぶ画面。Rust 側から開くので、画面に権限は渡さない
 tauri-plugin-dialog = "2.8.4"
+# レシートの読み取り（フェーズ 6）。Gemini API を Rust 側から呼ぶ。TLS は rustls（ring）で、
+# 自動アップデートと同じ版・同じ機能を使う（新しい crate を増やさない）
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+# API キーは OS の資格情報ストア（Windows の資格情報マネージャー・macOS のキーチェーン）に置く
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
+# 証憑のハッシュと、画像を API に送るときの base64
+sha2 = "0.10.9"
+base64 = "0.22.1"
 
 # 自動アップデートはデスクトップだけで使う
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
