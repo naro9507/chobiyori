@@ -9,6 +9,7 @@ pub mod import;
 pub mod inbox;
 pub mod journal;
 pub mod master;
+pub mod receipts;
 pub mod reports;
 pub mod setup;
 pub mod templates;
