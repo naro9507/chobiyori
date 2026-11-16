@@ -142,3 +142,6 @@ dist
 # Tauri / Rust
 src-tauri/target
 src-tauri/gen/schemas
+
+# Claude Code が作る作業用の場所（エージェントの git worktree）
+.claude/worktrees/
