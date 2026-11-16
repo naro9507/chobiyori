@@ -15,6 +15,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
+import { useInboxPendingCount } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
@@ -47,6 +48,7 @@ export function HomePage() {
 				</Card>
 			</div>
 			<PendingRecurring fiscalYear={fiscalYear} month={month} />
+			<PendingInbox />
 			<Card>
 				<CardHeader>
 					<CardTitle>{t("balancesTitle")}</CardTitle>
@@ -64,6 +66,30 @@ export function HomePage() {
 }
 
 const transactionsPath: string = "/transactions"
+const inboxPath: string = "/inbox"
+
+/** 取込受信箱に確認待ちの候補があれば、受信箱へ案内する。 */
+function PendingInbox() {
+	const t = useTranslations("home")
+	const count = useInboxPendingCount().data ?? 0
+	if (count === 0) return null
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>{t("inboxTitle")}</CardTitle>
+				<CardDescription>{t("inboxBody", { count })}</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<Link
+					to={inboxPath}
+					className="font-medium text-primary text-sm underline-offset-4 hover:underline"
+				>
+					{t("inboxLink")}
+				</Link>
+			</CardContent>
+		</Card>
+	)
+}
 
 /** 記録を待っている毎月の取引があれば、取引入力へ案内する。 */
 function PendingRecurring({

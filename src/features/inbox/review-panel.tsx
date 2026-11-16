@@ -1,0 +1,441 @@
+import { CircleAlert, Loader2 } from "lucide-react"
+import { type FormEvent, useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Field } from "@/components/ui/field"
+import {
+	Checkbox,
+	Input,
+	LabeledCheckbox,
+	NativeSelect,
+} from "@/components/ui/input"
+import { useRecordsTax } from "@/features/journal/journal-api"
+import { MasterCombobox } from "@/features/journal/master-combobox"
+import { useJournalMasters } from "@/features/journal/use-master-items"
+import { type BookColumn, BookTable } from "@/features/ledger/book-table"
+import { type TaxCategory, taxCategories } from "@/features/master/master-api"
+import { useTranslations } from "@/i18n/use-translations"
+import { formatAmount } from "@/lib/amount"
+import { useErrorMessage } from "@/lib/use-error-message"
+import {
+	type ConfirmInput,
+	type InboxItem,
+	type InboxStatus,
+	useConfirmInboxItem,
+	useConfirmInboxItems,
+	useInbox,
+	useSetInboxIgnored,
+} from "./inbox-api"
+
+const statuses: InboxStatus[] = ["pending", "posted", "ignored"]
+
+/** 確認待ちの候補を見て、1 件ずつ、またはまとめて確定する。 */
+export function ReviewPanel() {
+	const t = useTranslations("inbox")
+	const errorMessage = useErrorMessage()
+	const masters = useJournalMasters()
+	const [status, setStatus] = useState<InboxStatus>("pending")
+	const items = useInbox(status)
+	const [selectedId, setSelectedId] = useState<number | null>(null)
+	const [checked, setChecked] = useState<number[]>([])
+	const bulk = useConfirmInboxItems()
+	const ignore = useSetInboxIgnored()
+	const list = items.data ?? []
+	const selected =
+		list.find((i) => i.id === selectedId) ??
+		(status === "pending" ? list[0] : undefined)
+	const drawings = masters.accounts.find(
+		(a) => a.statementLine === "bs.owner_drawings"
+	)
+
+	const toggle = (id: number) =>
+		setChecked((prev) =>
+			prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+		)
+	const done = () => setChecked([])
+
+	const columns: BookColumn<InboxItem>[] = [
+		{
+			id: "check",
+			header: "",
+			className: "w-10",
+			cell: (item) =>
+				item.status === "posted" ? null : (
+					<Checkbox
+						aria-label={t("select", { name: item.merchant || item.date })}
+						checked={checked.includes(item.id)}
+						onClick={(e) => e.stopPropagation()}
+						onChange={() => toggle(item.id)}
+					/>
+				),
+		},
+		{
+			id: "date",
+			header: t("date"),
+			className: "w-28",
+			cell: (item) => item.date,
+		},
+		{
+			id: "merchant",
+			header: t("merchant"),
+			cell: (item) => (
+				<button
+					type="button"
+					className="text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+					onClick={() => setSelectedId(item.id)}
+				>
+					{item.merchant || t("noMerchant")}
+				</button>
+			),
+		},
+		{
+			id: "amount",
+			header: t("amount"),
+			numeric: true,
+			cell: (item) => formatAmount(item.spend),
+		},
+		{
+			id: "suggestion",
+			header: t("suggestion"),
+			cell: (item) => <SuggestionLabel item={item} />,
+		},
+	]
+
+	return (
+		<div className="flex flex-col gap-4">
+			<div className="flex flex-wrap items-end justify-between gap-4">
+				<Field label={t("status")} className="w-40">
+					<NativeSelect
+						value={status}
+						onChange={(e) => {
+							setStatus(e.target.value as InboxStatus)
+							setSelectedId(null)
+							done()
+						}}
+					>
+						{statuses.map((s) => (
+							<option key={s} value={s}>
+								{t(`status_${s}`)}
+							</option>
+						))}
+					</NativeSelect>
+				</Field>
+				{status !== "posted" && (
+					<div className="flex flex-wrap gap-2">
+						{status === "pending" && (
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={checked.length === 0 || bulk.isPending}
+								onClick={() =>
+									bulk.mutate(
+										{ ids: checked, input: null },
+										{ onSuccess: done }
+									)
+								}
+							>
+								{t("confirmSuggested")}
+							</Button>
+						)}
+						{drawings && (
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={checked.length === 0 || bulk.isPending}
+								onClick={() =>
+									bulk.mutate(
+										{
+											ids: checked,
+											input: {
+												accountId: drawings.id,
+												subAccountId: null,
+												partnerId: null,
+												taxCategory: null,
+												memo: "",
+												allocationPercent: null,
+												date: null,
+												saveRule: false,
+											},
+										},
+										{ onSuccess: done }
+									)
+								}
+							>
+								{t("confirmAsPrivate")}
+							</Button>
+						)}
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={checked.length === 0 || ignore.isPending}
+							onClick={() =>
+								ignore.mutate(
+									{ ids: checked, ignored: status === "pending" },
+									{ onSuccess: done }
+								)
+							}
+						>
+							{status === "pending" ? t("ignore") : t("unignore")}
+						</Button>
+					</div>
+				)}
+			</div>
+			<p aria-live="polite" className="text-muted-foreground text-sm">
+				{bulk.data && t("bulkResult", bulk.data)}
+			</p>
+			{(bulk.error || ignore.error || items.error) && (
+				<p role="alert" className="text-destructive text-sm">
+					{errorMessage(bulk.error ?? ignore.error ?? items.error)}
+				</p>
+			)}
+			{items.isPending ? (
+				<p className="flex items-center gap-2 text-muted-foreground text-sm">
+					<Loader2 aria-hidden="true" className="size-4 animate-spin" />
+					{t("loading")}
+				</p>
+			) : list.length === 0 ? (
+				<p className="py-8 text-center text-muted-foreground text-sm">
+					{t(`empty_${status}`)}
+				</p>
+			) : (
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+					<BookTable
+						label={t("listLabel")}
+						rows={list}
+						columns={columns}
+						rowKey={(item) => String(item.id)}
+						rowClassName={(item) =>
+							item.id === selected?.id ? "bg-accent/60" : undefined
+						}
+						onRowClick={(item) => setSelectedId(item.id)}
+					/>
+					{selected && selected.status === "pending" && (
+						<ConfirmForm
+							// 候補が変わったら、フォームを作り直す
+							key={selected.id}
+							item={selected}
+							onDone={() => {
+								const index = list.findIndex((i) => i.id === selected.id)
+								setSelectedId(list[index + 1]?.id ?? null)
+							}}
+						/>
+					)}
+				</div>
+			)}
+		</div>
+	)
+}
+
+function SuggestionLabel({ item }: { item: InboxItem }) {
+	const t = useTranslations("inbox")
+	const masters = useJournalMasters()
+	return (
+		<span className="flex flex-wrap items-center gap-1.5">
+			{item.status === "pending" && item.suggestion && (
+				<>
+					{item.suggestion.result.ignore
+						? t("suggestIgnore")
+						: masters.accountLabel(item.suggestion.result.accountId ?? -1)}
+					<Badge variant="outline">
+						{t(`source_${item.suggestion.source}`)}
+					</Badge>
+				</>
+			)}
+			{item.status === "posted" && t("status_posted")}
+			{item.possibleDuplicateId !== null && (
+				<Badge variant="warning">
+					<CircleAlert aria-hidden="true" />
+					{t("possibleDuplicate")}
+				</Badge>
+			)}
+		</span>
+	)
+}
+
+function ConfirmForm({
+	item,
+	onDone,
+}: {
+	item: InboxItem
+	onDone: () => void
+}) {
+	const t = useTranslations("inbox")
+	const tMaster = useTranslations("master")
+	const errorMessage = useErrorMessage()
+	const masters = useJournalMasters()
+	const confirm = useConfirmInboxItem()
+	const ignore = useSetInboxIgnored()
+	const year = Number(item.date.slice(0, 4))
+	const recordsTax = useRecordsTax(year)
+	const s = item.suggestion?.result
+	const [accountId, setAccountId] = useState<number | null>(
+		s && !s.ignore ? s.accountId : null
+	)
+	const [subAccountId, setSubAccountId] = useState<number | null>(
+		s?.subAccountId ?? null
+	)
+	const [partnerId, setPartnerId] = useState<number | null>(
+		s?.partnerId ?? null
+	)
+	const [taxCategory, setTaxCategory] = useState<TaxCategory | null>(
+		s?.taxCategory ?? null
+	)
+	const [memo, setMemo] = useState(s?.memo || item.merchant)
+	const [percent, setPercent] = useState(
+		s?.allocationPercent == null ? "" : String(s.allocationPercent)
+	)
+	const [saveRule, setSaveRule] = useState(
+		item.suggestion === null && item.merchant !== ""
+	)
+	const subAccounts = masters.subAccountsOf(accountId)
+
+	const submit = (e: FormEvent) => {
+		e.preventDefault()
+		if (accountId === null) return
+		const input: ConfirmInput = {
+			accountId,
+			subAccountId,
+			partnerId,
+			taxCategory: recordsTax ? taxCategory : null,
+			memo,
+			allocationPercent:
+				item.spend > 0 && percent !== "" ? Number(percent) : null,
+			date: null,
+			saveRule,
+		}
+		confirm.mutate({ id: item.id, input }, { onSuccess: onDone })
+	}
+
+	return (
+		<form
+			onSubmit={submit}
+			aria-label={t("formLabel")}
+			className="flex flex-col gap-3 rounded-lg border p-4"
+		>
+			<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+				<dt className="text-muted-foreground">{t("date")}</dt>
+				<dd>{item.date}</dd>
+				<dt className="text-muted-foreground">{t("merchant")}</dt>
+				<dd>{item.merchant}</dd>
+				<dt className="text-muted-foreground">
+					{item.spend > 0 ? t("spent") : t("refunded")}
+				</dt>
+				<dd className="num">{formatAmount(Math.abs(item.spend))}</dd>
+				<dt className="text-muted-foreground">{t("paidFrom")}</dt>
+				<dd>{masters.accountLabel(item.paymentAccountId)}</dd>
+				{item.memo && (
+					<>
+						<dt className="text-muted-foreground">{t("memoInFile")}</dt>
+						<dd>{item.memo}</dd>
+					</>
+				)}
+			</dl>
+			{item.possibleDuplicateId !== null && (
+				<p className="text-sm text-warning">{t("possibleDuplicateHint")}</p>
+			)}
+			<Field label={item.spend > 0 ? t("accountSpend") : t("accountBack")}>
+				<MasterCombobox
+					items={masters.accountItems}
+					value={accountId}
+					onChange={(id) => {
+						setAccountId(id)
+						setSubAccountId(null)
+						if (percent === "") {
+							const rule = masters.allocationPercentOf(id)
+							if (rule !== null && item.spend > 0) setPercent(String(rule))
+						}
+					}}
+				/>
+			</Field>
+			{subAccounts.length > 0 && (
+				<Field label={t("subAccount")}>
+					<NativeSelect
+						value={subAccountId ?? ""}
+						onChange={(e) =>
+							setSubAccountId(
+								e.target.value === "" ? null : Number(e.target.value)
+							)
+						}
+					>
+						<option value="">{t("none")}</option>
+						{subAccounts.map((sub) => (
+							<option key={sub.id} value={sub.id}>
+								{masters.subAccountLabel(sub.id)}
+							</option>
+						))}
+					</NativeSelect>
+				</Field>
+			)}
+			<Field label={t("partner")}>
+				<MasterCombobox
+					items={masters.partnerItems}
+					value={partnerId}
+					onChange={setPartnerId}
+				/>
+			</Field>
+			{recordsTax && (
+				<Field label={t("taxCategory")} hint={t("taxCategoryHint")}>
+					<NativeSelect
+						value={taxCategory ?? ""}
+						onChange={(e) =>
+							setTaxCategory(
+								e.target.value === "" ? null : (e.target.value as TaxCategory)
+							)
+						}
+					>
+						<option value="">{t("taxDefault")}</option>
+						{taxCategories.map((c) => (
+							<option key={c} value={c}>
+								{tMaster(`tax_${c}`)}
+							</option>
+						))}
+					</NativeSelect>
+				</Field>
+			)}
+			{item.spend > 0 && (
+				<Field label={t("allocation")} hint={t("allocationHint")}>
+					<Input
+						inputMode="numeric"
+						value={percent}
+						onChange={(e) => setPercent(e.target.value.replace(/[^0-9]/g, ""))}
+					/>
+				</Field>
+			)}
+			<Field label={t("memo")}>
+				<Input value={memo} onChange={(e) => setMemo(e.target.value)} />
+			</Field>
+			<LabeledCheckbox
+				label={t("saveRule")}
+				checked={saveRule}
+				onChange={(e) => setSaveRule(e.target.checked)}
+			/>
+			{(confirm.error || ignore.error) && (
+				<p role="alert" className="text-destructive text-sm">
+					{errorMessage(confirm.error ?? ignore.error)}
+				</p>
+			)}
+			<div className="flex flex-wrap gap-2">
+				<Button
+					type="submit"
+					disabled={accountId === null || confirm.isPending}
+				>
+					{t("confirm")}
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					disabled={ignore.isPending}
+					onClick={() =>
+						ignore.mutate(
+							{ ids: [item.id], ignored: true },
+							{ onSuccess: onDone }
+						)
+					}
+				>
+					{t("ignore")}
+				</Button>
+			</div>
+			<p className="text-muted-foreground text-xs">{t("enterHint")}</p>
+		</form>
+	)
+}

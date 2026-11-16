@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react"
 import { DataPage } from "@/pages/data-page"
 import { HomePage } from "@/pages/home-page"
+import { InboxPage } from "@/pages/inbox-page"
 import { LedgersPage } from "@/pages/ledgers-page"
 import { MasterPage } from "@/pages/master-page"
 import { PlaceholderPage } from "@/pages/placeholder-page"
@@ -23,6 +24,7 @@ const rootRoute = createRootRoute({ component: AppRoot })
 const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
 	transactions: TransactionsPage,
+	inbox: InboxPage,
 	ledgers: LedgersPage,
 	reports: ReportsPage,
 	master: MasterPage,
