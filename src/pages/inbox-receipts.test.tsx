@@ -112,9 +112,9 @@ const receiptItem: InboxItem = {
 	possibleDuplicateId: 77,
 }
 
-function renderPage() {
+function renderPage(path = "/inbox") {
 	const router = createAppRouter(
-		createMemoryHistory({ initialEntries: ["/inbox"] })
+		createMemoryHistory({ initialEntries: [path] })
 	)
 	render(
 		<AppProviders>
@@ -202,17 +202,34 @@ beforeEach(() => {
 })
 
 describe("レシート", () => {
-	it("同意して API キーを登録するまでは読み取らず、キーは画面に戻さない", async () => {
+	it("キーがない間は読み取らず、設定画面へ案内する", async () => {
 		const user = userEvent.setup()
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "レシート" }))
+		await user.click(await screen.findByRole("tab", { name: /^レシート$/ }))
+		expect(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		).toBeDisabled()
+		expect(
+			screen.getByRole("link", { name: "設定画面で API キーを登録する" })
+		).toHaveAttribute("href", expect.stringContaining("settings"))
+	})
+
+	it("設定画面でキーの取り方を案内し、同意とキーの登録をする。キーは画面に戻さない", async () => {
+		const user = userEvent.setup()
+		renderPage("/settings")
+		const card = await screen.findByRole("region", { name: "API キーの取り方" })
+		expect(
+			within(card).getByText("https://aistudio.google.com/")
+		).toBeInTheDocument()
+		expect(within(card).getByText(/1 日・1 分あたり/)).toBeInTheDocument()
+		expect(within(card).getByText(/1 円未満の見込み/)).toBeInTheDocument()
+		expect(
+			within(card).getByText(/Google AI Studio でそのキーを削除/)
+		).toBeInTheDocument()
 
 		expect(
-			await screen.findByText(/Gemini API（Google AI Studio）に送って/)
+			await screen.findByText("API キーはまだ登録していません。")
 		).toBeInTheDocument()
-		const read = screen.getByRole("button", { name: "読み取る（2 枚）" })
-		expect(read).toBeDisabled()
-
 		await user.click(
 			screen.getByLabelText(
 				"上の説明を読み、レシートの画像を送ることに同意します"
@@ -226,22 +243,36 @@ describe("レシート", () => {
 				consented: true,
 			},
 		})
-		const keyInput = screen.getByLabelText("API キー")
+		const keyInput = screen.getByLabelText("API キー", { selector: "input" })
 		expect(keyInput).toHaveAttribute("type", "password")
 		await user.type(keyInput, "AIza-test")
 		await user.click(screen.getByRole("button", { name: "キーを登録する" }))
 		expect(mocks.callCommand).toHaveBeenCalledWith("set_gemini_key", {
 			key: "AIza-test",
 		})
-		// 設定が済んだら設定は閉じる。開き直しても、キーは表示しない
-		await user.click(await screen.findByRole("button", { name: "設定を開く" }))
+		// 登録したかどうかだけを出し、替える・消すができる
 		expect(
-			screen.getByText("登録済みです。変えるときは新しいキーを入れてください。")
+			await screen.findByText("API キーは登録済みです。")
 		).toBeInTheDocument()
-		expect(screen.getByLabelText("API キー")).toHaveValue("")
+		expect(screen.getByLabelText("新しいキーに替える")).toHaveValue("")
+		expect(
+			screen.getByRole("button", { name: "キーを消す" })
+		).toBeInTheDocument()
+		expect(screen.queryByDisplayValue("AIza-test")).not.toBeInTheDocument()
+	})
 
-		// 束を 1 枚ずつ最後まで読む
-		await user.click(screen.getByRole("button", { name: "読み取る（2 枚）" }))
+	it("同意とキーがあれば、束を 1 枚ずつ最後まで読む", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		renderPage()
+		await user.click(await screen.findByRole("tab", { name: /^レシート$/ }))
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
 		expect(await screen.findByText(/2 枚を読み取りました/)).toBeInTheDocument()
 		expect(reads).toBe(2)
 	})
