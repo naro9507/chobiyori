@@ -41,6 +41,8 @@ export default defineConfig({
 	},
 	test: {
 		environment: "jsdom",
+		// このチェックアウトの src だけ（.claude/worktrees などの別の作業場所は含めない）
+		include: ["src/**/*.test.{ts,tsx}"],
 		setupFiles: ["./src/test/setup.ts"],
 		css: false,
 	},
