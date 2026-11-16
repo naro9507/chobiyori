@@ -33,6 +33,7 @@ export function BookTable<T extends RowData>({
 	columns,
 	rowKey,
 	rowClassName,
+	onRowClick,
 	footer,
 }: {
 	label: string
@@ -40,6 +41,8 @@ export function BookTable<T extends RowData>({
 	columns: BookColumn<T>[]
 	rowKey: (row: T, index: number) => string
 	rowClassName?: (row: T) => string | undefined
+	/** 行を押したとき（受信箱で候補を選ぶなど）。キーボードでは各行の中のボタンなどで操作する */
+	onRowClick?: (row: T) => void
 	footer?: ReactNode
 }) {
 	const helper = createColumnHelper<typeof features, T>()
@@ -123,7 +126,14 @@ export function BookTable<T extends RowData>({
 								key={row.id}
 								data-index={item.index}
 								ref={virtualizer.measureElement}
-								className={cn("border-b", rowClassName?.(row.original))}
+								className={cn(
+									"border-b",
+									onRowClick && "cursor-pointer hover:bg-accent/40",
+									rowClassName?.(row.original)
+								)}
+								onClick={
+									onRowClick ? () => onRowClick(row.original) : undefined
+								}
 							>
 								{row.getAllCells().map((cell) => (
 									<td key={cell.id} className={cellClass(cell.column.id)}>
