@@ -9,6 +9,16 @@ import {
 	LabeledCheckbox,
 	NativeSelect,
 } from "@/components/ui/input"
+import { DepositTargetSelect } from "@/features/deposits/deposit-target-select"
+import {
+	type DepositSuggestion,
+	type OpenTargets,
+	parseTargetKey,
+	targetKey,
+	useDepositSuggestions,
+	useInvalidateDeposits,
+	useOpenTargets,
+} from "@/features/deposits/deposits-api"
 import { useRecordsTax } from "@/features/journal/journal-api"
 import { MasterCombobox } from "@/features/journal/master-combobox"
 import { useJournalMasters } from "@/features/journal/use-master-items"
@@ -302,6 +312,12 @@ function ConfirmForm({
 	const [saveRule, setSaveRule] = useState(
 		item.suggestion === null && item.merchant !== ""
 	)
+	// 入金の行は、請求書か定期売上の月に結び付けられる
+	const isDeposit = item.spend < 0
+	const suggestions = useDepositSuggestions(isDeposit ? item.id : null)
+	const targets = useOpenTargets(isDeposit ? year : null)
+	const [depositKey, setDepositKey] = useState("")
+	const invalidateDeposits = useInvalidateDeposits()
 	const subAccounts = masters.subAccountsOf(accountId)
 	const link = useLinkInboxItem()
 	const receipt = useReceipts().data?.find((r) => r.id === item.receiptId)
@@ -309,6 +325,30 @@ function ConfirmForm({
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
+		const deposit = depositKey ? parseTargetKey(depositKey) : null
+		if (deposit) {
+			const input: ConfirmInput = {
+				accountId: 0,
+				subAccountId: null,
+				partnerId: null,
+				taxCategory: null,
+				memo,
+				allocationPercent: null,
+				date: null,
+				saveRule: false,
+				deposit,
+			}
+			confirm.mutate(
+				{ id: item.id, input },
+				{
+					onSuccess: () => {
+						invalidateDeposits()
+						onDone()
+					},
+				}
+			)
+			return
+		}
 		if (accountId === null) return
 		const input: ConfirmInput = {
 			accountId,
@@ -412,82 +452,98 @@ function ConfirmForm({
 					)}
 				</div>
 			)}
-			<Field label={item.spend > 0 ? t("accountSpend") : t("accountBack")}>
-				<MasterCombobox
-					items={masters.accountItems}
-					value={accountId}
-					onChange={(id) => {
-						setAccountId(id)
-						setSubAccountId(null)
-						if (percent === "") {
-							const rule = masters.allocationPercentOf(id)
-							if (rule !== null && item.spend > 0) setPercent(String(rule))
-						}
-					}}
+			{isDeposit && (
+				<DepositPicker
+					suggestions={suggestions.data ?? []}
+					targets={targets.data}
+					value={depositKey}
+					onChange={setDepositKey}
 				/>
-			</Field>
-			{subAccounts.length > 0 && (
-				<Field label={t("subAccount")}>
-					<NativeSelect
-						value={subAccountId ?? ""}
-						onChange={(e) =>
-							setSubAccountId(
-								e.target.value === "" ? null : Number(e.target.value)
-							)
-						}
-					>
-						<option value="">{t("none")}</option>
-						{subAccounts.map((sub) => (
-							<option key={sub.id} value={sub.id}>
-								{masters.subAccountLabel(sub.id)}
-							</option>
-						))}
-					</NativeSelect>
-				</Field>
 			)}
-			<Field label={t("partner")}>
-				<MasterCombobox
-					items={masters.partnerItems}
-					value={partnerId}
-					onChange={setPartnerId}
-				/>
-			</Field>
-			{recordsTax && (
-				<Field label={t("taxCategory")} hint={t("taxCategoryHint")}>
-					<NativeSelect
-						value={taxCategory ?? ""}
-						onChange={(e) =>
-							setTaxCategory(
-								e.target.value === "" ? null : (e.target.value as TaxCategory)
-							)
-						}
-					>
-						<option value="">{t("taxDefault")}</option>
-						{taxCategories.map((c) => (
-							<option key={c} value={c}>
-								{tMaster(`tax_${c}`)}
-							</option>
-						))}
-					</NativeSelect>
-				</Field>
-			)}
-			{item.spend > 0 && (
-				<Field label={t("allocation")} hint={t("allocationHint")}>
-					<Input
-						inputMode="numeric"
-						value={percent}
-						onChange={(e) => setPercent(e.target.value.replace(/[^0-9]/g, ""))}
+			{depositKey === "" && (
+				<>
+					<Field label={item.spend > 0 ? t("accountSpend") : t("accountBack")}>
+						<MasterCombobox
+							items={masters.accountItems}
+							value={accountId}
+							onChange={(id) => {
+								setAccountId(id)
+								setSubAccountId(null)
+								if (percent === "") {
+									const rule = masters.allocationPercentOf(id)
+									if (rule !== null && item.spend > 0) setPercent(String(rule))
+								}
+							}}
+						/>
+					</Field>
+					{subAccounts.length > 0 && (
+						<Field label={t("subAccount")}>
+							<NativeSelect
+								value={subAccountId ?? ""}
+								onChange={(e) =>
+									setSubAccountId(
+										e.target.value === "" ? null : Number(e.target.value)
+									)
+								}
+							>
+								<option value="">{t("none")}</option>
+								{subAccounts.map((sub) => (
+									<option key={sub.id} value={sub.id}>
+										{masters.subAccountLabel(sub.id)}
+									</option>
+								))}
+							</NativeSelect>
+						</Field>
+					)}
+					<Field label={t("partner")}>
+						<MasterCombobox
+							items={masters.partnerItems}
+							value={partnerId}
+							onChange={setPartnerId}
+						/>
+					</Field>
+					{recordsTax && (
+						<Field label={t("taxCategory")} hint={t("taxCategoryHint")}>
+							<NativeSelect
+								value={taxCategory ?? ""}
+								onChange={(e) =>
+									setTaxCategory(
+										e.target.value === ""
+											? null
+											: (e.target.value as TaxCategory)
+									)
+								}
+							>
+								<option value="">{t("taxDefault")}</option>
+								{taxCategories.map((c) => (
+									<option key={c} value={c}>
+										{tMaster(`tax_${c}`)}
+									</option>
+								))}
+							</NativeSelect>
+						</Field>
+					)}
+					{item.spend > 0 && (
+						<Field label={t("allocation")} hint={t("allocationHint")}>
+							<Input
+								inputMode="numeric"
+								value={percent}
+								onChange={(e) =>
+									setPercent(e.target.value.replace(/[^0-9]/g, ""))
+								}
+							/>
+						</Field>
+					)}
+					<Field label={t("memo")}>
+						<Input value={memo} onChange={(e) => setMemo(e.target.value)} />
+					</Field>
+					<LabeledCheckbox
+						label={t("saveRule")}
+						checked={saveRule}
+						onChange={(e) => setSaveRule(e.target.checked)}
 					/>
-				</Field>
+				</>
 			)}
-			<Field label={t("memo")}>
-				<Input value={memo} onChange={(e) => setMemo(e.target.value)} />
-			</Field>
-			<LabeledCheckbox
-				label={t("saveRule")}
-				checked={saveRule}
-				onChange={(e) => setSaveRule(e.target.checked)}
-			/>
 			{(confirm.error || ignore.error) && (
 				<p role="alert" className="text-destructive text-sm">
 					{errorMessage(confirm.error ?? ignore.error)}
@@ -496,7 +552,9 @@ function ConfirmForm({
 			<div className="flex flex-wrap gap-2">
 				<Button
 					type="submit"
-					disabled={accountId === null || confirm.isPending}
+					disabled={
+						(accountId === null && depositKey === "") || confirm.isPending
+					}
 				>
 					{t("confirm")}
 				</Button>
@@ -557,5 +615,73 @@ function PostedDetail({ item }: { item: InboxItem }) {
 				</p>
 			)}
 		</div>
+	)
+}
+
+/** 入金の行の結び付け先。候補（金額・名前・日付が合うもの）と、すべての未入金から選べる。 */
+function DepositPicker({
+	suggestions,
+	targets,
+	value,
+	onChange,
+}: {
+	suggestions: DepositSuggestion[]
+	targets: OpenTargets | undefined
+	value: string
+	onChange: (key: string) => void
+}) {
+	const t = useTranslations("deposits")
+	const masters = useJournalMasters()
+	const hasTargets =
+		(targets?.invoices.length ?? 0) > 0 || (targets?.planMonths.length ?? 0) > 0
+	if (!hasTargets && suggestions.length === 0) return null
+	return (
+		<fieldset className="flex flex-col gap-2 rounded-md border p-3">
+			<legend className="px-1 font-medium text-sm">{t("linkTitle")}</legend>
+			<p className="text-muted-foreground text-xs">{t("linkHint")}</p>
+			{suggestions.length > 0 && (
+				<ul className="flex flex-col gap-1" aria-label={t("suggestions")}>
+					{suggestions.map((s) => {
+						const key = targetKey(s.target)
+						return (
+							<li key={key}>
+								<label className="flex items-center gap-2 text-sm">
+									<input
+										type="radio"
+										name="deposit-suggestion"
+										checked={value === key}
+										onChange={() => onChange(key)}
+										className="accent-primary"
+									/>
+									<span>
+										{s.partnerId !== null &&
+											`${masters.partnerLabel(s.partnerId)} `}
+										{s.label}（
+										{t("remaining", { amount: formatAmount(s.remaining) })}）
+									</span>
+									{s.exactAmount && (
+										<span className="text-success text-xs">
+											{t("sameAmount")}
+										</span>
+									)}
+									{s.nameMatches && (
+										<span className="text-success text-xs">
+											{t("sameName")}
+										</span>
+									)}
+								</label>
+							</li>
+						)
+					})}
+				</ul>
+			)}
+			<Field label={t("chooseTarget")}>
+				<DepositTargetSelect
+					targets={targets}
+					value={value}
+					onChange={onChange}
+				/>
+			</Field>
+		</fieldset>
 	)
 }

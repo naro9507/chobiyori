@@ -11,6 +11,13 @@ import {
 import { Field } from "@/components/ui/field"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
+import { DepositTargetSelect } from "@/features/deposits/deposit-target-select"
+import {
+	parseTargetKey,
+	remainingOf,
+	useOpenTargets,
+	useRecordDeposit,
+} from "@/features/deposits/deposits-api"
 import { type AccountCategory, displayName } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount } from "@/lib/amount"
@@ -46,6 +53,8 @@ type Form = {
 	/** 家事按分する。経費の科目に按分ルールがあるときだけ選べる */
 	allocate: boolean
 	allocationPercent: string
+	/** 収入を請求書か定期売上の月に結び付ける（`targetKey` の文字列。空なら結び付けない） */
+	depositKey: string
 }
 
 function today() {
@@ -81,9 +90,14 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 		memo: "",
 		allocate: false,
 		allocationPercent: "",
+		depositKey: "",
 	})
+	const deposit = useRecordDeposit()
+	const targets = useOpenTargets(fiscalYear)
+	const linked = form.choice === "income" && form.depositKey !== ""
 	const setForm = (patch: Partial<Form>) => {
 		create.reset()
+		deposit.reset()
 		setSaved(null)
 		setFormState({ ...form, ...patch })
 	}
@@ -112,13 +126,45 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 
 	const kind: SimpleKind =
 		form.choice === "owner" ? form.ownerKind : form.choice
+	const error = create.error ?? deposit.error
 	const errorFor = (field: string) => {
-		const e = fieldError(create.error, field)
+		const e = fieldError(error, field)
 		return e ? errorMessage(e) : undefined
+	}
+
+	const onDepositChange = (depositKey: string) => {
+		// 金額がまだなら、残りの額を入れる
+		const remaining = remainingOf(targets.data, depositKey)
+		setForm({
+			depositKey,
+			amount:
+				form.amount === "" && remaining !== null
+					? String(remaining)
+					: form.amount,
+		})
 	}
 
 	const onSubmit = (event: FormEvent) => {
 		event.preventDefault()
+		const target = linked ? parseTargetKey(form.depositKey) : null
+		if (target) {
+			deposit.mutate(
+				{
+					target,
+					date: form.date,
+					amount: amountForCommand(form.amount),
+					accountId: Number(form.paymentAccountId || 0),
+					memo: form.memo,
+				},
+				{
+					onSuccess: (transaction) => {
+						setSaved(transaction)
+						setFormState({ ...form, amount: "", memo: "", depositKey: "" })
+					},
+				}
+			)
+			return
+		}
 		const usesAccount = form.choice !== "owner"
 		create.mutate(
 			{
@@ -213,7 +259,11 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 						<RadioCards
 							value={form.choice}
 							onValueChange={(value) =>
-								setForm({ choice: value as KindChoice, accountId: "" })
+								setForm({
+									choice: value as KindChoice,
+									accountId: "",
+									depositKey: "",
+								})
 							}
 							className="sm:grid-cols-4"
 						>
@@ -230,6 +280,22 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 							{t("noPaymentAccounts")}
 						</p>
 					)}
+
+					{form.choice === "income" &&
+						((targets.data?.invoices.length ?? 0) > 0 ||
+							(targets.data?.planMonths.length ?? 0) > 0) && (
+							<Field
+								label={t("depositTarget")}
+								hint={t("depositTargetHint")}
+								error={errorFor("targetMonth") ?? errorFor("status")}
+							>
+								<DepositTargetSelect
+									targets={targets.data}
+									value={form.depositKey}
+									onChange={onDepositChange}
+								/>
+							</Field>
+						)}
 
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{form.choice === "owner" && (
@@ -271,7 +337,7 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 								className="num text-right"
 							/>
 						</Field>
-						{form.choice !== "owner" && (
+						{form.choice !== "owner" && !linked && (
 							<Field
 								label={labels[form.choice].account}
 								error={errorFor("accountId")}
@@ -287,7 +353,7 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 						)}
 						<Field
 							label={labels[form.choice].payment}
-							error={errorFor("paymentAccountId")}
+							error={errorFor("paymentAccountId") ?? errorFor("accountId")}
 						>
 							<NativeSelect
 								value={form.paymentAccountId}
@@ -301,23 +367,25 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 								))}
 							</NativeSelect>
 						</Field>
-						<Field
-							label={t("partner")}
-							hint={t("optional")}
-							error={errorFor("partnerId")}
-						>
-							<NativeSelect
-								value={form.partnerId}
-								onChange={(e) => setForm({ partnerId: e.target.value })}
+						{!linked && (
+							<Field
+								label={t("partner")}
+								hint={t("optional")}
+								error={errorFor("partnerId")}
 							>
-								<option value="">{t("none")}</option>
-								{activePartners.map((p) => (
-									<option key={p.id} value={p.id}>
-										{p.code} {p.label}
-									</option>
-								))}
-							</NativeSelect>
-						</Field>
+								<NativeSelect
+									value={form.partnerId}
+									onChange={(e) => setForm({ partnerId: e.target.value })}
+								>
+									<option value="">{t("none")}</option>
+									{activePartners.map((p) => (
+										<option key={p.id} value={p.id}>
+											{p.code} {p.label}
+										</option>
+									))}
+								</NativeSelect>
+							</Field>
+						)}
 						<Field
 							label={t("memo")}
 							hint={t("memoHint")}
@@ -361,9 +429,9 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 						</fieldset>
 					)}
 
-					{create.error && !(isAppError(create.error) && create.error.field) ? (
+					{error && !(isAppError(error) && error.field) ? (
 						<p role="alert" className="text-destructive text-sm">
-							{errorMessage(create.error)}
+							{errorMessage(error)}
 						</p>
 					) : null}
 					{saved && (
@@ -379,9 +447,11 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 					<div>
 						<Button
 							type="submit"
-							disabled={create.isPending || fiscalYear === null}
+							disabled={
+								create.isPending || deposit.isPending || fiscalYear === null
+							}
 						>
-							{create.isPending && (
+							{(create.isPending || deposit.isPending) && (
 								<Loader2 aria-hidden="true" className="animate-spin" />
 							)}
 							{t("record")}

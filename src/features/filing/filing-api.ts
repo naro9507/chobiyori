@@ -42,6 +42,15 @@ export type CategoryTotal = {
 	nationalTax: number
 }
 
+/** Rust 側 `domain::filing::PurchaseGroup` と同じ形。 */
+export type PurchaseGroup = {
+	rate: Rate
+	qualified: boolean
+	percent: number
+	taxIncluded: number
+	deductible: number
+}
+
 export type ConsumptionReport = {
 	fiscalYear: number
 	taxStatus: TaxStatus
@@ -56,6 +65,8 @@ export type ConsumptionReport = {
 		simplified: Payable
 		categories: CategoryTotal[]
 	}
+	/** 本則課税で納める額の目安 */
+	standard: { groups: PurchaseGroup[]; payable: Payable }
 	accounts: {
 		accountId: number
 		rate: Rate

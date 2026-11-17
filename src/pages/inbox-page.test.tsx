@@ -341,4 +341,62 @@ describe("取込受信箱", () => {
 		expect(alert).toBeInTheDocument()
 		expect(screen.getByText("ポイント")).toBeInTheDocument()
 	})
+
+	it("口座の入金は合う請求書や定期売上を候補に出し、選んで確定する", async () => {
+		const base = mocks.callCommand.getMockImplementation()
+		mocks.callCommand.mockImplementation(async (command: string, args) => {
+			switch (command) {
+				case "list_inbox":
+					return [item(1, "ﾌﾘｺﾐ ﾔﾏﾀﾞ ﾀﾛｳ", -8000, null)]
+				case "deposit_suggestions":
+					return [
+						{
+							target: { kind: "plan", planId: 4, month: "2026-10" },
+							label: "月謝 2026-10",
+							partnerId: null,
+							remaining: 8000,
+							exactAmount: true,
+							nameMatches: true,
+							score: 100,
+						},
+					]
+				case "open_deposit_targets":
+					return {
+						invoices: [],
+						planMonths: [
+							{
+								planId: 4,
+								partnerId: 10,
+								name: "月謝",
+								month: "2026-10",
+								remaining: 8000,
+							},
+						],
+					}
+				default:
+					return base?.(command, args)
+			}
+		})
+		const user = userEvent.setup()
+		renderPage()
+		const form = await screen.findByRole("form", { name: "候補を確定する" })
+		const suggestions = await within(form).findByRole("list", {
+			name: "候補",
+		})
+		expect(within(suggestions).getByText("金額が同じ")).toBeInTheDocument()
+		expect(within(suggestions).getByText("名前が同じ")).toBeInTheDocument()
+		await user.click(within(suggestions).getByRole("radio"))
+		// 結び付けたら科目の欄は出さない
+		expect(
+			within(form).queryByLabelText("何に使ったか（科目）")
+		).not.toBeInTheDocument()
+		await user.click(within(form).getByRole("button", { name: "確定する" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("confirm_inbox_item", {
+			id: 1,
+			input: expect.objectContaining({
+				deposit: { kind: "plan", planId: 4, month: "2026-10" },
+				saveRule: false,
+			}),
+		})
+	})
 })

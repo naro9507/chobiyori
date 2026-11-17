@@ -145,6 +145,23 @@ const consumption: ConsumptionReport = {
 		},
 	],
 	summary: [{ taxCategory: "taxable_sales_10", debit: 0, credit: 3_300_000 }],
+	standard: {
+		groups: [
+			{
+				rate: "standard10",
+				qualified: false,
+				percent: 80,
+				taxIncluded: 1_100_000,
+				deductible: 62_400,
+			},
+		],
+		payable: {
+			deductible: 62_400,
+			national: 171_600,
+			local: 48_400,
+			total: 220_000,
+		},
+	},
 }
 
 function renderAt(path: string) {
@@ -267,7 +284,7 @@ describe("確定申告の補助", () => {
 		})
 	})
 
-	it("消費税は 2 割特例と簡易課税の納める額を並べ、年の途中の登録を知らせる", async () => {
+	it("消費税は 2 割特例・簡易課税・本則課税の目安を並べ、年の途中の登録を知らせる", async () => {
 		const user = userEvent.setup()
 		renderAt("/closing")
 		await user.click(await screen.findByRole("tab", { name: "消費税" }))
@@ -282,6 +299,12 @@ describe("確定申告の補助", () => {
 		expect(
 			screen.getByText("簡易課税で納める額").nextSibling
 		).toHaveTextContent("150,000")
+		expect(
+			screen.getByText("本則課税（目安）で納める額").nextSibling
+		).toHaveTextContent("220,000")
+		expect(
+			screen.getByText("インボイスなし（80% を引く）", { exact: false })
+		).toBeInTheDocument()
 		expect(screen.getByRole("table", { name: "課税売上" })).toHaveTextContent(
 			"234,000"
 		)

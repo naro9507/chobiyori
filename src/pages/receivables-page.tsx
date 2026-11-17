@@ -23,7 +23,9 @@ import {
 	type PaymentStatus,
 	type Plan,
 	type PlanInput,
+	useAssignPayment,
 	useDeletePlan,
+	useDraftInvoices,
 	useMonthly,
 	usePlans,
 	useRecordPayment,
@@ -200,9 +202,14 @@ function MonthlyTable({ data, month }: { data: MonthlyList; month: string }) {
 	const [bulkDate, setBulkDate] = useState(() => defaultPaymentDate(month))
 	const [bulkAccount, setBulkAccount] = useState<number | null>(null)
 	const bulkAccountId = bulkAccount ?? accounts[0]?.id ?? null
+	// 請求書で請求した月は、入金を請求書に記録するので、まとめて記録しない
 	const unpaid = data.rows.filter(
-		(r) => r.cell.status === "unpaid" || r.cell.status === "partial"
+		(r) =>
+			r.invoiceId === null &&
+			(r.cell.status === "unpaid" || r.cell.status === "partial")
 	)
+	const drafts = useDraftInvoices(fiscalYear)
+	const monthNumber = Number(month.slice(5, 7))
 	const cell = "num px-3 py-2 text-right"
 
 	const recordAll = () => {
@@ -281,17 +288,24 @@ function MonthlyTable({ data, month }: { data: MonthlyList; month: string }) {
 								<td className={cell}>{formatAmount(r.cell.net)}</td>
 								<td className="px-3 py-2">
 									<StatusBadge status={r.cell.status} />
+									{r.invoiceId !== null && (
+										<span className="ml-2 text-muted-foreground text-xs">
+											{t("invoiced", { number: r.invoiceNumber ?? t("draft") })}
+										</span>
+									)}
 								</td>
 								<td className="flex justify-end gap-1 px-3 py-1.5">
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() =>
-											setOpenPlan(openPlan === r.planId ? null : r.planId)
-										}
-									>
-										{t("recordPayment")}
-									</Button>
+									{r.invoiceId === null && (
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() =>
+												setOpenPlan(openPlan === r.planId ? null : r.planId)
+											}
+										>
+											{t("recordPayment")}
+										</Button>
+									)}
 									<Button
 										variant="ghost"
 										size="sm"
@@ -329,6 +343,34 @@ function MonthlyTable({ data, month }: { data: MonthlyList; month: string }) {
 					{errorMessage(setSkipped.error)}
 				</p>
 			)}
+			<div className="flex flex-col gap-2 rounded-lg border p-4">
+				<p className="font-bold text-sm">{t("draftInvoicesTitle")}</p>
+				<p className="text-muted-foreground text-xs">
+					{t("draftInvoicesHint")}
+				</p>
+				<Button
+					variant="outline"
+					className="w-fit"
+					disabled={drafts.isPending || fiscalYear === null}
+					onClick={() => drafts.mutate(monthNumber)}
+				>
+					{t("draftInvoices", { month: monthNumber })}
+				</Button>
+				{drafts.isSuccess && (
+					<p role="status" className="text-sm">
+						{t("draftInvoicesDone", {
+							count: drafts.data.documents.length,
+							invoiced: drafts.data.alreadyInvoiced,
+							paid: drafts.data.alreadyPaid,
+						})}
+					</p>
+				)}
+				{drafts.error && (
+					<p role="alert" className="text-destructive text-sm">
+						{errorMessage(drafts.error)}
+					</p>
+				)}
+			</div>
 			{unpaid.length > 0 && (
 				<div className="flex flex-col gap-3 rounded-lg border p-4">
 					<p className="flex items-center gap-2 font-bold text-sm">
@@ -580,6 +622,7 @@ function UnassignedCard({ data, month }: { data: MonthlyList; month: string }) {
 									)}
 								</span>
 								<span className="num">{formatAmount(u.amount)}</span>
+								{u.amount > 0 && <AssignForm payment={u} month={month} />}
 							</li>
 						))}
 					</ul>
@@ -924,5 +967,70 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 					</p>
 				)}
 		</form>
+	)
+}
+
+/** 未割当の入金を、プランと対象月に割り当てる。 */
+function AssignForm({
+	payment,
+	month,
+}: {
+	payment: MonthlyList["unassigned"][number]
+	month: string
+}) {
+	const t = useTranslations("receivables")
+	const masters = useJournalMasters()
+	const errorMessage = useErrorMessage()
+	const plans = usePlans().data ?? []
+	const assign = useAssignPayment()
+	// 取引先が分かっていれば、その取引先のプランを先に選んでおく
+	const initial =
+		plans.find((p) => p.partnerId === payment.partnerId)?.id ?? plans[0]?.id
+	const [planId, setPlanId] = useState<number | null>(null)
+	const [target, setTarget] = useState(payment.targetMonth ?? month)
+	const chosen = planId ?? initial ?? null
+	if (plans.length === 0) return null
+	return (
+		<div className="flex w-full flex-wrap items-end gap-2">
+			<Field label={t("assignPlan")} className="w-64">
+				<NativeSelect
+					value={chosen ?? ""}
+					onChange={(e) => setPlanId(Number(e.target.value))}
+				>
+					{plans.map((p) => (
+						<option key={p.id} value={p.id}>
+							{masters.partnerLabel(p.partnerId)} {p.name}
+						</option>
+					))}
+				</NativeSelect>
+			</Field>
+			<Field label={t("assignMonth")} className="w-40">
+				<Input
+					type="month"
+					value={target}
+					onChange={(e) => setTarget(e.target.value)}
+				/>
+			</Field>
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={chosen === null || assign.isPending}
+				onClick={() => {
+					if (chosen === null) return
+					assign.mutate({
+						transactionId: payment.transactionId,
+						planId: chosen,
+						month: target,
+					})
+				}}
+			>
+				{t("assign")}
+			</Button>
+			{assign.error && (
+				<p role="alert" className="w-full text-destructive text-sm">
+					{errorMessage(assign.error)}
+				</p>
+			)}
+		</div>
 	)
 }

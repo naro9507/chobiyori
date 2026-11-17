@@ -319,6 +319,66 @@ describe("かんたん入力", () => {
 		)
 	})
 
+	it("収入は請求書や定期売上を選ぶと、残りの額を入れて入金として記録する", async () => {
+		const base = mocks.callCommand.getMockImplementation()
+		mocks.callCommand.mockImplementation(async (command: string, args) => {
+			switch (command) {
+				case "open_deposit_targets":
+					return {
+						invoices: [
+							{
+								documentId: 7,
+								number: "INV-0001",
+								partnerId: null,
+								recipientName: "山田商店",
+								issueDate: "2026-03-01",
+								dueDate: "2026-03-31",
+								total: 11000,
+								remaining: 11000,
+								saleRecorded: true,
+							},
+						],
+						planMonths: [],
+					}
+				case "record_deposit":
+					return saved({
+						date: args.input.date,
+						entryMode: "simple",
+						memo: "",
+						lines: [],
+					})
+				default:
+					return base?.(command, args)
+			}
+		})
+		const user = userEvent.setup()
+		renderPage()
+		const form = await screen.findByRole("form", { name: "かんたん入力" })
+		await user.click(within(form).getByRole("radio", { name: "収入" }))
+		await user.selectOptions(
+			await within(form).findByLabelText("入金をつなげる"),
+			"INV-0001 山田商店（残り 11,000 円）"
+		)
+		expect(within(form).getByLabelText("金額")).toHaveValue("11000")
+		const date = within(form).getByLabelText("日付")
+		await user.clear(date)
+		await user.type(date, "2026-04-10")
+		await user.selectOptions(
+			within(form).getByLabelText("どこに入ったか"),
+			"104 普通預金"
+		)
+		await user.click(within(form).getByRole("button", { name: "記録する" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("record_deposit", {
+			input: {
+				target: { kind: "invoice", documentId: 7 },
+				date: "2026-04-10",
+				amount: 11000,
+				accountId: 2,
+				memo: "",
+			},
+		})
+	})
+
 	it("年度の外の日付は、直し方が分かる文で入力欄に示す", async () => {
 		const user = userEvent.setup()
 		failNext = { code: "outOfRange", field: "date" }
