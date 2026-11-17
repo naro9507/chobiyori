@@ -74,3 +74,24 @@ pub async fn recurring_monthly(
 pub async fn recurring_year(db: State<'_, Database>, fiscal_year: i64) -> AppResult<YearMatrix> {
     recurring::year_matrix(&db.conn(), fiscal_year)
 }
+
+/// 未割当の入金を、あとからプランと対象月に割り当てる。
+#[tauri::command]
+pub async fn assign_recurring_payment(
+    db: State<'_, Database>,
+    transaction_id: i64,
+    plan_id: i64,
+    month: String,
+) -> AppResult<Transaction> {
+    recurring::assign(&db, transaction_id, plan_id, &month)
+}
+
+/// その月に予定のあるプランから、取引先ごとに請求書の下書きを作る。
+#[tauri::command]
+pub async fn draft_recurring_invoices(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    month: u32,
+) -> AppResult<recurring::DraftInvoices> {
+    recurring::draft_invoices(&db, fiscal_year, month)
+}

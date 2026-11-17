@@ -8,6 +8,7 @@
 //!
 //! 書類の操作は変更履歴に残す（宛先のメールアドレスや金額は残さない）。
 
+use super::transactions::Transaction;
 use super::{attachments, audit, closing, setup, transactions, Database};
 use crate::domain::document::{
     self as doc, DisplayStatus, DocumentKind, DocumentStatus, LineInput, TaxMode, Totals,
@@ -552,6 +553,12 @@ fn insert_draft(
     Ok(id)
 }
 
+/// 下書きを作る（呼び出し側の DB トランザクションの中で）。定期売上からまとめて作るときに使う。
+pub(crate) fn create_in(conn: &Connection, input: &DocumentInput) -> AppResult<i64> {
+    let v = validate(conn, input)?;
+    insert_draft(conn, input.kind, &v, None)
+}
+
 /// 下書きを作る。
 pub fn create(db: &Database, input: &DocumentInput) -> AppResult<Document> {
     db.transaction(|tx| {
@@ -864,64 +871,70 @@ pub struct PaymentInput {
     pub amount: i64,
     /// 入金した口座（預金・現金）
     pub account_id: i64,
+    /// 口座の補助科目（明細の取込先が補助科目を持つとき）
+    #[serde(default)]
+    pub sub_account_id: Option<i64>,
 }
 
-/// 入金を記帳する。「口座 / 売掛金」。売上をまだ記帳していなければ先に記帳してもらう。
-/// 残りの額より多くは入れない。
+/// 請求書の入金を記帳する（呼び出し側の DB トランザクションの中で）。「口座 / 売掛金」。
+/// 売上をまだ記帳していなければ先に記帳してもらう。残りの額より多くは入れない。
+/// かんたん入力・受信箱から入金を記録するときも、これを使う。
+pub(crate) fn record_payment_in(
+    conn: &Connection,
+    id: i64,
+    input: &PaymentInput,
+    entry_mode: EntryMode,
+) -> AppResult<Transaction> {
+    let d = get(conn, id)?;
+    if d.kind != DocumentKind::Invoice
+        || matches!(d.status, DocumentStatus::Draft | DocumentStatus::Canceled)
+    {
+        return Err(AppError::field(ErrorCode::InvalidFormat, "status"));
+    }
+    if d.transaction_id.is_none() {
+        return Err(AppError::new(ErrorCode::SaleNotRecorded));
+    }
+    let remaining = d.totals.total - d.paid;
+    if input.amount <= 0 || input.amount > remaining {
+        return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+    }
+    transactions::ensure_payment_account(conn, input.account_id, "accountId")?;
+    let receivable = closing::account_by_line(conn, "bs.accounts_receivable")?;
+    let year = journal::parse_date(input.date.trim())
+        .map(|(y, _, _)| y)
+        .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;
+    let t = transactions::insert_kind(
+        conn,
+        year,
+        &TransactionInput {
+            date: input.date.trim().to_string(),
+            entry_mode,
+            memo: format!("入金 {}", d.number.clone().unwrap_or_default()),
+            lines: vec![
+                journal::LineInput {
+                    partner_id: d.partner_id,
+                    sub_account_id: input.sub_account_id,
+                    ..journal::LineInput::new(Side::Debit, input.account_id, input.amount)
+                },
+                journal::LineInput {
+                    partner_id: d.partner_id,
+                    ..journal::LineInput::new(Side::Credit, receivable, input.amount)
+                },
+            ],
+        },
+        TransactionKind::Normal,
+    )?;
+    conn.execute(
+        "INSERT INTO document_payments (document_id, transaction_id, amount) VALUES (?1, ?2, ?3)",
+        params![id, t.id, input.amount],
+    )?;
+    Ok(t)
+}
+
+/// 請求書の画面から入金を記帳する。
 pub fn record_payment(db: &Database, id: i64, input: &PaymentInput) -> AppResult<Document> {
     db.transaction(|tx| {
-        let d = get(tx, id)?;
-        if d.kind != DocumentKind::Invoice
-            || matches!(d.status, DocumentStatus::Draft | DocumentStatus::Canceled)
-        {
-            return Err(AppError::field(ErrorCode::InvalidFormat, "status"));
-        }
-        if d.transaction_id.is_none() {
-            return Err(AppError::new(ErrorCode::SaleNotRecorded));
-        }
-        let remaining = d.totals.total - d.paid;
-        if input.amount <= 0 || input.amount > remaining {
-            return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
-        }
-        let is_payment: bool = tx
-            .query_row(
-                "SELECT is_payment_account FROM accounts WHERE id = ?1",
-                [input.account_id],
-                |r| r.get(0),
-            )
-            .optional()?
-            .ok_or(AppError::field(ErrorCode::NotFound, "accountId"))?;
-        if !is_payment {
-            return Err(AppError::field(ErrorCode::InvalidFormat, "accountId"));
-        }
-        let receivable = closing::account_by_line(tx, "bs.accounts_receivable")?;
-        let year = journal::parse_date(input.date.trim())
-            .map(|(y, _, _)| y)
-            .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;
-        let t = transactions::insert_kind(
-            tx,
-            year,
-            &TransactionInput {
-                date: input.date.trim().to_string(),
-                entry_mode: EntryMode::Simple,
-                memo: format!("入金 {}", d.number.clone().unwrap_or_default()),
-                lines: vec![
-                    journal::LineInput {
-                        partner_id: d.partner_id,
-                        ..journal::LineInput::new(Side::Debit, input.account_id, input.amount)
-                    },
-                    journal::LineInput {
-                        partner_id: d.partner_id,
-                        ..journal::LineInput::new(Side::Credit, receivable, input.amount)
-                    },
-                ],
-            },
-            TransactionKind::Normal,
-        )?;
-        tx.execute(
-            "INSERT INTO document_payments (document_id, transaction_id, amount) VALUES (?1, ?2, ?3)",
-            params![id, t.id, input.amount],
-        )?;
+        record_payment_in(tx, id, input, EntryMode::Simple)?;
         get(tx, id)
     })
 }
@@ -1076,6 +1089,7 @@ mod tests {
             date: "2026-03-20".into(),
             amount,
             account_id: bank,
+            sub_account_id: None,
         };
         assert_eq!(
             record_payment(&db, d.id, &pay(1_000)).unwrap_err().code,
@@ -1151,6 +1165,7 @@ mod tests {
                 date: "2026-03-20".into(),
                 amount: 21_080,
                 account_id: bank,
+                sub_account_id: None,
             },
         )
         .unwrap();

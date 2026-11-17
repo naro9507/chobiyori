@@ -175,6 +175,7 @@ pub fn read_with(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::domain::statement::ColumnRole;
 
     /// 匿名化したアメックスの明細（Shift_JIS）。様式は推測で、実物での確認が要る。
     pub(crate) fn amex_fixture(rows: &[(&str, &str, &str, &str)]) -> Vec<u8> {
@@ -219,6 +220,62 @@ pub(crate) mod tests {
             .unwrap()
             .unwrap_err();
         assert_eq!(diff.added, ["ポイント"]);
+    }
+
+    /// 匿名化した銀行の明細（Shift_JIS）。見出しはプリセットのまま、行は役割から作る。
+    /// 様式は公開情報からの推測で、実物の明細での確認が要る。
+    fn bank_fixture(def: &FormatDefinition) -> Vec<u8> {
+        let mut text = def.header.join(",");
+        text.push_str("\r\n");
+        // 出金 1,080（文具店）と、入金 8,000（振込 ﾔﾏﾀﾞ ﾀﾛｳ）
+        for (date, merchant, out, inn) in [
+            ("2026/10/01", "ﾌﾞﾝｸﾞﾃﾝ", "1,080", ""),
+            ("2026/10/05", "ﾌﾘｺﾐ ﾔﾏﾀﾞ ﾀﾛｳ", "", "8,000"),
+        ] {
+            let cells: Vec<String> = def
+                .columns
+                .iter()
+                .map(|role| match role {
+                    ColumnRole::Date => date.to_string(),
+                    ColumnRole::Merchant => merchant.to_string(),
+                    ColumnRole::Withdrawal => format!("\"{out}\""),
+                    ColumnRole::Deposit => format!("\"{inn}\""),
+                    ColumnRole::Amount if out.is_empty() => format!("\"{inn}\""),
+                    ColumnRole::Amount => format!("\"-{out}\""),
+                    _ => String::new(),
+                })
+                .collect();
+            text.push_str(&cells.join(","));
+            text.push_str("\r\n");
+        }
+        encoding_rs::SHIFT_JIS.encode(&text).0.into_owned()
+    }
+
+    #[test]
+    fn each_bank_preset_reads_its_own_anonymized_statement() {
+        let presets = crate::db::formats::presets();
+        let banks: Vec<_> = presets
+            .iter()
+            .filter(|p| p.preset.as_deref().is_some_and(|k| k.starts_with("bank-")))
+            .collect();
+        assert_eq!(banks.len(), 6);
+        for bank in banks {
+            let bytes = bank_fixture(&bank.definition);
+            let found = matching_format(&bytes, "meisai.csv", &presets).unwrap();
+            assert_eq!(found.preset, bank.preset, "{}", bank.name);
+            let s = read_with(&bytes, "meisai.csv", &bank.definition)
+                .unwrap()
+                .unwrap();
+            assert!(s.errors.is_empty(), "{}: {:?}", bank.name, s.errors);
+            // 出金は出ていったお金（プラス）、入金はマイナス
+            assert_eq!(
+                s.rows.iter().map(|r| r.spend).collect::<Vec<_>>(),
+                [1080, -8000],
+                "{}",
+                bank.name
+            );
+            assert_eq!(s.rows[1].merchant, "ﾌﾘｺﾐ ﾔﾏﾀﾞ ﾀﾛｳ");
+        }
     }
 
     #[test]

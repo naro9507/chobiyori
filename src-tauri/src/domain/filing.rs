@@ -2,7 +2,8 @@
 //!
 //! - 申告の期限、2 割特例の期間、みなし仕入率は年度ごとのデータ（`data/filing.json`）で持つ
 //! - 消費税は、明細行の税区分（税込経理）から税率ごとに集計し、2 割特例と簡易課税で納める額を出す。
-//!   本則課税は計算しない（集計表だけ）
+//!   本則課税は、仕入れの税区分から引ける額を割戻しで計算した目安だけを出す（95% ルールや
+//!   個別対応方式などは扱わない）
 //! - 年の途中でインボイスに登録した年は、登録日の前を免税、登録日からを課税として扱う
 //!
 //! 計算のしかた・特例の条件・期限が正しいかは、税理士か税務署に確認すること。
@@ -24,11 +25,20 @@ struct Special20 {
 }
 
 #[derive(Debug, Deserialize)]
+struct Transitional {
+    from: String,
+    to: String,
+    percent: i64,
+}
+
+#[derive(Debug, Deserialize)]
 struct FilingData {
     deadlines: BTreeMap<String, Deadlines>,
     special20: Special20,
     deemed_purchase_rates: BTreeMap<String, i64>,
     paper_deduction_cap: i64,
+    invoice_start: String,
+    transitional: Vec<Transitional>,
 }
 
 fn data() -> &'static FilingData {
@@ -86,6 +96,14 @@ fn next_weekday(y: i64, m: u32, d: u32) -> String {
         _ => 0,
     };
     format_date(civil_from_days(days + shift))
+}
+
+/// 日付に日数を足す。
+pub fn add_days(date: &str, days: i64) -> Option<String> {
+    let (y, m, d) = ymd(date)?;
+    Some(format_date(civil_from_days(
+        days_from_civil(y, m, d) + days,
+    )))
 }
 
 /// 日付 `to` まで、`from` から何日か（過ぎていれば負）。
@@ -360,6 +378,89 @@ pub fn consumption_tax(year: i64, sales: &[SalesAmount]) -> ConsumptionTax {
     }
 }
 
+/// 本則課税の目安の材料。課税仕入れ（税込。返品は引いたもの）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PurchaseAmount {
+    pub rate: Rate,
+    /// インボイス（登録番号のある請求書・レシート）がある
+    pub qualified: bool,
+    /// 取引の日付（経過措置の割合を決める）
+    pub date: String,
+    pub tax_included: i64,
+}
+
+/// 登録番号のない仕入先からの仕入れで、仕入れの消費税を引ける割合（%）。
+/// インボイス制度の前は 100%、経過措置の期間は 80% か 50%、その後は 0%。
+pub fn transitional_percent(date: &str) -> i64 {
+    let d = data();
+    if date < d.invoice_start.as_str() {
+        return 100;
+    }
+    d.transitional
+        .iter()
+        .find(|t| t.from.as_str() <= date && date <= t.to.as_str())
+        .map_or(0, |t| t.percent)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PurchaseGroup {
+    pub rate: Rate,
+    /// インボイスあり、なし（経過措置の割合ごと）
+    pub qualified: bool,
+    /// 引ける割合（%）。インボイスありは 100
+    pub percent: i64,
+    pub tax_included: i64,
+    /// 引ける消費税（国税）
+    pub deductible: i64,
+}
+
+/// 本則課税の目安。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardEstimate {
+    pub groups: Vec<PurchaseGroup>,
+    pub payable: Payable,
+}
+
+/// 本則課税で納める額の目安（割戻し計算）。
+///
+/// - 仕入れの消費税（国税）= 税込の課税仕入れ × 7.8/110（軽減 8% は 6.24/108）、円未満切り捨て
+/// - 登録番号のない仕入先からの分は、日付で決まる経過措置の割合（80% / 50%）だけ引く
+/// - 課税売上割合が 95% 未満のときの按分、個別対応方式、積上げ計算は扱わない
+pub fn standard_estimate(national_tax: i64, purchases: &[PurchaseAmount]) -> StandardEstimate {
+    let mut groups: BTreeMap<(Rate, bool, i64), i64> = BTreeMap::new();
+    for p in purchases {
+        let percent = if p.qualified {
+            100
+        } else {
+            transitional_percent(&p.date)
+        };
+        *groups.entry((p.rate, !p.qualified, -percent)).or_default() += p.tax_included;
+    }
+    let groups: Vec<PurchaseGroup> = groups
+        .into_iter()
+        .map(|((rate, not_qualified, minus_percent), included)| {
+            let percent = -minus_percent;
+            let included = included.max(0);
+            let tax =
+                (included * rate.national_per_10000()).div_euclid((100 + rate.percent()) * 100);
+            PurchaseGroup {
+                rate,
+                qualified: !not_qualified,
+                percent,
+                tax_included: included,
+                deductible: tax * percent / 100,
+            }
+        })
+        .collect();
+    let deductible = groups.iter().map(|g| g.deductible).sum();
+    StandardEstimate {
+        payable: payable(national_tax, deductible),
+        groups,
+    }
+}
+
 /// 65 万円の控除を、e-Tax でも優良な電子帳簿でもなく出すときの上限（55 万円）。
 pub fn paper_deduction_cap() -> i64 {
     data().paper_deduction_cap
@@ -368,6 +469,72 @@ pub fn paper_deduction_cap() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn purchase(rate: Rate, qualified: bool, date: &str, amount: i64) -> PurchaseAmount {
+        PurchaseAmount {
+            rate,
+            qualified,
+            date: date.into(),
+            tax_included: amount,
+        }
+    }
+
+    #[test]
+    fn transitional_percent_follows_the_date() {
+        assert_eq!(transitional_percent("2023-09-30"), 100);
+        assert_eq!(transitional_percent("2023-10-01"), 80);
+        assert_eq!(transitional_percent("2026-09-30"), 80);
+        assert_eq!(transitional_percent("2026-10-01"), 50);
+        assert_eq!(transitional_percent("2029-09-30"), 50);
+        assert_eq!(transitional_percent("2029-10-01"), 0);
+    }
+
+    #[test]
+    fn standard_estimate_by_hand() {
+        // 売上の消費税（国税）: 課税標準額 1,000,000 × 7.8% = 78,000
+        let est = standard_estimate(
+            78_000,
+            &[
+                // インボイスあり 10%: 330,000 × 7.8/110 = 23,400
+                purchase(Rate::Standard10, true, "2026-03-01", 330_000),
+                // インボイスあり 8%: 108,000 × 6.24/108 = 6,240
+                purchase(Rate::Reduced8, true, "2026-04-01", 108_000),
+                // インボイスなし 10%（9 月まで 80%）: 110,000 × 7.8/110 = 7,800 → 6,240
+                purchase(Rate::Standard10, false, "2026-09-15", 110_000),
+                // インボイスなし 10%（10 月から 50%）: 55,000 × 7.8/110 = 3,900 → 1,950
+                purchase(Rate::Standard10, false, "2026-10-15", 55_000),
+            ],
+        );
+        let d: Vec<(bool, i64, i64)> = est
+            .groups
+            .iter()
+            .map(|g| (g.qualified, g.percent, g.deductible))
+            .collect();
+        assert_eq!(
+            d,
+            [
+                (true, 100, 23_400),
+                (false, 80, 6_240),
+                (false, 50, 1_950),
+                (true, 100, 6_240)
+            ]
+        );
+        // 引ける額 37,830 → 納める国税 78,000 − 37,830 = 40,170 → 百円未満切り捨て 40,100
+        // 地方 40,100 × 22/78 = 11,310.2 → 11,300
+        assert_eq!(est.payable.deductible, 37_830);
+        assert_eq!(est.payable.national, 40_100);
+        assert_eq!(est.payable.local, 11_300);
+        assert_eq!(est.payable.total, 51_400);
+    }
+
+    #[test]
+    fn standard_estimate_never_goes_negative() {
+        let est = standard_estimate(
+            1_000,
+            &[purchase(Rate::Standard10, true, "2026-01-01", 1_100_000)],
+        );
+        assert_eq!(est.payable.total, 0);
+    }
 
     #[test]
     fn year_data_reads() {
@@ -425,6 +592,7 @@ mod tests {
         assert_eq!(days_between("2026-03-17", "2026-03-16"), Some(-1));
         assert_eq!(days_between("2024-02-28", "2024-03-01"), Some(2));
         assert_eq!(civil_from_days(days_from_civil(2024, 2, 29)), (2024, 2, 29));
+        assert_eq!(add_days("2026-01-31", 30).as_deref(), Some("2026-03-02"));
     }
 
     #[test]

@@ -1,0 +1,26 @@
+{
+  "app": "dcs-accounting",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "楽天銀行",
+  "sourceKind": "bank",
+  "definition": {
+    "encoding": "shiftJis",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": [
+      "date",
+      "amount",
+      "ignore",
+      "merchant"
+    ],
+    "sign": "spendNegative",
+    "skipUnreadableDates": true,
+    "header": [
+      "取引日",
+      "入出金(円)",
+      "取引後残高(円)",
+      "入出金内容"
+    ]
+  }
+}

@@ -336,13 +336,26 @@ pub(crate) fn account_rounding(conn: &Connection, account_id: i64) -> AppResult<
 /// 取引を変更する。年度は変えられない（日付は同じ年度の中で動かせる）。
 /// 入力方法（`entry_mode`）は作ったときのままにする。
 pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Transaction> {
-    db.transaction(|tx| {
+    db.transaction(|tx| update_in(tx, id, input))
+}
+
+/// 取引を変更する（呼び出し側の DB トランザクションの中で）。締めと変更履歴は `update` と同じ。
+pub(crate) fn update_in(
+    tx: &Connection,
+    id: i64,
+    input: &TransactionInput,
+) -> AppResult<Transaction> {
+    {
         let current = get(tx, id)?;
         ensure_date_open(tx, current.fiscal_year, &current.date)?;
         let allowed = AllowedInactive {
             accounts: current.lines.iter().map(|l| l.account_id).collect(),
             partners: current.lines.iter().filter_map(|l| l.partner_id).collect(),
-            sub_accounts: current.lines.iter().filter_map(|l| l.sub_account_id).collect(),
+            sub_accounts: current
+                .lines
+                .iter()
+                .filter_map(|l| l.sub_account_id)
+                .collect(),
         };
         let valid = journal::validate(
             input,
@@ -362,7 +375,7 @@ pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Tra
         let saved = get(tx, id)?;
         audit::transaction(tx, "update", Some(&current), Some(&saved))?;
         Ok(saved)
-    })
+    }
 }
 
 pub fn delete(db: &Database, id: i64) -> AppResult<()> {

@@ -186,6 +186,8 @@ pub struct ConsumptionReport {
     /// 簡易課税の事業の区分が決まっていない売上がある
     pub needs_category: bool,
     pub tax: ConsumptionTax,
+    /// 本則課税で納める額の目安（仕入れの税区分とインボイスの印から）
+    pub standard: filing::StandardEstimate,
     pub accounts: Vec<AccountSales>,
     pub summary: Vec<TaxCategorySummary>,
 }
@@ -290,12 +292,40 @@ pub fn consumption(conn: &Connection, year: i64) -> AppResult<ConsumptionReport>
             .unwrap_or(usize::MAX)
     });
 
+    // 本則課税の目安: 課税仕入れ（税込。返品は引く）を、税率・インボイスの印・日付ごとに
+    let mut stmt = conn.prepare(
+        "SELECT l.tax_category, l.is_qualified_invoice, t.date,
+                sum(CASE WHEN l.side = 'debit' THEN l.amount ELSE -l.amount END)
+         FROM journal_lines l
+         JOIN transactions t ON t.id = l.transaction_id
+         WHERE t.fiscal_year = ?1 AND t.date >= ?2
+           AND l.tax_category IN ('taxable_purchase_10', 'taxable_purchase_8')
+         GROUP BY l.tax_category, l.is_qualified_invoice, t.date",
+    )?;
+    let purchases: Vec<filing::PurchaseAmount> = stmt
+        .query_map(params![year, start], |r| {
+            let tax: TaxCategory = r.get(0)?;
+            Ok(filing::PurchaseAmount {
+                rate: if tax == TaxCategory::TaxablePurchase8 {
+                    Rate::Reduced8
+                } else {
+                    Rate::Standard10
+                },
+                qualified: r.get(1)?,
+                date: r.get(2)?,
+                tax_included: r.get(3)?,
+            })
+        })?
+        .collect::<Result<_, _>>()?;
+    let tax = filing::consumption_tax(year, &sales);
+
     Ok(ConsumptionReport {
         fiscal_year: year,
         tax_status,
         special20_period: filing::special20_year(year),
         needs_category,
-        tax: filing::consumption_tax(year, &sales),
+        standard: filing::standard_estimate(tax.national_tax, &purchases),
+        tax,
         taxable_from: from,
         accounts,
         summary,
