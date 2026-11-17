@@ -1,6 +1,7 @@
 //! 初期設定（事業者情報・申告区分・年度・科目の投入）。
 
 use super::Database;
+pub use crate::domain::industry::IndustryTemplate;
 use crate::domain::master::{self, FilingType, TaxStatus, NAME_MAX};
 use crate::domain::standard_accounts;
 use crate::error::{AppError, AppResult, ErrorCode};
@@ -8,13 +9,6 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 const ADDRESS_MAX: usize = 200;
-
-/// 業種テンプレート。いまは汎用だけ。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum IndustryTemplate {
-    General,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,9 +113,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
 }
 
 fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()> {
-    let accounts = match template {
-        IndustryTemplate::General => standard_accounts::GENERAL,
-    };
+    let accounts = standard_accounts::GENERAL;
     let mut insert = conn.prepare(
         "INSERT INTO accounts (code, name_ja, name_en, kana, category, statement_line, default_tax_category, is_payment_account, is_system, sort)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9)",
@@ -136,6 +128,35 @@ fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()>
             a.statement_line,
             a.default_tax_category,
             standard_accounts::PAYMENT_ACCOUNTS.contains(&a.code),
+            (index as i64 + 1) * 10
+        ])?;
+    }
+    // 業種で足す科目は、標準の経費のあと（雑費の前）に並べる
+    let mut extra = conn.prepare(
+        "INSERT INTO accounts (code, name_ja, name_en, kana, category, statement_line, default_tax_category, is_system, sort)
+         VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, 0,
+                 (SELECT sort FROM accounts WHERE code = '699') - 5 + ?7)",
+    )?;
+    for (index, a) in template.accounts().iter().enumerate() {
+        extra.execute(params![
+            a.code,
+            a.name_ja,
+            a.name_en,
+            a.kana,
+            a.category,
+            a.tax,
+            index as i64
+        ])?;
+    }
+    let mut rule = conn.prepare(
+        "INSERT INTO allocation_rules (code, name_ja, name_en, business_percent, sort) VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    for (index, r) in template.allocation_rules().iter().enumerate() {
+        rule.execute(params![
+            r.code,
+            r.name_ja,
+            r.name_en,
+            r.business_percent,
             (index as i64 + 1) * 10
         ])?;
     }
@@ -221,6 +242,38 @@ pub(crate) mod tests {
         let db = Database::open_in_memory().unwrap();
         complete(&db, &input()).unwrap();
         db
+    }
+
+    #[test]
+    fn industry_templates_add_accounts_before_misc_and_allocation_rules() {
+        let db = Database::open_in_memory().unwrap();
+        complete(
+            &db,
+            &SetupInput {
+                template: IndustryTemplate::School,
+                ..input()
+            },
+        )
+        .unwrap();
+        let conn = db.conn();
+        let accounts = crate::db::accounts::list(&conn).unwrap();
+        let position = |code: &str| accounts.iter().position(|a| a.code == code).unwrap();
+        // 教材費は標準の経費（貸倒金）のあと、雑費の前
+        assert!(position("617") < position("620") && position("620") < position("699"));
+        let materials = &accounts[position("620")];
+        assert_eq!(materials.name_ja, "教材費");
+        assert!(materials.statement_line.is_none() && !materials.is_system);
+        let rules = crate::db::allocation_rules::list(&conn).unwrap();
+        assert_eq!(
+            rules.iter().map(|r| r.business_percent).collect::<Vec<_>>(),
+            [50, 50]
+        );
+        // 汎用は足さない
+        drop(conn);
+        let general = set_up_db();
+        assert!(crate::db::allocation_rules::list(&general.conn())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

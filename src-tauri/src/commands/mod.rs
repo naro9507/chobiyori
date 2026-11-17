@@ -12,5 +12,6 @@ pub mod journal;
 pub mod master;
 pub mod receipts;
 pub mod reports;
+pub mod security;
 pub mod setup;
 pub mod templates;

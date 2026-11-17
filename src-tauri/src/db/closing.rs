@@ -257,7 +257,7 @@ pub fn record_inventory(
             )
             .optional()?;
         if let Some((Some(id), _)) = previous {
-            tx.execute("DELETE FROM transactions WHERE id = ?1", [id])?;
+            transactions::remove(tx, id)?;
         }
         let entry = |date: String, memo: &str, debit: i64, credit: i64, amount: i64, kind| {
             transactions::insert_kind(

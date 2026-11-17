@@ -3,7 +3,8 @@
 //! 書き込みはすべて 1 つの DB トランザクションで行い、検証（`domain::journal::validate`）を
 //! 通らない取引は保存しない。これで「取引ごとに借方合計 = 貸方合計」が常に成り立つ。
 
-use super::Database;
+use super::locks::ensure_date_open;
+use super::{audit, Database};
 use crate::domain::allocation;
 use crate::domain::journal::{
     self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput,
@@ -162,13 +163,26 @@ pub(crate) fn insert_kind(
         &DbMasters::load(conn, year)?,
         &AllowedInactive::default(),
     )?;
+    ensure_date_open(conn, year, &valid.date)?;
     conn.execute(
         "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![year, valid.date, kind, input.entry_mode, valid.memo],
     )?;
     let id = conn.last_insert_rowid();
     insert_lines(conn, id, &valid)?;
-    get(conn, id)
+    let saved = get(conn, id)?;
+    audit::transaction(conn, "create", None, Some(&saved))?;
+    Ok(saved)
+}
+
+/// 取引を消す。締めた月なら消さない。変更履歴に消す前の内容を残す。
+/// 決算の仕訳を作り直すときなど、ほかのモジュールからもこれを使う。
+pub(crate) fn remove(conn: &Connection, id: i64) -> AppResult<()> {
+    let current = get(conn, id)?;
+    ensure_date_open(conn, current.fiscal_year, &current.date)?;
+    // 明細行は ON DELETE CASCADE で一緒に消える
+    conn.execute("DELETE FROM transactions WHERE id = ?1", [id])?;
+    audit::transaction(conn, "delete", Some(&current), None)
 }
 
 /// 取込で、たくさんの取引をまとめて保存する。呼び出し側の DB トランザクションの中で使う。
@@ -185,6 +199,7 @@ pub(crate) fn insert_many(
     )?;
     for input in inputs {
         let valid = journal::validate(input, year, &masters, &AllowedInactive::default())?;
+        ensure_date_open(conn, year, &valid.date)?;
         insert.execute(params![
             year,
             valid.date,
@@ -192,7 +207,9 @@ pub(crate) fn insert_many(
             input.entry_mode,
             valid.memo
         ])?;
-        insert_lines(conn, conn.last_insert_rowid(), &valid)?;
+        let id = conn.last_insert_rowid();
+        insert_lines(conn, id, &valid)?;
+        audit::transaction(conn, "import", None, Some(&get(conn, id)?))?;
     }
     Ok(inputs.len())
 }
@@ -302,7 +319,7 @@ pub(crate) fn account_rounding(conn: &Connection, account_id: i64) -> AppResult<
 pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Transaction> {
     db.transaction(|tx| {
         let current = get(tx, id)?;
-        ensure_year_open(tx, current.fiscal_year)?;
+        ensure_date_open(tx, current.fiscal_year, &current.date)?;
         let allowed = AllowedInactive {
             accounts: current.lines.iter().map(|l| l.account_id).collect(),
             partners: current.lines.iter().filter_map(|l| l.partner_id).collect(),
@@ -314,6 +331,8 @@ pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Tra
             &DbMasters::load(tx, current.fiscal_year)?,
             &allowed,
         )?;
+        // 締めた月へ動かすこともできない
+        ensure_date_open(tx, current.fiscal_year, &valid.date)?;
         tx.execute(
             "UPDATE transactions SET date = ?2, memo = ?3, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1",
@@ -321,18 +340,14 @@ pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Tra
         )?;
         tx.execute("DELETE FROM journal_lines WHERE transaction_id = ?1", [id])?;
         insert_lines(tx, id, &valid)?;
-        get(tx, id)
+        let saved = get(tx, id)?;
+        audit::transaction(tx, "update", Some(&current), Some(&saved))?;
+        Ok(saved)
     })
 }
 
 pub fn delete(db: &Database, id: i64) -> AppResult<()> {
-    db.transaction(|tx| {
-        let current = get(tx, id)?;
-        ensure_year_open(tx, current.fiscal_year)?;
-        // 明細行は ON DELETE CASCADE で一緒に消える
-        tx.execute("DELETE FROM transactions WHERE id = ?1", [id])?;
-        Ok(())
-    })
+    db.transaction(|tx| remove(tx, id))
 }
 
 const SELECT: &str = "
