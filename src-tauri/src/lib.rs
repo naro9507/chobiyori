@@ -9,6 +9,7 @@ pub mod domain;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod mail;
 pub mod receipt;
 
 use tauri::Manager;
@@ -162,7 +163,33 @@ pub fn run() {
             commands::closing::closing_checklist,
             commands::closing::set_closing_check,
             commands::closing::statement_amounts,
-            commands::closing::carry_forward
+            commands::closing::carry_forward,
+            commands::documents::list_documents,
+            commands::documents::get_document,
+            commands::documents::create_document,
+            commands::documents::update_document,
+            commands::documents::delete_document,
+            commands::documents::new_document_defaults,
+            commands::documents::preview_document,
+            commands::documents::issue_document,
+            commands::documents::cancel_document,
+            commands::documents::copy_document,
+            commands::documents::save_document_pdf,
+            commands::documents::document_sale_proposal,
+            commands::documents::post_document_sale,
+            commands::documents::record_document_payment,
+            commands::documents::document_settings,
+            commands::documents::save_document_settings,
+            commands::documents::choose_document_image,
+            commands::documents::remove_document_image,
+            commands::documents::mail_settings,
+            commands::documents::save_mail_settings,
+            commands::documents::set_mail_password,
+            commands::documents::delete_mail_password,
+            commands::documents::document_mail_draft,
+            commands::documents::send_document_mail,
+            commands::documents::open_document_in_mail_app,
+            commands::documents::mark_document_sent
         ])
         .build(tauri::generate_context!())
         .expect("アプリの起動に失敗しました")

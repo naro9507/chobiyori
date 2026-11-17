@@ -4,6 +4,7 @@ pub mod allocation;
 pub mod balance;
 pub mod closing;
 pub mod depreciation;
+pub mod document;
 pub mod industry;
 pub mod journal;
 pub mod ledger;

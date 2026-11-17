@@ -4,6 +4,7 @@
 //! 帳簿のデータは `db::books`・`db::reports` から読み、ここでは計算しない。
 
 pub mod csv;
+pub mod document;
 pub mod labels;
 pub mod pdf;
 pub mod report;

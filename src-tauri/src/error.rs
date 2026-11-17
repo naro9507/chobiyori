@@ -77,6 +77,18 @@ pub enum ErrorCode {
     BooksLocked,
     /// バックアップのファイルが壊れている・帳簿のファイルでない・パスワードが合わない
     BackupInvalid,
+    /// 発行した書類は書き換えられない（取り消して作り直す）
+    DocumentIssued,
+    /// 入金のある請求書は取り消せない
+    HasPayments,
+    /// 入金の前に、請求書の売上を記帳する
+    SaleNotRecorded,
+    /// メールの送信の設定がまだない
+    MailNotConfigured,
+    /// メールのサーバーにログインできない（アドレス・パスワードが違う）
+    MailAuth,
+    /// メールを送れなかった（つながらない・相手のアドレスが受け付けられない）
+    MailFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
