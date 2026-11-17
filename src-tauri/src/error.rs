@@ -67,6 +67,16 @@ pub enum ErrorCode {
     ConsentRequired,
     /// 期首残高はもう確定している（直すときは確定を取り消す）
     OpeningConfirmed,
+    /// 締めた月・年の取引は追加・変更・削除できない
+    MonthLocked,
+    /// パスワードが違う
+    WrongPassword,
+    /// パスワードが短すぎる
+    WeakPassword,
+    /// 帳簿がまだ開いていない（パスワードを入れる前）
+    BooksLocked,
+    /// バックアップのファイルが壊れている・帳簿のファイルでない・パスワードが合わない
+    BackupInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

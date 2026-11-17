@@ -6,11 +6,14 @@
 pub mod accounts;
 pub mod allocation_rules;
 pub mod attachments;
+pub mod audit;
+pub mod backup;
 pub mod books;
 pub mod closing;
 pub mod fixed_assets;
 pub mod formats;
 pub mod inbox;
+pub mod locks;
 pub mod partners;
 pub mod receipts;
 pub mod reports;
@@ -19,10 +22,11 @@ pub mod setup;
 pub mod sub_accounts;
 pub mod templates;
 pub mod transactions;
+pub mod vault;
 
 use crate::error::{AppError, AppResult};
 use rusqlite::Connection;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 /// スキーマの変更。番号順に 1 回だけ当てる。適用済みの番号は `PRAGMA user_version` に持つ。
@@ -34,20 +38,57 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0004_inbox.sql"),
     include_str!("migrations/0005_receipts.sql"),
     include_str!("migrations/0006_closing.sql"),
+    include_str!("migrations/0007_security.sql"),
 ];
 
 pub struct Database {
     conn: Mutex<Connection>,
+    /// 帳簿のファイル。メモリ上の帳簿（テスト）なら None
+    path: Option<PathBuf>,
+    /// 暗号化の鍵（起動時のパスワード）。バックアップ・復元・パスワードの変更に使う。
+    /// 画面・ログには出さない
+    key: Mutex<Option<vault::Password>>,
+    /// 最後にバックアップしたときの、この接続での変更の数。変わっていなければ終了時に作らない
+    backed_up_changes: Mutex<u64>,
+}
+
+impl std::fmt::Debug for Database {
+    /// 鍵は出さない。
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Database")
+            .field("path", &self.path)
+            .finish_non_exhaustive()
+    }
+}
+
+/// ファイルを開いて設定する（マイグレーションはしない）。鍵が違うと、最初の読み込みで失敗する。
+pub(crate) fn connect(path: &Path, key: Option<&str>) -> AppResult<Connection> {
+    let conn = Connection::open(path)?;
+    if let Some(key) = key {
+        conn.pragma_update(None, "key", key)?;
+    }
+    configure(&conn)?;
+    Ok(conn)
+}
+
+fn configure(conn: &Connection) -> AppResult<()> {
+    conn.pragma_update(None, "foreign_keys", true)?;
+    conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))?;
+    conn.pragma_update(None, "synchronous", "NORMAL")?;
+    Ok(())
 }
 
 impl Database {
     /// ファイルを開く（なければ作る）。`key` を渡すと SQLCipher で暗号化する。
     pub fn open(path: &Path, key: Option<&str>) -> AppResult<Self> {
-        let conn = Connection::open(path)?;
-        if let Some(key) = key {
-            conn.pragma_update(None, "key", key)?;
-        }
-        Self::init(conn)
+        let conn = connect(path, key)?;
+        migrate(&conn)?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+            path: Some(path.to_path_buf()),
+            key: Mutex::new(key.map(vault::Password::new)),
+            backed_up_changes: Mutex::new(0),
+        })
     }
 
     /// テスト用に、メモリ上に作る。
@@ -56,14 +97,46 @@ impl Database {
     }
 
     fn init(conn: Connection) -> AppResult<Self> {
-        // 鍵が違うとここで初めて読み込みが起き、失敗する
-        conn.pragma_update(None, "foreign_keys", true)?;
-        conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))?;
-        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        configure(&conn)?;
         migrate(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
+            path: None,
+            key: Mutex::new(None),
+            backed_up_changes: Mutex::new(0),
         })
+    }
+
+    /// 帳簿のファイル。
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    /// 暗号化の鍵。暗号化していなければ None。
+    pub(crate) fn key(&self) -> Option<vault::Password> {
+        self.key.lock().unwrap_or_else(|p| p.into_inner()).clone()
+    }
+
+    pub(crate) fn set_key(&self, key: Option<vault::Password>) {
+        *self.key.lock().unwrap_or_else(|p| p.into_inner()) = key;
+    }
+
+    /// 前のバックアップのあとに変更があったか。
+    pub(crate) fn changed_since_backup(&self) -> bool {
+        let changes = self.conn().total_changes();
+        changes
+            != *self
+                .backed_up_changes
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+    }
+
+    pub(crate) fn mark_backed_up(&self) {
+        let changes = self.conn().total_changes();
+        *self
+            .backed_up_changes
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = changes;
     }
 
     /// 接続を借りる。前の処理が途中で落ちていても、SQLite 側は

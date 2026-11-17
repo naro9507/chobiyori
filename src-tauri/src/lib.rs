@@ -15,6 +15,8 @@ use tauri::Manager;
 
 /// 帳簿のファイル名。アプリのデータフォルダに置く。
 const DATABASE_FILE: &str = "books.db";
+/// バックアップの既定の保存先（アプリのデータフォルダの中）。
+const BACKUP_DIR: &str = "backups";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,15 +33,36 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // 帳簿の DB を開く（初回は作る）。暗号化の鍵の管理はフェーズ 8 で入れる
+            // 帳簿のファイルの場所だけを決める。帳簿は暗号化してあり、起動時のパスワードで
+            // 開けたときに登録する（commands::security）
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
-            let database = db::Database::open(&dir.join(DATABASE_FILE), None)?;
-            app.manage(database);
+            app.manage(commands::security::BookFiles {
+                path: dir.join(DATABASE_FILE),
+                default_backup_dir: dir.join(BACKUP_DIR),
+            });
             Ok(())
         })
+        .manage(commands::security::RestoreState::default())
         .invoke_handler(tauri::generate_handler![
             commands::app::app_info,
+            commands::security::book_status,
+            commands::security::create_books,
+            commands::security::unlock_books,
+            commands::security::encrypt_books,
+            commands::security::change_password,
+            commands::security::backup_settings,
+            commands::security::backup_now,
+            commands::security::choose_backup_dir,
+            commands::security::reset_backup_dir,
+            commands::security::choose_restore_file,
+            commands::security::select_backup,
+            commands::security::inspect_backup,
+            commands::security::restore_backup,
+            commands::security::lock_status,
+            commands::security::set_month_lock,
+            commands::security::set_year_closed,
+            commands::security::list_history,
             commands::setup::setup_status,
             commands::setup::complete_setup,
             commands::setup::get_business_profile,
@@ -141,6 +164,12 @@ pub fn run() {
             commands::closing::statement_amounts,
             commands::closing::carry_forward
         ])
-        .run(tauri::generate_context!())
-        .expect("アプリの起動に失敗しました");
+        .build(tauri::generate_context!())
+        .expect("アプリの起動に失敗しました")
+        .run(|app, event| {
+            // 終了するときに、変更があればバックアップを作る（帳簿は PC の外に送らない）
+            if let tauri::RunEvent::Exit = event {
+                commands::security::backup_on_exit(app);
+            }
+        });
 }
