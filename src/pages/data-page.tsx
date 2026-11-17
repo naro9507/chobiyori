@@ -406,6 +406,7 @@ type ExportItemId =
 	| "exportAllLedgers"
 	| "exportExpenseBook"
 	| "exportTrialBalance"
+	| "exportStatement"
 	| "exportAccounts"
 	| "exportPartners"
 
@@ -415,6 +416,7 @@ const exportItems: { id: ExportItemId; target: ExportTarget; pdf: boolean }[] =
 		{ id: "exportAllLedgers", target: { kind: "allLedgers" }, pdf: true },
 		{ id: "exportExpenseBook", target: { kind: "expenseBook" }, pdf: true },
 		{ id: "exportTrialBalance", target: { kind: "trialBalance" }, pdf: true },
+		{ id: "exportStatement", target: { kind: "statement" }, pdf: true },
 		{ id: "exportAccounts", target: { kind: "accounts" }, pdf: false },
 		{ id: "exportPartners", target: { kind: "partners" }, pdf: false },
 	]

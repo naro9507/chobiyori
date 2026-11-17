@@ -145,6 +145,14 @@ dcs-accounting-app/
 - HTTP は `reqwest`（自動アップデートと同じ版・機能。TLS は rustls と ring）。送るのはレシートの画像と固定の指示の文だけ。ログに画像・キー・金額・名前を出さない。
 - 証憑（画像・PDF）は `db/attachments.rs`。中身は DB の BLOB に置く（帳簿と一緒に暗号化される）。レシートの状態は `db/receipts.rs`、受信箱との紐付けと突合は `db/inbox.rs`。
 
+## 決算
+
+- 計算は `domain/depreciation.rs`（減価償却）と `domain/closing.rs`（期首残高の貸借、決算書の金額、元入金の繰越）。DB の読み書きは `db/closing.rs`（期首残高・棚卸・チェックリスト・決算書・年度の繰越）と `db/fixed_assets.rs`（固定資産台帳と償却の記録）。
+- 償却率・耐用年数の例・決算書の様式は `domain/data/*.json` に年度ごとのデータとして持ち、コードで書き分けない。様式が改定されたら、`from_year` を付けた新しい様式を足す。
+- 減価償却と棚卸の仕訳は、利用者が「記録する」を押したときだけ作る。償却費・売上原価は保存せず、毎回計算する。
+- 期首残高（`opening_balances`）は、試算表（`db/reports.rs`）と元帳の繰越（`db/books.rs`）に足す。
+- 欄の番号・控除額・償却率の正しさは、最新の様式と税理士に確認すること。
+
 ## UI 部品
 
 shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコードとして編集してよい。

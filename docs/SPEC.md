@@ -311,6 +311,16 @@ Excel 帳簿と同じ手数で高速に入力できる。
 
 資産・負債の期末残高を翌期首へ繰り越す。`翌期首元入金 = 期末元入金 + 青色控除前所得 + 事業主借 − 事業主貸`。マスタ・定型仕訳・固定資産・定期売上プランは引き継ぐ。
 
+**F6-7 実装メモ（フェーズ 7）**
+
+- 決算の画面はタブで分ける: チェックリスト・期首残高・固定資産と減価償却・棚卸・決算書の金額・年度の繰越。
+- 期首残高は科目ごとに入れて保存し、資産の合計と負債・資本の合計がそろうと確定できる。確定した期首残高は試算表・帳簿（元帳の繰越）・口座残高に入る。直すときは確定を取り消す。翌年からは年度の繰越で、確定した状態で入る。
+- 減価償却は、登録した資産から年ごとに計算して候補に出し、選んで「記録する」と「減価償却費・事業主貸 / 資産の科目」の仕訳にする（日付は年末、年の途中で手放したら手放した月の末日）。取引を消すと、その年の償却はまた候補に出る。償却費は保存せず毎回計算する。償却率は `domain/data/depreciation_rates.json`、耐用年数の例は `useful_lives.json` に年度ごとのデータとして持つ。取得した年より後から帳簿をつけ始めた資産は、その年の初めの帳簿価額から計算する。
+- 棚卸は期末の棚卸高を入れると「棚卸資産 / 期末商品棚卸高」（年末）と、期首の棚卸高があれば「期首商品棚卸高 / 棚卸資産」（年始）の仕訳を作る。入れ直すと作り直す。
+- チェックリストは、期首残高・減価償却・棚卸を帳簿から自動で判定し、ほかは手で印を付ける。資産や仕入がなければ、減価償却と棚卸の項目は出さない。白色申告の年度は貸倒引当金を出さない。
+- 決算書の金額一覧は `domain/data/blue_general.json`（様式の行・番号・どの決算書の行キーを足すか・控除額）に従って集計する。決算書に専用の行がない経費の科目は空欄の行に入れ、入りきらない分は雑費に足して知らせる。期首と期末の貸借、損益計算書の所得と帳簿の所得の一致を確かめ、合わなければ直し方を示す。CSV と PDF でも出せる。F12-1（確定申告の補助）は、この金額一覧の行キーをそのまま使う。
+- 欄の番号や控除額は様式の改定で変わることがあるので、画面に「最新の様式と税理士・税務署で確かめる」と出す。
+
 ### F7. データ取込・出力
 
 | 機能 | 内容 |
@@ -632,10 +642,12 @@ e-Tax の送信や、申告書・申請書そのものの作成はしない。�
 | `templates` | 定型仕訳。name, memo, debit_account_id, debit_sub_account_id, credit_account_id, credit_sub_account_id, amount, partner_id, allocation_percent, recurrence（none/monthly）, day_of_month, start_month, is_active（いまは借方 1 科目 / 貸方 1 科目の形。3 行以上の定型仕訳は後で `template_lines` を足す） |
 | `template_postings` | 毎月の定型仕訳をどの月まで記録したか。template_id, fiscal_year, month, transaction_id（空なら見送り。取引を消すと行も消え、その月はまた候補に出る） |
 | `recurring_plans` | id, partner_id, name, amount, cycle, start_month, end_month, status（定期売上） |
-| `opening_balances` | fiscal_year, account_id, sub_account_id, amount |
-| `fixed_assets` | id, account_id, name, acquired_on, cost, useful_life, method, business_percent, opening_book_value, disposed_on |
-| `inventories` | fiscal_year, closing_amount |
-| `statement_layouts` | year, form（blue_general/white_general）, line_no, label, 対応科目（様式改定に備えデータ化） |
+| `opening_balances` | fiscal_year, account_id, amount（補助科目ごとの期首残高は後で足す。確定した日時は `fiscal_years.opening_confirmed_at`） |
+| `fixed_assets` | id, account_id, name, acquired_on, cost, useful_life, method（straight_line/declining_balance/lump_sum/small_asset）, business_percent, book_value_year, book_value（その年の初めの帳簿価額）, disposed_on, memo |
+| `depreciation_postings` | asset_id, fiscal_year, transaction_id（その年の償却を記録した取引。取引を消すと行も消える） |
+| `inventories` | fiscal_year, closing_amount, closing_transaction_id, opening_transaction_id |
+| `closing_checks` | fiscal_year, item, done_at（チェックリストで手で印を付けた項目） |
+| 決算書の様式 | DB には置かず、アプリに同梱する年度ごとのデータ（`domain/data/blue_general.json`: from_year, 控除額, 行の並び・番号・名前・足す行キー）。様式の改定はファイルの差し替えで対応する |
 | `cards` | id, name, issuer, payable_sub_account_id, settlement_account_id, closing_day, payment_day, usage（business/mixed） |
 | `import_profiles` | id, name, kind（card/bank/emoney/journal）, file_type, encoding, delimiter, header_row, skip_rows, row_filter_json, column_map_json, date_format, amount_format, amount_sign, detect_signature, is_preset, version |
 | `import_batches` | id, source（receipt/card_csv）, card_id, profile_id, file_name, file_hash, imported_at |
@@ -785,7 +797,7 @@ dcs-accounting-app/
 | 4 | 家事按分、定型・繰り返し仕訳、補助科目、税区分の記録 | 毎月の定例入力が候補の確認だけで済む（完了。按分はかんたん入力の支出と定型仕訳で取引ごとに行う。期末に年間合計へ一括で按分する方式、摘要マスタの画面、定型仕訳の複合仕訳（3 行以上）・過去取引のコピー、元帳の補助科目ごとの表示と取込受信箱での補助科目は後のフェーズで足す） |
 | 5 | 取込受信箱、形式エディタ、カード明細取込（プリセットはアメックスから）、自動仕訳ルール、重複防止 | 初めて見るカード会社の CSV でも、形式を自作して取り込める（完了。アメックスのプリセットは様式を推測して作ったので、実物の明細での確認が要る。取込先は形式ごとの口座・補助科目で持ち、カードの登録（締め日・支払日・引落口座・事業用か兼用か）と引落時の残高照合は後のフェーズで足す。日付と金額の書式は手で選ばず、いろいろな書き方を自動で読む。店名の支店名の除去、F7 の汎用 CSV 取込（借方・貸方の列を持つ仕訳の CSV の列の対応）は後のフェーズに回す。銀行・電子マネーの明細も同じ仕組み（出金額・入金額の列）で読める） |
 | 6 | レシート OCR、証憑添付、レシートとカード明細の突合 | レシートの束を読み込み、確認だけで記帳できる（完了。読み取りは Gemini API で、本物の API・実物のレシートでの精度の確認は利用者に頼む。画像の前処理（傾き補正・トリミング・1 枚に複数のレシートの分割）、読み取った項目の画像上の位置のハイライト、画面へのドラッグ&ドロップ、初期設定ウィザードでの同意と API キーの登録は後のフェーズに回す。いまは設定画面の「レシートの読み取り」で、キーの取り方の案内を見ながら同意とキーの登録をする（受信箱の「レシート」から案内する）。HEIC と PDF はそのまま読み取りに送れるが、画面には出せないのでファイルに保存して開く） |
-| 7 | 期首残高、固定資産・減価償却、棚卸、決算チェックリスト、決算書金額一覧、年度繰越 | 青色申告決算書（一般用）に転記できる数字が出る |
+| 7 | 期首残高、固定資産・減価償却、棚卸、決算チェックリスト、決算書金額一覧、年度繰越 | 青色申告決算書（一般用）に転記できる数字が出る（完了。計算は手で計算した値で cargo test している。欄の番号・控除額・償却率・耐用年数は、最新の様式と税理士に確認が要る。補助科目ごとの期首残高、白色申告の収支内訳書、開業初年度の開業費・元入金の入力ガイド、固定資産を手放したときの売却損益・除却損の仕訳、旧定額法・旧定率法・250% 定率法、貸倒引当金の計算、決算書の内訳のうち専従者給与・税理士等報酬、ホームの決算の進み具合の表示は後に回す。未収・未払などの決算整理は、チェックリストで案内し、仕訳は取引入力で入れる） |
 | 8 | バックアップ / 復元、暗号化、月締め、変更履歴、業種テンプレート追加 | 配布可能（v1） |
 | 9 | 請求書・見積書・納品書・領収書（F11）: 作成とプレビュー、PDF、メール送信（アプリから直接 + 予備としてメールソフトを開く）、売上の仕訳の候補と入金の記録 | 請求書を作ってプレビューで確かめ、メールで送り、入金まで帳簿とつながる |
 | 10 | 確定申告・消費税の申告（2 割特例・簡易課税）・インボイス登録申請の補助、年の途中の登録、取引先の登録番号の確認（公表サイトを開いて利用者が確かめる）、申告期限のお知らせ（F12） | 作成コーナーに入れる金額（所得税・消費税）と手順が分かり、インボイスの登録申請の内容と手順が分かる |
