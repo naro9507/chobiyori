@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { navItems, screenEnabled } from "@/app/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { helpArticles, matchesHelp } from "@/features/help/help-content"
+import { matchesHelp } from "@/features/help/help-content"
+import { useHelpArticles } from "@/features/help/use-help-articles"
 import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { useEntryIntent } from "@/stores/entry-intent-store"
@@ -12,6 +13,7 @@ import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function CommandPalette() {
 	const features = useFeatures()
+	const helpArticles = useHelpArticles()
 	const t = useTranslations("commands")
 	const nav = useTranslations("nav")
 	const help = useTranslations("help")
@@ -67,10 +69,10 @@ export function CommandPalette() {
 		...helpArticles.map((a) => ({
 			id: `help-${a.id}`,
 			label: `${nav("help")}：${help(a.id)}`,
-			keywords: help(a.body),
+			keywords: `${help(a.body)} ${a.reading ? help(a.reading) : ""}`,
 			run: () => {
 				setOpen(false)
-				void navigate({ to: "/help", search: { q: help(a.id) } })
+				void navigate({ to: "/help", search: { q: help(a.id), article: a.id } })
 			},
 		})),
 	]

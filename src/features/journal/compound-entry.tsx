@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
+import { TermHelp } from "@/features/help/term-help"
 import { type TaxCategory, taxCategories } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount, parseAmount } from "@/lib/amount"
@@ -166,7 +167,9 @@ export function CompoundEntry({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{title}</CardTitle>
+				<CardTitle>
+					{title} <TermHelp term="journal" />
+				</CardTitle>
 				<CardDescription>{t("compoundDescription")}</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -206,10 +209,11 @@ export function CompoundEntry({
 							<thead className="border-b bg-muted/50 text-left text-muted-foreground">
 								<tr>
 									<th scope="col" className="w-28 px-2 py-2 font-medium">
-										{t("side")}
+										{t("side")} <TermHelp term="debit" />
+										<TermHelp term="credit" />
 									</th>
 									<th scope="col" className="px-2 py-2 font-medium">
-										{t("account")}
+										{t("account")} <TermHelp term="account" />
 									</th>
 									<th
 										scope="col"

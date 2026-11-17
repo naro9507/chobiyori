@@ -110,7 +110,20 @@ export function PurposesSection() {
 							"allocationRuleId",
 						] as const
 					).map((key) => (
-						<Field key={key} label={t(key)} error={error(key)}>
+						<Field
+							key={key}
+							term={
+								key === "defaultDebitAccountId"
+									? "debit"
+									: key === "defaultCreditAccountId"
+										? "credit"
+										: key === "allocationRuleId"
+											? "allocation"
+											: undefined
+							}
+							label={t(key)}
+							error={error(key)}
+						>
 							<NativeSelect
 								value={form[key]}
 								onChange={(e) => set({ [key]: e.target.value })}

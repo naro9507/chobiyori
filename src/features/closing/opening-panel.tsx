@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { TermHelp } from "@/features/help/term-help"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import type { AccountCategory } from "@/features/master/master-api"
@@ -93,7 +94,9 @@ function OpeningForm({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-muted-foreground text-sm">{t("openingHint")}</p>
+			<p className="text-muted-foreground text-sm">
+				{t("openingHint")} <TermHelp term="capital" />
+			</p>
 			{data.confirmed && (
 				<Badge variant="success" className="w-fit">
 					<CircleCheck aria-hidden="true" />

@@ -215,6 +215,7 @@ function AccountsSection() {
 						/>
 					</Field>
 					<Field
+						term="account"
 						label={t("category")}
 						hint={editing?.isSystem ? t("categoryLocked") : undefined}
 						error={errorFor("category")}
@@ -250,6 +251,7 @@ function AccountsSection() {
 						</NativeSelect>
 					</Field>
 					<Field
+						term="allocation"
 						label={t("allocationRule")}
 						hint={t("allocationRuleHint")}
 						error={errorFor("defaultAllocationRuleId")}
@@ -342,6 +344,7 @@ function SubAccountsSection() {
 			renderFields={(form, setForm, errorFor, editing) => (
 				<>
 					<Field
+						term="account"
 						label={t("parentAccount")}
 						hint={t("parentAccountHint")}
 						error={errorFor("accountId")}
@@ -566,6 +569,7 @@ function AllocationRulesSection() {
 				<>
 					<NameFields form={form} setForm={setForm} errorFor={errorFor} />
 					<Field
+						term="allocation"
 						label={t("businessPercent")}
 						hint={t("businessPercentHint")}
 						error={errorFor("businessPercent")}

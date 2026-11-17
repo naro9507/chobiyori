@@ -64,6 +64,7 @@ pub fn run() {
             commands::security::set_month_lock,
             commands::security::set_year_closed,
             commands::security::list_history,
+            commands::setup::get_industry_template,
             commands::setup::get_feature_settings,
             commands::setup::save_feature_settings,
             commands::setup::setup_status,

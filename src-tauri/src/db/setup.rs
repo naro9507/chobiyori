@@ -88,6 +88,22 @@ impl Default for FeatureSettings {
     }
 }
 
+/// 保存済みの業種。選択した記録のない古い帳簿では汎用の案内を使う。
+pub fn industry_template(conn: &Connection) -> AppResult<IndustryTemplate> {
+    let value: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'industry_template'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    match value {
+        Some(value) => serde_json::from_value(serde_json::Value::String(value))
+            .map_err(|_| AppError::new(ErrorCode::InvalidFormat)),
+        None => Ok(IndustryTemplate::General),
+    }
+}
+
 pub fn features(conn: &Connection) -> AppResult<FeatureSettings> {
     let value: Option<String> = conn
         .query_row(
@@ -614,5 +630,44 @@ mod extended_tests {
         };
         save_features(&db.conn(), &features).unwrap();
         assert_eq!(super::features(&db.conn()).unwrap(), features);
+    }
+}
+
+#[cfg(test)]
+mod help_context_tests {
+    use super::*;
+    #[test]
+    fn industry_help_uses_the_saved_template_and_general_for_older_books() {
+        let db = Database::open_in_memory().unwrap();
+        assert_eq!(
+            industry_template(&db.conn()).unwrap(),
+            IndustryTemplate::General
+        );
+        let input = SetupInput {
+            template: IndustryTemplate::School,
+            ..super::tests::input()
+        };
+        complete(&db, &input).unwrap();
+        assert_eq!(
+            industry_template(&db.conn()).unwrap(),
+            IndustryTemplate::School
+        );
+        db.conn()
+            .execute("DELETE FROM settings WHERE key='industry_template'", [])
+            .unwrap();
+        assert_eq!(
+            industry_template(&db.conn()).unwrap(),
+            IndustryTemplate::General
+        );
+        db.conn()
+            .execute(
+                "INSERT INTO settings (key,value) VALUES ('industry_template','invalid')",
+                [],
+            )
+            .unwrap();
+        assert_eq!(
+            industry_template(&db.conn()).unwrap_err().code,
+            ErrorCode::InvalidFormat
+        );
     }
 }

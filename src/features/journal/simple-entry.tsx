@@ -18,6 +18,7 @@ import {
 	useOpenTargets,
 	useRecordDeposit,
 } from "@/features/deposits/deposits-api"
+import { TermHelp } from "@/features/help/term-help"
 import { type AccountCategory, displayName } from "@/features/master/master-api"
 import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
@@ -329,7 +330,11 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						{form.choice === "owner" && (
-							<Field label={t("ownerDirection")} className="lg:col-span-3">
+							<Field
+								term={form.ownerKind === "owner_draw" ? "draw" : "contribution"}
+								label={t("ownerDirection")}
+								className="lg:col-span-3"
+							>
 								<NativeSelect
 									value={form.ownerKind}
 									onChange={(e) =>
@@ -369,6 +374,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						</Field>
 						{form.choice !== "owner" && !linked && (
 							<Field
+								term="account"
 								label={labels[form.choice].account}
 								error={errorFor("accountId")}
 							>
@@ -431,7 +437,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					{rulePercent !== null && (
 						<fieldset className="flex flex-col gap-3 rounded-lg border p-4">
 							<legend className="px-1 font-medium text-sm">
-								{t("allocationTitle")}
+								{t("allocationTitle")} <TermHelp term="allocation" />
 							</legend>
 							<LabeledCheckbox
 								className=""
@@ -441,6 +447,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							/>
 							{form.allocate && (
 								<Field
+									term="allocation"
 									label={t("businessPercent")}
 									hint={t("businessPercentHint")}
 									error={errorFor("allocationPercent")}

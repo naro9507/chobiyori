@@ -2,6 +2,7 @@ import { Loader2, Pencil, Trash2 } from "lucide-react"
 import { type KeyboardEvent, useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox, Input } from "@/components/ui/input"
+import { TermHelp } from "@/features/help/term-help"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount } from "@/lib/amount"
 import { type AppError, fieldError, lineFieldError } from "@/lib/errors"
@@ -91,10 +92,10 @@ export function JournalGrid({
 								{t("day")}
 							</th>
 							<th scope="col" className="px-3 py-2.5 font-medium">
-								{t("debit")}
+								{t("debit")} <TermHelp term="debit" />
 							</th>
 							<th scope="col" className="px-3 py-2.5 font-medium">
-								{t("credit")}
+								{t("credit")} <TermHelp term="credit" />
 							</th>
 							<th
 								scope="col"

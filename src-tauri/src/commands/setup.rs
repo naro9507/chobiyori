@@ -47,3 +47,8 @@ pub async fn save_feature_settings(
 ) -> AppResult<setup::FeatureSettings> {
     setup::save_features(&db.conn(), &input)
 }
+
+#[tauri::command]
+pub async fn get_industry_template(db: State<'_, Database>) -> AppResult<setup::IndustryTemplate> {
+    setup::industry_template(&db.conn())
+}
