@@ -189,7 +189,20 @@ pub fn run() {
             commands::documents::document_mail_draft,
             commands::documents::send_document_mail,
             commands::documents::open_document_in_mail_app,
-            commands::documents::mark_document_sent
+            commands::documents::mark_document_sent,
+            commands::filing::invoice_registration,
+            commands::filing::save_invoice_registration,
+            commands::filing::set_simplified_category,
+            commands::filing::set_account_simplified_category,
+            commands::filing::consumption_tax_report,
+            commands::filing::income_tax_guide,
+            commands::filing::filing_checklist,
+            commands::filing::set_filing_check,
+            commands::filing::filing_deadlines,
+            commands::filing::partner_invoice_checks,
+            commands::filing::invoice_number_status,
+            commands::filing::record_invoice_check,
+            commands::filing::open_invoice_site
         ])
         .build(tauri::generate_context!())
         .expect("アプリの起動に失敗しました")

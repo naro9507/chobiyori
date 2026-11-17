@@ -73,12 +73,26 @@ pub(crate) fn year_is_exempt(conn: &Connection, year: i64) -> AppResult<bool> {
     Ok(status.is_none_or(|s| s == TaxStatus::Exempt))
 }
 
+/// その日の取引を免税として扱うか。年の途中でインボイスに登録した年は、登録日の前が免税（F12-3）。
+pub(crate) fn date_is_exempt(conn: &Connection, date: &str) -> AppResult<bool> {
+    let year = journal::parse_date(date.trim())
+        .map(|(y, _, _)| y)
+        .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;
+    let registered_on = crate::db::filing::registered_on(conn)?;
+    Ok(crate::domain::filing::exempt_on(
+        year_is_exempt(conn, year)?,
+        registered_on.as_deref(),
+        date.trim(),
+    ))
+}
+
 /// 科目・取引先・補助科目の有効・無効と、科目の既定の税区分。件数は多くても数百なので、まとめて読む。
 pub(crate) struct DbMasters {
     accounts: HashMap<i64, (bool, Option<TaxCategory>)>,
     partners: HashMap<i64, bool>,
     sub_accounts: HashMap<i64, (i64, bool)>,
-    exempt: bool,
+    year_exempt: bool,
+    registered_on: Option<String>,
 }
 
 impl DbMasters {
@@ -99,7 +113,8 @@ impl DbMasters {
             accounts,
             partners,
             sub_accounts,
-            exempt: year_is_exempt(conn, year)?,
+            year_exempt: year_is_exempt(conn, year)?,
+            registered_on: crate::db::filing::registered_on(conn)?,
         })
     }
 }
@@ -117,8 +132,8 @@ impl MasterLookup for DbMasters {
     fn account_tax(&self, id: i64) -> Option<TaxCategory> {
         self.accounts.get(&id).and_then(|a| a.1)
     }
-    fn tax_exempt(&self) -> bool {
-        self.exempt
+    fn tax_exempt(&self, date: &str) -> bool {
+        crate::domain::filing::exempt_on(self.year_exempt, self.registered_on.as_deref(), date)
     }
 }
 
