@@ -123,6 +123,31 @@ pub fn journal(book: &JournalBook, names: &Names, locale: Locale) -> AppResult<S
 
 /// 帳簿・試算表の CSV。科目ごとの節がある帳簿は、先頭に科目の列を足す。
 pub fn report(report: &Report) -> AppResult<String> {
+    let labels = |s: &super::report::Section| {
+        s.columns
+            .iter()
+            .map(|c| c.label.clone())
+            .collect::<Vec<_>>()
+    };
+    // 節ごとに列が違う帳票（決算書の金額一覧など）は、節ごとに見出しと列名を書く
+    if let Some(first) = report.sections.first() {
+        if report.sections.iter().any(|s| labels(s) != labels(first)) {
+            let mut records = Vec::new();
+            for (i, section) in report.sections.iter().enumerate() {
+                if i > 0 {
+                    records.push(Vec::new());
+                }
+                if let Some(heading) = &section.heading {
+                    records.push(vec![heading.clone()]);
+                }
+                records.push(labels(section));
+                for row in &section.rows {
+                    records.push(row.cells.iter().map(cell_text).collect());
+                }
+            }
+            return write(records);
+        }
+    }
     let with_heading = report.sections.iter().any(|s| s.heading.is_some());
     let mut records = Vec::new();
     if let Some(first) = report.sections.first() {
@@ -139,15 +164,19 @@ pub fn report(report: &Report) -> AppResult<String> {
             if with_heading {
                 record.push(section.heading.clone().unwrap_or_default());
             }
-            record.extend(row.cells.iter().map(|cell| match cell {
-                Cell::Empty => String::new(),
-                Cell::Text(text) | Cell::Date(text) => text.clone(),
-                Cell::Amount(value) => value.to_string(),
-            }));
+            record.extend(row.cells.iter().map(cell_text));
             records.push(record);
         }
     }
     write(records)
+}
+
+fn cell_text(cell: &Cell) -> String {
+    match cell {
+        Cell::Empty => String::new(),
+        Cell::Text(text) | Cell::Date(text) => text.clone(),
+        Cell::Amount(value) => value.to_string(),
+    }
 }
 
 fn yes_no(value: bool, locale: Locale) -> String {

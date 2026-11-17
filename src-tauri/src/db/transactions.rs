@@ -45,7 +45,7 @@ pub struct Transaction {
 }
 
 /// 年度があり、締めていないことを確かめる。
-fn ensure_year_open(conn: &Connection, year: i64) -> AppResult<()> {
+pub(crate) fn ensure_year_open(conn: &Connection, year: i64) -> AppResult<()> {
     let closed: Option<bool> = conn
         .query_row(
             "SELECT status = 'closed' FROM fiscal_years WHERE year = ?1",

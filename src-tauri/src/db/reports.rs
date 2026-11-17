@@ -9,7 +9,7 @@ use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
 /// 年度 `year` の `from_month` 月から `to_month` 月までの合計残高試算表。
-/// 繰越は年度の初めから `from_month` 月の前までの増減（フェーズ 7 で期首残高を足す）。
+/// 繰越は、期首残高と、年度の初めから `from_month` 月の前までの増減。
 pub fn trial_balance(
     conn: &Connection,
     year: i64,
@@ -47,6 +47,7 @@ pub fn trial_balance(
         })?
         .collect::<Result<_, _>>()?;
 
+    let opening = crate::db::closing::opening_map(conn, year)?;
     // 科目の並び順（区分の順・並び順）で並べる。無効にした科目も残高があれば出す
     let movements: Vec<Movement> = accounts::list(conn)?
         .into_iter()
@@ -55,7 +56,7 @@ pub fn trial_balance(
             Movement {
                 account_id: a.id,
                 category: a.category,
-                opening: 0,
+                opening: opening.get(&a.id).copied().unwrap_or(0),
                 before,
                 period,
             }

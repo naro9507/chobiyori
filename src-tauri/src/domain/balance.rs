@@ -8,7 +8,7 @@
 //! | 負債・資本（と収益）の残高 | 期首 + 貸方計 − 借方計 |
 //! | 青色控除前所得 | 収益計 − 売上原価 − 経費計 |
 //!
-//! 期首残高の入力はフェーズ 7 で入れる。それまでの期首は 0 として扱う。
+//! 期首は、決算の画面で入れた期首残高（`opening_balances`）。
 
 use super::master::AccountCategory;
 use serde::Serialize;
@@ -25,7 +25,7 @@ pub struct Totals {
 pub struct Movement {
     pub account_id: i64,
     pub category: AccountCategory,
-    /// 期首残高（区分の向きで正）。フェーズ 7 までは 0
+    /// 期首残高（区分の向きで正）
     pub opening: i64,
     pub before: Totals,
     pub period: Totals,

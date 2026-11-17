@@ -2,6 +2,8 @@
 
 pub mod allocation;
 pub mod balance;
+pub mod closing;
+pub mod depreciation;
 pub mod journal;
 pub mod ledger;
 pub mod master;
