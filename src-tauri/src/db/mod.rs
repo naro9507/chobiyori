@@ -18,6 +18,7 @@ pub mod inbox;
 pub mod locks;
 pub mod partners;
 pub mod receipts;
+pub mod recurring;
 pub mod reports;
 pub mod rules;
 pub mod setup;
@@ -43,6 +44,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0007_security.sql"),
     include_str!("migrations/0008_documents.sql"),
     include_str!("migrations/0009_filing.sql"),
+    include_str!("migrations/0010_recurring.sql"),
 ];
 
 pub struct Database {

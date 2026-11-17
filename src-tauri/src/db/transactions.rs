@@ -235,7 +235,11 @@ pub fn create(db: &Database, year: i64, input: &TransactionInput) -> AppResult<T
 }
 
 /// 口座の印が付いた、ある科目か。
-fn ensure_payment_account(conn: &Connection, id: i64, field: &'static str) -> AppResult<()> {
+pub(crate) fn ensure_payment_account(
+    conn: &Connection,
+    id: i64,
+    field: &'static str,
+) -> AppResult<()> {
     let is_payment: Option<bool> = conn
         .query_row(
             "SELECT is_payment_account FROM accounts WHERE id = ?1",

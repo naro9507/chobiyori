@@ -95,6 +95,104 @@ fn non_empty(ledgers: Vec<Ledger>) -> AppResult<Vec<Ledger>> {
     Ok(ledgers.into_iter().filter(|l| !l.is_empty()).collect())
 }
 
+/// 取引先ごとの元帳（売掛帳・買掛帳）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PartnerLedger {
+    /// 取引先。空は取引先を付けていない行と期首残高（取引先ごとの期首残高はまだ持たない）
+    pub partner_id: Option<i64>,
+    pub ledger: Ledger,
+}
+
+/// 売掛帳・買掛帳。科目 `account_id` の明細行を取引先ごとに分け、それぞれの残高を出す。
+/// 取引先の並び順で、取引先のない分は最後。動きのない取引先は出さない。
+pub fn partner_ledgers(
+    conn: &Connection,
+    year: i64,
+    from_month: u32,
+    to_month: u32,
+    account_id: i64,
+) -> AppResult<Vec<PartnerLedger>> {
+    let account = accounts::get(conn, account_id)
+        .map_err(|_| AppError::field(ErrorCode::NotFound, "accountId"))?;
+    let (from, to) = period_range(year, from_month, to_month)?;
+    let opening = crate::db::closing::opening_map(conn, year)?
+        .get(&account_id)
+        .copied()
+        .unwrap_or(0);
+
+    let mut stmt = conn.prepare(
+        "SELECT l.partner_id,
+                coalesce(sum(CASE WHEN l.side = 'debit' THEN l.amount END), 0),
+                coalesce(sum(CASE WHEN l.side = 'credit' THEN l.amount END), 0)
+         FROM journal_lines l
+         JOIN transactions t ON t.id = l.transaction_id
+         WHERE t.fiscal_year = ?1 AND t.date < ?2 AND l.account_id = ?3
+         GROUP BY l.partner_id",
+    )?;
+    let before: HashMap<Option<i64>, Totals> = stmt
+        .query_map(params![year, from, account_id], |row| {
+            Ok((
+                row.get(0)?,
+                Totals {
+                    debit: row.get(1)?,
+                    credit: row.get(2)?,
+                },
+            ))
+        })?
+        .collect::<Result<_, _>>()?;
+
+    let mut entries: HashMap<Option<i64>, Vec<LedgerEntry>> = HashMap::new();
+    for t in transactions::list_between(conn, year, &from, &to)? {
+        let sides: Vec<(Side, i64)> = t.lines.iter().map(|l| (l.side, l.account_id)).collect();
+        for line in t.lines.iter().filter(|l| l.account_id == account_id) {
+            entries
+                .entry(line.partner_id)
+                .or_default()
+                .push(LedgerEntry {
+                    transaction_id: t.id,
+                    date: t.date.clone(),
+                    side: line.side,
+                    amount: line.amount,
+                    counter_account_id: ledger::counter_account(&sides, line.side),
+                    partner_id: line.partner_id,
+                    memo: if line.memo.is_empty() {
+                        t.memo.clone()
+                    } else {
+                        line.memo.clone()
+                    },
+                });
+        }
+    }
+
+    let mut keys: Vec<Option<i64>> = crate::db::partners::list(conn)?
+        .into_iter()
+        .map(|p| Some(p.id))
+        .collect();
+    keys.push(None);
+    Ok(keys
+        .into_iter()
+        .map(|partner_id| {
+            let start = if partner_id.is_none() { opening } else { 0 };
+            let brought_forward = start
+                + signed(
+                    account.category,
+                    before.get(&partner_id).copied().unwrap_or_default(),
+                );
+            PartnerLedger {
+                partner_id,
+                ledger: ledger::ledger(
+                    account_id,
+                    account.category,
+                    brought_forward,
+                    entries.remove(&partner_id).unwrap_or_default(),
+                ),
+            }
+        })
+        .filter(|p| !p.ledger.is_empty())
+        .collect())
+}
+
 /// `accounts` の元帳を、渡した順に作る。取引は 1 回だけ読む。
 fn ledgers_for(
     conn: &Connection,
@@ -281,6 +379,72 @@ mod tests {
         assert_eq!(
             ledger(&db.conn(), 2026, 1, 12, 9_999).unwrap_err(),
             AppError::field(ErrorCode::NotFound, "accountId")
+        );
+    }
+
+    #[test]
+    fn receivables_are_split_by_partner() {
+        let db = crate::db::setup::tests::set_up_db();
+        let (bank, sales, ar) = {
+            let conn = db.conn();
+            (
+                account(&conn, "104"),
+                account(&conn, "401"),
+                account(&conn, "106"),
+            )
+        };
+        let (a, b) = {
+            let conn = db.conn();
+            conn.execute_batch(
+                "INSERT INTO partners (code, name_ja, is_customer) VALUES ('1', 'A社', 1), ('2', 'B社', 1);",
+            )
+            .unwrap();
+            (
+                conn.query_row("SELECT id FROM partners WHERE code = '1'", [], |r| {
+                    r.get::<_, i64>(0)
+                })
+                .unwrap(),
+                conn.query_row("SELECT id FROM partners WHERE code = '2'", [], |r| {
+                    r.get::<_, i64>(0)
+                })
+                .unwrap(),
+            )
+        };
+        let with_partner = |date: &str, debit, credit, amount, partner| {
+            let mut e = crate::db::transactions::tests::entry(date, debit, credit, amount);
+            for l in &mut e.lines {
+                l.partner_id = Some(partner);
+            }
+            e
+        };
+        transactions::create(&db, 2026, &with_partner("2026-02-28", ar, sales, 50_000, a)).unwrap();
+        transactions::create(&db, 2026, &with_partner("2026-03-31", ar, sales, 30_000, b)).unwrap();
+        transactions::create(&db, 2026, &with_partner("2026-03-31", ar, sales, 20_000, a)).unwrap();
+        transactions::create(&db, 2026, &with_partner("2026-04-10", bank, ar, 45_000, a)).unwrap();
+
+        let conn = db.conn();
+        let book = partner_ledgers(&conn, 2026, 3, 4, ar).unwrap();
+        assert_eq!(
+            book.iter().map(|p| p.partner_id).collect::<Vec<_>>(),
+            [Some(a), Some(b)]
+        );
+        let la = &book[0].ledger;
+        // A: 2 月の 50,000 が繰越、3 月 +20,000、4 月 −45,000 → 25,000 が未回収
+        assert_eq!(
+            (
+                la.brought_forward,
+                la.total_debit,
+                la.total_credit,
+                la.closing_balance
+            ),
+            (50_000, 20_000, 45_000, 25_000)
+        );
+        assert_eq!(book[1].ledger.closing_balance, 30_000);
+        // 取引先ごとの残高の合計は、売掛金の残高と一致する
+        let total: i64 = book.iter().map(|p| p.ledger.closing_balance).sum();
+        assert_eq!(
+            total,
+            ledger(&conn, 2026, 3, 4, ar).unwrap().closing_balance
         );
     }
 }
