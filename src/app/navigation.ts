@@ -13,6 +13,7 @@ import {
 	Repeat,
 	Settings,
 } from "lucide-react"
+import type { FeatureSettings } from "@/features/setup/setup"
 
 export type ScreenId =
 	| "home"
@@ -30,7 +31,7 @@ export type ScreenId =
 
 export type NavItem = {
 	id: ScreenId
-	path: string
+	path: "/" | `/${Exclude<ScreenId, "home">}`
 	icon: LucideIcon
 }
 
@@ -57,3 +58,9 @@ export const navGroups: NavItem[][] = [
 ]
 
 export const navItems = navGroups.flat()
+
+export function screenEnabled(id: ScreenId, features: FeatureSettings) {
+	if (id === "receivables") return features.recurring
+	if (id === "documents") return features.receivables
+	return true
+}

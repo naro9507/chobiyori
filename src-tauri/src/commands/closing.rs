@@ -133,3 +133,12 @@ pub async fn carry_forward(
 ) -> AppResult<CarryForward> {
     closing::carry_forward(&db, fiscal_year, overwrite)
 }
+
+#[tauri::command]
+pub async fn save_white_deduction(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    amount: i64,
+) -> AppResult<StatementAmounts> {
+    closing::save_white_deduction(&db, fiscal_year, amount)
+}

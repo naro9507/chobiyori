@@ -1,5 +1,5 @@
 import { ArrowLeft, Loader2, Plus } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,7 @@ import { StatusBadge } from "@/features/documents/status-badge"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
 import { useErrorMessage } from "@/lib/use-error-message"
+import { useEntryIntent } from "@/stores/entry-intent-store"
 
 type View =
 	| { mode: "list" }
@@ -43,7 +44,22 @@ const statusFilters: (DisplayStatus | "all")[] = [
 
 /** 請求書・見積書・納品書・領収書。一覧・作成（プレビュー付き）・送る・記帳する。 */
 export function DocumentsPage() {
-	const [view, setView] = useState<View>({ mode: "list" })
+	const revision = useEntryIntent((s) => s.invoice)
+	return (
+		<DocumentsView
+			key={revision}
+			newInvoice={useEntryIntent.getState().invoicePending}
+		/>
+	)
+}
+
+function DocumentsView({ newInvoice }: { newInvoice: boolean }) {
+	useEffect(() => {
+		useEntryIntent.setState({ invoicePending: false })
+	}, [])
+	const [view, setView] = useState<View>(
+		newInvoice ? { mode: "new", kind: "invoice" } : { mode: "list" }
+	)
 	const documents = useDocuments()
 	const open = (d: DocumentRecord) => setView({ mode: "open", id: d.id })
 	const back = () => setView({ mode: "list" })

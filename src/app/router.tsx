@@ -4,11 +4,13 @@ import {
 	createRoute,
 	createRouter,
 	type RouterHistory,
+	useSearch,
 } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import { ClosingPage } from "@/pages/closing-page"
 import { DataPage } from "@/pages/data-page"
 import { DocumentsPage } from "@/pages/documents-page"
+import { HelpPage } from "@/pages/help-page"
 import { HomePage } from "@/pages/home-page"
 import { InboxPage } from "@/pages/inbox-page"
 import { LedgersPage } from "@/pages/ledgers-page"
@@ -21,11 +23,17 @@ import { TransactionsPage } from "@/pages/transactions-page"
 import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
+const useHelpSearch = () => useSearch({ strict: false }) as { q?: string }
+
 const rootRoute = createRootRoute({ component: AppRoot })
 
 /** 作り終えた画面。ここにない画面は「準備中」を表示する。 */
 const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
+	help: () => {
+		const search = useHelpSearch()
+		return <HelpPage key={search.q ?? ""} />
+	},
 	transactions: TransactionsPage,
 	inbox: InboxPage,
 	ledgers: LedgersPage,
@@ -43,6 +51,9 @@ const screenRoutes = navItems.map((item) => {
 	return createRoute({
 		getParentRoute: () => rootRoute,
 		path: item.path,
+		validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+			q: typeof search.q === "string" ? search.q : undefined,
+		}),
 		component: Screen ?? (() => <PlaceholderPage screen={item.id} />),
 	})
 })

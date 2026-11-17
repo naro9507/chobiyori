@@ -15,6 +15,7 @@ import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
 import { PasswordCard } from "@/features/security/password-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
+import { FeatureSettingsPanel } from "@/features/setup/feature-settings"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
 import { useTranslations } from "@/i18n/use-translations"
@@ -34,6 +35,7 @@ export function SettingsPage() {
 
 	return (
 		<Page screen="settings">
+			<FeatureSettingsPanel />
 			<BusinessProfileCard />
 			<InvoiceRegistrationCard />
 			<PasswordCard />

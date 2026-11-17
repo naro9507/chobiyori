@@ -1,12 +1,21 @@
 import { CircleAlert, CircleCheck } from "lucide-react"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Field } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { ExportButtons } from "@/features/ledger/export-buttons"
 import { useTranslations } from "@/i18n/use-translations"
-import { formatAmount } from "@/lib/amount"
+import { amountForCommand, formatAmount } from "@/lib/amount"
+import { useErrorMessage } from "@/lib/use-error-message"
 import { cn } from "@/lib/utils"
 import { useSettingsStore } from "@/stores/settings-store"
-import { type StatementAmounts, useStatementAmounts } from "./closing-api"
+import {
+	type StatementAmounts,
+	useSaveWhiteDeduction,
+	useStatementAmounts,
+} from "./closing-api"
 import { QueryMessage } from "./query-message"
 
 const th = "px-3 py-2 font-medium"
@@ -27,7 +36,7 @@ export function StatementPanel({ fiscalYear }: { fiscalYear: number | null }) {
 		<div className="flex flex-col gap-6">
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<p className="max-w-2xl text-muted-foreground text-sm">
-					{t("statementHint")}
+					{t(data.filingType === "white" ? "whiteHint" : "statementHint")}
 				</p>
 				<ExportButtons
 					target={{ kind: "statement" }}
@@ -55,9 +64,16 @@ export function StatementPanel({ fiscalYear }: { fiscalYear: number | null }) {
 					))}
 				</ul>
 			)}
+			{data.filingType === "white" && (
+				<WhiteDeduction
+					key={fiscalYear}
+					fiscalYear={fiscalYear}
+					amount={statement.deduction}
+				/>
+			)}
 			<ProfitAndLoss data={data} />
-			<BalanceSheet data={data} />
-			<Monthly data={data} />
+			{data.filingType !== "white" && <BalanceSheet data={data} />}
+			{data.filingType !== "white" && <Monthly data={data} />}
 			<Breakdowns data={data} />
 			<Depreciation data={data} />
 		</div>
@@ -90,10 +106,12 @@ function ProfitAndLoss({ data }: { data: StatementAmounts }) {
 	const label = useLabel()
 	const { statement } = data
 	return (
-		<Section title={t("plTitle")}>
+		<Section title={t(data.filingType === "white" ? "whiteTitle" : "plTitle")}>
 			<div className="overflow-x-auto rounded-lg border">
 				<table className="w-full text-sm">
-					<caption className="sr-only">{t("plTitle")}</caption>
+					<caption className="sr-only">
+						{t(data.filingType === "white" ? "whiteTitle" : "plTitle")}
+					</caption>
 					<thead className="border-b bg-muted/50 text-muted-foreground">
 						<tr>
 							<th scope="col" className={cn(th, "w-14 text-left")}>
@@ -133,16 +151,32 @@ function ProfitAndLoss({ data }: { data: StatementAmounts }) {
 				</table>
 			</div>
 			<dl className="grid gap-x-8 gap-y-1.5 text-sm sm:grid-cols-[auto_auto] sm:justify-start">
-				<dt className="text-muted-foreground">{t("incomeBeforeDeduction")}</dt>
+				<dt className="text-muted-foreground">
+					{t(
+						data.filingType === "white"
+							? "whiteBeforeDeduction"
+							: "incomeBeforeDeduction"
+					)}
+				</dt>
 				<dd className="num font-bold">
 					{formatAmount(statement.incomeBeforeDeduction)}
 				</dd>
-				<dt className="text-muted-foreground">{t("deduction")}</dt>
-				<dd className="num font-bold">{formatAmount(statement.deduction)}</dd>
+				{data.filingType !== "white" && (
+					<>
+						<dt className="text-muted-foreground">{t("deduction")}</dt>
+						<dd className="num font-bold">
+							{formatAmount(statement.deduction)}
+						</dd>
+					</>
+				)}
 				<dt className="text-muted-foreground">{t("income")}</dt>
 				<dd className="num font-bold">{formatAmount(statement.income)}</dd>
 			</dl>
-			<p className="text-muted-foreground text-xs">{t("deductionHint")}</p>
+			<p className="text-muted-foreground text-xs">
+				{t(
+					data.filingType === "white" ? "whiteDeductionHint" : "deductionHint"
+				)}
+			</p>
 		</Section>
 	)
 }
@@ -352,5 +386,53 @@ function Depreciation({ data }: { data: StatementAmounts }) {
 				</table>
 			</div>
 		</Section>
+	)
+}
+
+function WhiteDeduction({
+	fiscalYear,
+	amount,
+}: {
+	fiscalYear: number | null
+	amount: number
+}) {
+	const t = useTranslations("closing")
+	const [text, setText] = useState<string | null>(null)
+	const save = useSaveWhiteDeduction(fiscalYear)
+	const errorMessage = useErrorMessage()
+	return (
+		<form
+			className="flex flex-col items-start gap-3"
+			onSubmit={(e) => {
+				e.preventDefault()
+				save.mutate(amountForCommand(text ?? String(amount)), {
+					onSuccess: () => setText(null),
+				})
+			}}
+		>
+			<Field label={t("whiteDeduction")} hint={t("whiteDeductionHint")}>
+				<Input
+					inputMode="numeric"
+					value={text ?? String(amount)}
+					onChange={(e) => {
+						setText(e.target.value)
+						save.reset()
+					}}
+				/>
+			</Field>
+			<Button type="submit" variant="outline" disabled={save.isPending}>
+				{t("whiteDeductionSave")}
+			</Button>
+			{save.error && (
+				<p role="alert" className="text-destructive text-sm">
+					{errorMessage(save.error)}
+				</p>
+			)}
+			{save.isSuccess && (
+				<p role="status" className="text-success text-sm">
+					{t("whiteDeductionSaved")}
+				</p>
+			)}
+		</form>
 	)
 }

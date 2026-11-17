@@ -81,10 +81,11 @@ export function usePartnerLedgers(period: Period, accountId: number | null) {
 	})
 }
 
-export function useExpenseBook(period: Period) {
+export function useExpenseBook(period: Period, sales = false) {
 	return useQuery({
-		queryKey: ["books", "expense", period],
-		queryFn: () => callCommand<Ledger[]>("expense_book", period),
+		queryKey: ["books", sales ? "sales" : "expense", period],
+		queryFn: () =>
+			callCommand<Ledger[]>(sales ? "sales_book" : "expense_book", period),
 		enabled: enabled(period),
 		retry: false,
 	})
@@ -97,6 +98,7 @@ export type ExportTarget =
 	| { kind: "allLedgers" }
 	| { kind: "cashBook"; accountId: number }
 	| { kind: "expenseBook" }
+	| { kind: "salesBook" }
 	| { kind: "trialBalance" }
 	/** 青色申告決算書の金額一覧（いつも 1 年分） */
 	| { kind: "statement" }

@@ -194,3 +194,21 @@ export function displayName(
 ) {
 	return locale === "en" && record.nameEn ? record.nameEn : record.nameJa
 }
+
+export type PurposeInput = {
+	code: string
+	nameJa: string
+	nameEn: string
+	kana: string
+	defaultDebitAccountId: number | null
+	defaultCreditAccountId: number | null
+	defaultTaxCategory: TaxCategory | null
+	allocationRuleId: number | null
+	defaultPartnerId: number | null
+}
+export type Purpose = MasterRecord &
+	Omit<PurposeInput, "code" | "nameJa" | "nameEn">
+export const purposeKind: MasterKind<Purpose, PurposeInput> = {
+	one: "purpose",
+	many: "purposes",
+}

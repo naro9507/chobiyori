@@ -41,6 +41,9 @@ texts! {
     CASH_BOOK = "出納帳", "Cash book";
     EXPENSE_BOOK = "経費帳", "Expense book";
     TRIAL_BALANCE = "合計残高試算表", "Trial balance";
+    SALES_BOOK = "売上帳", "Sales book";
+    WHITE_STATEMENT = "収支内訳書（一般用）の金額一覧", "White-return income and expense statement";
+    WHITE_NOTE = "事業専従者控除は利用者が確認して入力した金額です。対象と金額は税理士か税務署に確認してください。", "The family worker deduction is entered by the user. Confirm eligibility and the amount with a tax professional.";
     STATEMENT = "青色申告決算書の金額一覧", "Blue-return statement amounts";
     PROFIT_AND_LOSS = "損益計算書", "Profit and loss";
     MONTHLY_SALES = "月別の売上（収入）金額と仕入金額", "Sales and purchases by month";

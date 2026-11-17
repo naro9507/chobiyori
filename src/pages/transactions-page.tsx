@@ -4,10 +4,13 @@ import { Page } from "@/components/layout/page"
 import { CompoundEntry } from "@/features/journal/compound-entry"
 import { type Transaction, useFiscalYear } from "@/features/journal/journal-api"
 import { JournalGrid } from "@/features/journal/journal-grid"
+import { PurposeEntry } from "@/features/journal/purpose-entry"
 import { SimpleEntry } from "@/features/journal/simple-entry"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useFeatures } from "@/features/setup/setup"
 import { RecurringPanel } from "@/features/templates/recurring-panel"
 import { useTranslations } from "@/i18n/use-translations"
+import { useEntryIntent } from "@/stores/entry-intent-store"
 import {
 	type TransactionTab,
 	transactionTabs,
@@ -19,6 +22,8 @@ type Tab = TransactionTab
 
 /** 取引入力。かんたん入力・仕訳グリッド・複合仕訳を切り替える。どれも同じ仕訳になる。 */
 export function TransactionsPage() {
+	const features = useFeatures()
+	const revision = useEntryIntent((s) => s.revision)
 	const t = useTranslations("journal")
 	const fiscalYear = useFiscalYear()
 	const tab = useTransactionsTab((state) => state.tab)
@@ -30,7 +35,7 @@ export function TransactionsPage() {
 	return (
 		<Page screen="transactions">
 			<Tabs.Root
-				value={tab}
+				value={tab === "recurring" && !features.recurring ? "simple" : tab}
 				onValueChange={(value) => {
 					setEditing(undefined)
 					setTab(value as Tab)
@@ -41,18 +46,24 @@ export function TransactionsPage() {
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
 				>
-					{tabs.map((value) => (
-						<Tabs.Trigger
-							key={value}
-							value={value}
-							className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-						>
-							{t(value)}
-						</Tabs.Trigger>
-					))}
+					{tabs
+						.filter((value) => value !== "recurring" || features.recurring)
+						.map((value) => (
+							<Tabs.Trigger
+								key={value}
+								value={value}
+								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+							>
+								{t(value)}
+							</Tabs.Trigger>
+						))}
 				</Tabs.List>
 				<Tabs.Content value="simple" className="outline-none">
-					<SimpleEntry fiscalYear={fiscalYear} />
+					<PurposeEntry key={fiscalYear} fiscalYear={fiscalYear} />
+					<SimpleEntry
+						key={`${fiscalYear}-${revision}`}
+						fiscalYear={fiscalYear}
+					/>
 				</Tabs.Content>
 				<Tabs.Content value="grid" className="outline-none">
 					<JournalGrid

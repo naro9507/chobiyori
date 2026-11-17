@@ -33,6 +33,9 @@ export type SetupInput = {
 	filingType: FilingType
 	taxStatus: TaxStatus
 	template: IndustryTemplate
+	accounts: SetupAccount[]
+	openingBalances: { accountCode: string; amount: number }[]
+	features: FeatureSettings
 }
 
 /** Rust 側 `domain::industry::IndustryTemplate` と同じ文字列。 */
@@ -86,4 +89,42 @@ export function useUpdateBusinessProfile() {
 			callCommand<BusinessProfile>("update_business_profile", { input }),
 		onSuccess: (profile) => queryClient.setQueryData(profileKey, profile),
 	})
+}
+
+export type FeatureSettings = {
+	inventory: boolean
+	receivables: boolean
+	recurring: boolean
+	allocation: boolean
+}
+export type SetupAccount = {
+	name: string
+	kind: "cash" | "bank" | "card" | "eMoney"
+	balance: number
+}
+export const defaultFeatures: FeatureSettings = {
+	inventory: true,
+	receivables: true,
+	recurring: true,
+	allocation: true,
+}
+export function useFeatureSettings() {
+	return useQuery({
+		queryKey: ["feature-settings"],
+		queryFn: () => callCommand<FeatureSettings>("get_feature_settings"),
+		retry: false,
+		retryOnMount: false,
+	})
+}
+export function useSaveFeatureSettings() {
+	const client = useQueryClient()
+	return useMutation({
+		mutationFn: (input: FeatureSettings) =>
+			callCommand<FeatureSettings>("save_feature_settings", { input }),
+		onSuccess: (data) => client.setQueryData(["feature-settings"], data),
+	})
+}
+
+export function useFeatures() {
+	return useFeatureSettings().data ?? defaultFeatures
 }

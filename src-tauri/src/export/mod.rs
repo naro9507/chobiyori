@@ -35,6 +35,7 @@ pub enum ExportTarget {
         account_id: i64,
     },
     ExpenseBook,
+    SalesBook,
     TrialBalance,
     /// 青色申告決算書の金額一覧（いつも 1 年分）
     Statement,
@@ -166,6 +167,16 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
             &names()?,
             &ctx,
         ),
+        ExportTarget::SalesBook => {
+            let mut r = report::ledgers(
+                LedgerKind::Expense,
+                &books::sales_book(conn, year, from_month, to_month)?,
+                &names()?,
+                &ctx,
+            );
+            r.title = labels::SALES_BOOK.get(locale).to_string();
+            r
+        }
         ExportTarget::TrialBalance => report::trial_balance(
             &reports::trial_balance(conn, year, from_month, to_month)?,
             &names()?,

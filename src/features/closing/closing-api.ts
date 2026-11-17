@@ -321,3 +321,18 @@ export function useCarryForward(fiscalYear: number | null) {
 		onSuccess,
 	})
 }
+
+export function useSaveWhiteDeduction(fiscalYear: number | null) {
+	const client = useQueryClient()
+	return useMutation({
+		mutationFn: (amount: number) =>
+			callCommand<StatementAmounts>("save_white_deduction", {
+				fiscalYear,
+				amount,
+			}),
+		onSuccess: async (data) => {
+			client.setQueryData(["closing", "statement", fiscalYear], data)
+			await client.invalidateQueries({ queryKey: ["income-guide"] })
+		},
+	})
+}

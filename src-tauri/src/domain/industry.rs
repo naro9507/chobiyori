@@ -21,6 +21,17 @@ pub enum IndustryTemplate {
     RetailFood,
 }
 
+impl IndustryTemplate {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::General => "general",
+            Self::School => "school",
+            Self::Service => "service",
+            Self::RetailFood => "retailFood",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExtraAccount {
     pub code: &'static str,

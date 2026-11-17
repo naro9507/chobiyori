@@ -77,6 +77,7 @@ const SELECT: &str = "
            a.default_tax_category, a.default_allocation_rule_id, a.is_payment_account,
            a.is_system, a.is_active,
            EXISTS (SELECT 1 FROM journal_lines WHERE account_id = a.id)
+           OR EXISTS (SELECT 1 FROM opening_balances WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM sub_accounts WHERE account_id = a.id)
            OR EXISTS (SELECT 1 FROM purposes WHERE default_debit_account_id = a.id OR default_credit_account_id = a.id)
            OR EXISTS (SELECT 1 FROM templates WHERE debit_account_id = a.id OR credit_account_id = a.id)

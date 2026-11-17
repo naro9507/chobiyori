@@ -9,23 +9,48 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
+import { FeatureChoices } from "@/features/setup/feature-settings"
 import {
+	defaultFeatures,
+	type FeatureSettings,
 	type FilingType,
 	filingTypes,
 	type IndustryTemplate,
 	industryTemplates,
+	type SetupAccount,
 	type SetupInput,
 	type TaxStatus,
 	taxStatuses,
 	useCompleteSetup,
 } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
+import { signedAmountForCommand } from "@/lib/amount"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 
-const steps = ["business", "filing", "year"] as const
+const openingAccountOptions = [
+	{ code: "106" },
+	{ code: "108" },
+	{ code: "109" },
+	{ code: "111" },
+	{ code: "114" },
+	{ code: "115" },
+	{ code: "202" },
+	{ code: "203" },
+	{ code: "204" },
+	{ code: "205" },
+] as const
+
+const steps = [
+	"business",
+	"filing",
+	"year",
+	"accounts",
+	"opening",
+	"features",
+] as const
 type Step = (typeof steps)[number]
 
 /** エラーの出た入力欄が、どの手順にあるか。 */
@@ -36,6 +61,8 @@ const stepOfField: Record<string, Step> = {
 	industry: "business",
 	invoiceRegistrationNo: "business",
 	fiscalYear: "year",
+	accountName: "accounts",
+	openingBalance: "opening",
 }
 
 type Form = {
@@ -48,6 +75,10 @@ type Form = {
 	taxStatus: TaxStatus
 	fiscalYear: string
 	template: IndustryTemplate
+	accounts: (Omit<SetupAccount, "balance"> & { balance: string; key: number })[]
+	openingBalances: { key: number; accountCode: string; amount: string }[]
+	features: FeatureSettings
+	firstYear: boolean
 }
 
 function toInput(form: Form): SetupInput {
@@ -63,6 +94,16 @@ function toInput(form: Form): SetupInput {
 		filingType: form.filingType,
 		taxStatus: form.taxStatus,
 		template: form.template,
+		accounts: form.accounts.map(({ name, kind, balance }) => ({
+			name,
+			kind,
+			balance: signedAmountForCommand(balance || "0"),
+		})),
+		openingBalances: form.openingBalances.map(({ accountCode, amount }) => ({
+			accountCode,
+			amount: signedAmountForCommand(amount || "0"),
+		})),
+		features: form.features,
 	}
 }
 
@@ -72,6 +113,7 @@ function toInput(form: Form): SetupInput {
  */
 export function SetupPage() {
 	const t = useTranslations("setup")
+	const more = useTranslations("setupMore")
 	const errorMessage = useErrorMessage()
 	const complete = useCompleteSetup()
 	const [step, setStep] = useState<Step>("business")
@@ -85,7 +127,12 @@ export function SetupPage() {
 		taxStatus: "exempt",
 		fiscalYear: String(new Date().getFullYear()),
 		template: "general",
+		accounts: [{ key: 1, name: more("cash"), kind: "cash", balance: "" }],
+		openingBalances: [],
+		features: { ...defaultFeatures },
+		firstYear: false,
 	})
+	const [nextAccountKey, setNextAccountKey] = useState(2)
 	const [missingOwner, setMissingOwner] = useState(false)
 	const filingId = useId()
 	const taxId = useId()
@@ -334,6 +381,220 @@ export function SetupPage() {
 					</Card>
 				)}
 
+				{step === "accounts" && (
+					<Card>
+						<CardHeader>
+							<CardTitle>{more("accounts")}</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							{form.accounts.map((account) => (
+								<div
+									key={account.key}
+									className="flex flex-wrap items-end gap-3"
+								>
+									<Field label={more("kind")}>
+										<NativeSelect
+											value={account.kind}
+											onChange={(e) =>
+												update({
+													accounts: form.accounts.map((a) =>
+														a.key === account.key
+															? {
+																	...a,
+																	kind: e.target.value as SetupAccount["kind"],
+																}
+															: a
+													),
+												})
+											}
+										>
+											{(["cash", "bank", "card", "eMoney"] as const).map(
+												(kind) => (
+													<option key={kind} value={kind}>
+														{more(kind)}
+													</option>
+												)
+											)}
+										</NativeSelect>
+									</Field>
+									<Field
+										label={more("accountName")}
+										error={message("accountName")}
+									>
+										<Input
+											value={account.name}
+											onChange={(e) =>
+												update({
+													accounts: form.accounts.map((a) =>
+														a.key === account.key
+															? { ...a, name: e.target.value }
+															: a
+													),
+												})
+											}
+										/>
+									</Field>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={() =>
+											update({
+												accounts: form.accounts.filter(
+													(a) => a.key !== account.key
+												),
+											})
+										}
+									>
+										{more("remove")}
+									</Button>
+								</div>
+							))}
+							<Button
+								type="button"
+								variant="outline"
+								className="w-fit"
+								onClick={() => {
+									update({
+										accounts: [
+											...form.accounts,
+											{
+												key: nextAccountKey,
+												kind: "bank",
+												name: "",
+												balance: "",
+											},
+										],
+									})
+									setNextAccountKey(nextAccountKey + 1)
+								}}
+							>
+								{more("add")}
+							</Button>
+						</CardContent>
+					</Card>
+				)}
+				{step === "opening" && (
+					<Card>
+						<CardHeader>
+							<CardTitle>{more("opening")}</CardTitle>
+							<CardDescription>{more("openingHint")}</CardDescription>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							{form.accounts.map((account) => (
+								<Field
+									key={account.key}
+									label={`${account.name} — ${more("balance")}`}
+									error={message("openingBalance")}
+								>
+									<Input
+										inputMode="numeric"
+										value={account.balance}
+										onChange={(e) =>
+											update({
+												accounts: form.accounts.map((a) =>
+													a.key === account.key
+														? { ...a, balance: e.target.value }
+														: a
+												),
+											})
+										}
+									/>
+								</Field>
+							))}
+							{form.openingBalances.map((row) => (
+								<div key={row.key} className="flex items-end gap-3">
+									<Field label={more("otherCode")}>
+										<NativeSelect
+											value={row.accountCode}
+											onChange={(e) =>
+												update({
+													openingBalances: form.openingBalances.map((r) =>
+														r.key === row.key
+															? { ...r, accountCode: e.target.value }
+															: r
+													),
+												})
+											}
+										>
+											{openingAccountOptions.map((option) => (
+												<option key={option.code} value={option.code}>
+													{option.code} {more(`account_${option.code}`)}
+												</option>
+											))}
+										</NativeSelect>
+									</Field>
+									<Field
+										label={more("otherAmount")}
+										error={message("openingBalance")}
+									>
+										<Input
+											inputMode="numeric"
+											value={row.amount}
+											onChange={(e) =>
+												update({
+													openingBalances: form.openingBalances.map((r) =>
+														r.key === row.key
+															? { ...r, amount: e.target.value }
+															: r
+													),
+												})
+											}
+										/>
+									</Field>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={() =>
+											update({
+												openingBalances: form.openingBalances.filter(
+													(r) => r.key !== row.key
+												),
+											})
+										}
+									>
+										{more("remove")}
+									</Button>
+								</div>
+							))}
+							<Button
+								type="button"
+								variant="outline"
+								className="w-fit"
+								onClick={() => {
+									update({
+										openingBalances: [
+											...form.openingBalances,
+											{ key: nextAccountKey, accountCode: "106", amount: "" },
+										],
+									})
+									setNextAccountKey(nextAccountKey + 1)
+								}}
+							>
+								{more("otherAccount")}
+							</Button>
+							<LabeledCheckbox
+								label={more("firstYear")}
+								checked={form.firstYear}
+								onChange={(e) => update({ firstYear: e.target.checked })}
+							/>
+							{form.firstYear && (
+								<p className="text-muted-foreground text-sm">
+									{more("startupHint")}
+								</p>
+							)}
+						</CardContent>
+					</Card>
+				)}
+				{step === "features" && (
+					<Card>
+						<CardContent>
+							<FeatureChoices
+								value={form.features}
+								onChange={(features) => update({ features })}
+							/>
+						</CardContent>
+					</Card>
+				)}
 				{error && !(isAppError(error) && error.field) && (
 					<p role="alert" className="text-destructive text-sm">
 						{errorMessage(error)}
@@ -345,7 +606,7 @@ export function SetupPage() {
 						type="button"
 						variant="outline"
 						onClick={() => setStep(steps[index - 1])}
-						disabled={index === 0}
+						disabled={index === 0 || complete.isPending}
 					>
 						<ArrowLeft aria-hidden="true" />
 						{t("back")}

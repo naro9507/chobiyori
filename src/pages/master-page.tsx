@@ -28,13 +28,22 @@ import {
 	useMasterList,
 } from "@/features/master/master-api"
 import { MasterSection } from "@/features/master/master-section"
+import { PurposesSection } from "@/features/master/purposes-section"
+import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const tabs = ["accounts", "subAccounts", "partners", "allocationRules"] as const
+const tabs = [
+	"accounts",
+	"subAccounts",
+	"partners",
+	"allocationRules",
+	"purposes",
+] as const
 
 /** 勘定科目・補助科目・取引先・家事按分ルール。 */
 export function MasterPage() {
+	const features = useFeatures()
 	const t = useTranslations("master")
 
 	return (
@@ -44,16 +53,21 @@ export function MasterPage() {
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
 				>
-					{tabs.map((tab) => (
-						<Tabs.Trigger
-							key={tab}
-							value={tab}
-							className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-						>
-							{t(tab)}
-						</Tabs.Trigger>
-					))}
+					{tabs
+						.filter((tab) => tab !== "allocationRules" || features.allocation)
+						.map((tab) => (
+							<Tabs.Trigger
+								key={tab}
+								value={tab}
+								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+							>
+								{t(tab)}
+							</Tabs.Trigger>
+						))}
 				</Tabs.List>
+				<Tabs.Content value="purposes" className="outline-none">
+					<PurposesSection />
+				</Tabs.Content>
 				<Tabs.Content value="accounts" className="outline-none">
 					<AccountsSection />
 				</Tabs.Content>

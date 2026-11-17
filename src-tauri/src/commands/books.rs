@@ -49,3 +49,13 @@ pub async fn partner_ledgers(
 ) -> AppResult<Vec<books::PartnerLedger>> {
     books::partner_ledgers(&db.conn(), fiscal_year, from_month, to_month, account_id)
 }
+
+#[tauri::command]
+pub async fn sales_book(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    from_month: u32,
+    to_month: u32,
+) -> AppResult<Vec<Ledger>> {
+    books::sales_book(&db.conn(), fiscal_year, from_month, to_month)
+}

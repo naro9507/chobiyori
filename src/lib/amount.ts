@@ -27,3 +27,20 @@ export function amountForCommand(text: string) {
 	const amount = parseAmount(text)
 	return amount === null || Number.isNaN(amount) ? -1 : amount
 }
+
+/** 期首残高用。貸越などのマイナスの残高も、そのまま読める。 */
+export function parseSignedAmount(text: string): number | null {
+	const normalized = text.normalize("NFKC").replace(/[,、¥￥円\s]/g, "")
+	if (normalized === "") return null
+	if (!/^-?\d+$/.test(normalized)) return Number.NaN
+	const amount = Number(normalized)
+	return Number.isSafeInteger(amount) ? amount : Number.NaN
+}
+
+/** 負の残高も有効なので、読めない値は Rust の上限を超える値として送る。 */
+export function signedAmountForCommand(text: string) {
+	const amount = parseSignedAmount(text)
+	return amount === null || Number.isNaN(amount)
+		? Number.MAX_SAFE_INTEGER
+		: amount
+}

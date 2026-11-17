@@ -14,6 +14,8 @@ import { ConsumptionPanel } from "@/features/filing/consumption-panel"
 import { IncomePanel } from "@/features/filing/income-panel"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { LockPanel } from "@/features/security/lock-panel"
+import { useFiscalYears } from "@/features/setup/fiscal-years"
+import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 
 const tabs = [
@@ -36,12 +38,16 @@ type Tab = (typeof tabs)[number]
 export function ClosingPage() {
 	const t = useTranslations("closing")
 	const fiscalYear = useFiscalYear()
+	const features = useFeatures()
+	const white =
+		useFiscalYears().data?.find((y) => y.year === fiscalYear)?.filingType ===
+		"white"
 	const [tab, setTab] = useState<Tab>("checklist")
 
 	return (
 		<Page screen="closing">
 			<Tabs.Root
-				value={tab}
+				value={tab === "inventory" && !features.inventory ? "checklist" : tab}
 				onValueChange={(value) => setTab(value as Tab)}
 				className="flex flex-col gap-4"
 			>
@@ -49,15 +55,19 @@ export function ClosingPage() {
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
 				>
-					{tabs.map((value) => (
-						<Tabs.Trigger
-							key={value}
-							value={value}
-							className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-						>
-							{t(`tab_${value}`)}
-						</Tabs.Trigger>
-					))}
+					{tabs
+						.filter((value) => value !== "inventory" || features.inventory)
+						.map((value) => (
+							<Tabs.Trigger
+								key={value}
+								value={value}
+								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+							>
+								{white && value === "statement"
+									? t("whiteTitle")
+									: t(`tab_${value}`)}
+							</Tabs.Trigger>
+						))}
 				</Tabs.List>
 				<Card>
 					<CardContent>
