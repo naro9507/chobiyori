@@ -4,6 +4,7 @@ import {
 	CircleHelp,
 	Database,
 	FileCheck2,
+	FileText,
 	House,
 	Inbox,
 	ListTree,
@@ -20,6 +21,7 @@ export type ScreenId =
 	| "ledgers"
 	| "reports"
 	| "receivables"
+	| "documents"
 	| "closing"
 	| "master"
 	| "data"
@@ -43,6 +45,7 @@ export const navGroups: NavItem[][] = [
 		{ id: "ledgers", path: "/ledgers", icon: BookOpen },
 		{ id: "reports", path: "/reports", icon: ChartColumn },
 		{ id: "receivables", path: "/receivables", icon: Repeat },
+		{ id: "documents", path: "/documents", icon: FileText },
 		{ id: "closing", path: "/closing", icon: FileCheck2 },
 	],
 	[

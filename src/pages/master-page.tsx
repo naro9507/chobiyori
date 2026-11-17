@@ -393,6 +393,9 @@ function PartnersSection() {
 				isVendor: false,
 				invoiceRegistrationNo: "",
 				memo: "",
+				billingName: "",
+				email: "",
+				address: "",
 			})}
 			toForm={(p) => ({
 				...p,
@@ -407,6 +410,9 @@ function PartnersSection() {
 				isVendor: f.isVendor,
 				invoiceRegistrationNo: f.invoiceRegistrationNo || null,
 				memo: f.memo,
+				billingName: f.billingName,
+				email: f.email,
+				address: f.address,
 			})}
 			renderFields={(form, setForm, errorFor) => (
 				<>
@@ -462,6 +468,33 @@ function PartnersSection() {
 						<Input
 							value={form.memo}
 							onChange={(e) => setForm({ memo: e.target.value })}
+						/>
+					</Field>
+					<Field
+						label={t("billingName")}
+						hint={t("billingNameHint")}
+						error={errorFor("billingName")}
+					>
+						<Input
+							value={form.billingName}
+							onChange={(e) => setForm({ billingName: e.target.value })}
+						/>
+					</Field>
+					<Field label={t("email")} error={errorFor("email")}>
+						<Input
+							type="email"
+							value={form.email}
+							onChange={(e) => setForm({ email: e.target.value })}
+						/>
+					</Field>
+					<Field
+						label={t("address")}
+						error={errorFor("address")}
+						className="sm:col-span-2"
+					>
+						<Input
+							value={form.address}
+							onChange={(e) => setForm({ address: e.target.value })}
 						/>
 					</Field>
 				</>
