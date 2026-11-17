@@ -65,6 +65,8 @@ pub enum ErrorCode {
     ReadFailed,
     /// 画像を送ることへの同意がまだない
     ConsentRequired,
+    /// 期首残高はもう確定している（直すときは確定を取り消す）
+    OpeningConfirmed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

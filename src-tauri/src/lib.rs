@@ -124,7 +124,22 @@ pub fn run() {
             commands::receipts::delete_attachment,
             commands::receipts::link_inbox_item,
             commands::receipts::unlink_inbox_item,
-            commands::receipts::reconciliation
+            commands::receipts::reconciliation,
+            commands::closing::opening_balances,
+            commands::closing::save_opening_balances,
+            commands::closing::confirm_opening_balances,
+            commands::closing::depreciation_year,
+            commands::closing::useful_life_examples,
+            commands::closing::create_fixed_asset,
+            commands::closing::update_fixed_asset,
+            commands::closing::delete_fixed_asset,
+            commands::closing::record_depreciation,
+            commands::closing::inventory_status,
+            commands::closing::record_inventory,
+            commands::closing::closing_checklist,
+            commands::closing::set_closing_check,
+            commands::closing::statement_amounts,
+            commands::closing::carry_forward
         ])
         .run(tauri::generate_context!())
         .expect("アプリの起動に失敗しました");

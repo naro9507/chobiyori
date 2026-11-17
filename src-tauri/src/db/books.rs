@@ -1,7 +1,7 @@
 //! 帳簿（仕訳帳・総勘定元帳・現金出納帳 / 預金出納帳・経費帳）の読み出し。
 //!
 //! どの帳簿も、保存してある仕訳から毎回作る。残高の計算は `domain::ledger` で行う。
-//! 期首残高はフェーズ 7 で入れる。それまでは 0 として、年度の初めからの増減を繰越にする。
+//! 繰越は、期首残高と、年度の初めから期間の前までの増減。
 
 use crate::db::accounts::{self, Account};
 use crate::db::transactions::{self, Transaction};
@@ -105,7 +105,8 @@ fn ledgers_for(
 ) -> AppResult<Vec<Ledger>> {
     let (from, to) = period_range(year, from_month, to_month)?;
 
-    // 年度の初めから期間の前までの増減（フェーズ 7 で期首残高を足す）
+    // 繰越 = 期首残高 + 年度の初めから期間の前までの増減
+    let opening = crate::db::closing::opening_map(conn, year)?;
     let mut stmt = conn.prepare(
         "SELECT l.account_id,
                 coalesce(sum(CASE WHEN l.side = 'debit' THEN l.amount END), 0),
@@ -154,8 +155,8 @@ fn ledgers_for(
     Ok(accounts
         .iter()
         .map(|a| {
-            let brought_forward =
-                signed(a.category, before.get(&a.id).copied().unwrap_or_default());
+            let brought_forward = opening.get(&a.id).copied().unwrap_or(0)
+                + signed(a.category, before.get(&a.id).copied().unwrap_or_default());
             ledger::ledger(
                 a.id,
                 a.category,

@@ -5,9 +5,12 @@
 use super::labels::{self as l, Locale};
 use crate::db::accounts::Account;
 use crate::db::books::JournalBook;
+use crate::db::closing::StatementAmounts;
 use crate::db::partners::Partner;
 use crate::db::sub_accounts::SubAccount;
 use crate::domain::balance::TrialBalance;
+use crate::domain::closing::Side as BsSide;
+use crate::domain::depreciation::Method;
 use crate::domain::journal::Side;
 use crate::domain::ledger::Ledger;
 use crate::domain::master::AccountCategory;
@@ -430,6 +433,284 @@ pub fn trial_balance(tb: &TrialBalance, names: &Names, ctx: &Context) -> Report 
         l::PRE_TAX_INCOME.get(locale),
         l::amount(tb.pre_tax_income)
     ));
+    r
+}
+
+fn simple_section(
+    heading: &l::Text,
+    locale: Locale,
+    columns: Vec<Column>,
+    rows: Vec<Row>,
+) -> Section {
+    Section {
+        heading: Some(heading.get(locale).to_string()),
+        columns,
+        rows,
+        carry_label_column: None,
+    }
+}
+
+fn plain(cells: Vec<Cell>, group: usize, emphasis: bool) -> Row {
+    Row {
+        cells,
+        group,
+        style: if emphasis {
+            RowStyle::Emphasis
+        } else {
+            RowStyle::Normal
+        },
+    }
+}
+
+/// 青色申告決算書（一般用）に転記する金額の一覧。損益計算書・月別売上・内訳・減価償却費の計算・貸借対照表。
+pub fn statement(amounts: &StatementAmounts, names: &Names, ctx: &Context) -> Report {
+    let locale = ctx.locale;
+    let pick = |ja: &str, en: &str| {
+        if locale == Locale::En && !en.is_empty() {
+            en.to_string()
+        } else {
+            ja.to_string()
+        }
+    };
+    let s = &amounts.statement;
+    let mut sections = Vec::new();
+
+    let pl_rows =
+        s.pl.iter()
+            .enumerate()
+            .map(|(i, line)| {
+                plain(
+                    vec![
+                        text(line.no.clone()),
+                        text(pick(&line.label_ja, &line.label_en)),
+                        Cell::Amount(line.amount),
+                    ],
+                    i,
+                    line.total,
+                )
+            })
+            .collect();
+    sections.push(simple_section(
+        &l::PROFIT_AND_LOSS,
+        locale,
+        vec![
+            column(&l::LINE_NO, locale, 8.0, ColumnKind::Text),
+            column(&l::ITEM, locale, 62.0, ColumnKind::Text),
+            column(&l::AMOUNT, locale, 30.0, ColumnKind::Amount),
+        ],
+        pl_rows,
+    ));
+
+    let mut monthly: Vec<Row> = amounts
+        .monthly
+        .iter()
+        .map(|m| {
+            plain(
+                vec![
+                    text(format!("{}", m.month)),
+                    Cell::Amount(m.sales),
+                    Cell::Amount(m.purchases),
+                ],
+                m.month as usize,
+                false,
+            )
+        })
+        .collect();
+    let (sales, purchases): (i64, i64) = amounts
+        .monthly
+        .iter()
+        .fold((0, 0), |(s, p), m| (s + m.sales, p + m.purchases));
+    monthly.push(plain(
+        vec![
+            text(l::PERSONAL_CONSUMPTION.get(locale)),
+            Cell::Amount(amounts.personal_consumption),
+            Cell::Empty,
+        ],
+        13,
+        false,
+    ));
+    monthly.push(plain(
+        vec![
+            text(l::MISC_INCOME.get(locale)),
+            Cell::Amount(amounts.misc_income),
+            Cell::Empty,
+        ],
+        14,
+        false,
+    ));
+    monthly.push(plain(
+        vec![
+            text(l::TOTAL.get(locale)),
+            Cell::Amount(sales + amounts.personal_consumption + amounts.misc_income),
+            Cell::Amount(purchases),
+        ],
+        15,
+        true,
+    ));
+    sections.push(simple_section(
+        &l::MONTHLY_SALES,
+        locale,
+        vec![
+            column(&l::MONTH, locale, 30.0, ColumnKind::Text),
+            column(&l::SALES, locale, 35.0, ColumnKind::Amount),
+            column(&l::PURCHASES, locale, 35.0, ColumnKind::Amount),
+        ],
+        monthly,
+    ));
+
+    let mut breakdown = Vec::new();
+    for b in &amounts.breakdowns {
+        let label = match b.key.as_str() {
+            "wages" => &l::WAGES,
+            "rent" => &l::RENT,
+            _ => &l::INTEREST,
+        };
+        for r in &b.rows {
+            let payee = match r.partner_id {
+                Some(_) => names.partner_name(r.partner_id),
+                None => l::NO_PARTNER.get(locale).to_string(),
+            };
+            breakdown.push(plain(
+                vec![text(label.get(locale)), text(payee), Cell::Amount(r.amount)],
+                breakdown.len(),
+                false,
+            ));
+        }
+    }
+    sections.push(simple_section(
+        &l::BREAKDOWNS,
+        locale,
+        vec![
+            column(&l::ACCOUNT, locale, 30.0, ColumnKind::Text),
+            column(&l::PAYEE, locale, 40.0, ColumnKind::Text),
+            column(&l::AMOUNT, locale, 30.0, ColumnKind::Amount),
+        ],
+        breakdown,
+    ));
+
+    let method = |m: Method| match m {
+        Method::StraightLine => l::STRAIGHT_LINE.get(locale),
+        Method::DecliningBalance => l::DECLINING_BALANCE.get(locale),
+        Method::LumpSum => l::LUMP_SUM.get(locale),
+        Method::SmallAsset => l::SMALL_ASSET.get(locale),
+    };
+    let rate = |r: i64| {
+        if r == 0 {
+            Cell::Empty
+        } else {
+            text(format!("{}.{:03}", r / 1000, r % 1000))
+        }
+    };
+    let mut dep: Vec<Row> = amounts
+        .depreciation
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            let years = if d.useful_life > 0 {
+                format!(" {}", d.useful_life)
+            } else {
+                String::new()
+            };
+            plain(
+                vec![
+                    text(d.name.clone()),
+                    text(d.acquired_on.get(..7).unwrap_or(&d.acquired_on).to_string()),
+                    Cell::Amount(d.cost),
+                    text(format!("{}{years}", method(d.method))),
+                    rate(d.rate),
+                    text(format!("{}/12", d.months)),
+                    Cell::Amount(d.depreciation),
+                    text(format!("{}%", d.business_percent)),
+                    Cell::Amount(d.business),
+                    Cell::Amount(d.closing_book_value),
+                ],
+                i,
+                false,
+            )
+        })
+        .collect();
+    let (dep_total, business_total) = amounts
+        .depreciation
+        .iter()
+        .fold((0, 0), |(a, b), d| (a + d.depreciation, b + d.business));
+    dep.push(plain(
+        vec![
+            text(l::TOTAL.get(locale)),
+            Cell::Empty,
+            Cell::Empty,
+            Cell::Empty,
+            Cell::Empty,
+            Cell::Empty,
+            Cell::Amount(dep_total),
+            Cell::Empty,
+            Cell::Amount(business_total),
+            Cell::Empty,
+        ],
+        usize::MAX,
+        true,
+    ));
+    sections.push(simple_section(
+        &l::DEPRECIATION_CALC,
+        locale,
+        vec![
+            column(&l::ASSET_NAME, locale, 16.0, ColumnKind::Text),
+            column(&l::ACQUIRED, locale, 9.0, ColumnKind::Text),
+            column(&l::COST, locale, 11.0, ColumnKind::Amount),
+            column(&l::METHOD_YEARS, locale, 11.0, ColumnKind::Text),
+            column(&l::RATE, locale, 7.0, ColumnKind::Text),
+            column(&l::MONTHS, locale, 6.0, ColumnKind::Text),
+            column(&l::DEPRECIATION_AMOUNT, locale, 11.0, ColumnKind::Amount),
+            column(&l::BUSINESS_PERCENT, locale, 7.0, ColumnKind::Text),
+            column(&l::BUSINESS_AMOUNT, locale, 11.0, ColumnKind::Amount),
+            column(&l::BOOK_VALUE, locale, 11.0, ColumnKind::Amount),
+        ],
+        dep,
+    ));
+
+    let amount_or_blank = |v: Option<i64>| v.map_or(Cell::Empty, Cell::Amount);
+    let mut bs: Vec<Row> = Vec::new();
+    for side in [BsSide::Asset, BsSide::Liability] {
+        for line in s.bs.iter().filter(|l| l.side == side) {
+            if line.opening.unwrap_or(0) == 0 && line.closing == 0 {
+                continue;
+            }
+            bs.push(plain(
+                vec![
+                    text(pick(&line.label_ja, &line.label_en)),
+                    amount_or_blank(line.opening),
+                    Cell::Amount(line.closing),
+                ],
+                bs.len(),
+                false,
+            ));
+        }
+        let (label, total) = match side {
+            BsSide::Asset => (&l::ASSET_TOTAL, s.asset_total),
+            BsSide::Liability => (&l::LIABILITY_TOTAL, s.liability_total),
+        };
+        bs.push(plain(
+            vec![
+                text(label.get(locale)),
+                Cell::Amount(total.opening),
+                Cell::Amount(total.closing),
+            ],
+            bs.len(),
+            true,
+        ));
+    }
+    sections.push(simple_section(
+        &l::BALANCE_SHEET,
+        locale,
+        vec![
+            column(&l::ITEM, locale, 50.0, ColumnKind::Text),
+            column(&l::OPENING, locale, 25.0, ColumnKind::Amount),
+            column(&l::CLOSING, locale, 25.0, ColumnKind::Amount),
+        ],
+        bs,
+    ));
+
+    let mut r = report(&l::STATEMENT, ctx, sections);
+    r.footnote = Some(l::STATEMENT_NOTE.get(locale).to_string());
     r
 }
 

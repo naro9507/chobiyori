@@ -3,6 +3,7 @@
 
 pub mod app;
 pub mod books;
+pub mod closing;
 pub mod export;
 mod files;
 pub mod import;

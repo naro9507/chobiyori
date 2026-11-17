@@ -35,6 +35,8 @@ pub enum ExportTarget {
     },
     ExpenseBook,
     TrialBalance,
+    /// 青色申告決算書の金額一覧（いつも 1 年分）
+    Statement,
     /// マスタ（CSV だけ）
     Accounts,
     Partners,
@@ -168,6 +170,15 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
             &names()?,
             &ctx,
         ),
+        ExportTarget::Statement => report::statement(
+            &crate::db::closing::statement(conn, year)?,
+            &names()?,
+            &Context {
+                from: format!("{year:04}-01-01"),
+                to: format!("{year:04}-12-31"),
+                ..ctx.clone()
+            },
+        ),
     };
 
     // 1 つの科目の帳簿は、ファイル名に科目を入れる
@@ -250,6 +261,21 @@ mod tests {
     }
 
     #[test]
+    fn statement_csv_writes_each_section_with_its_own_columns() {
+        let db = sample_books();
+        let conn = db.conn();
+        let file = build(&conn, &request(ExportTarget::Statement, ExportFormat::Csv)).unwrap();
+        assert_eq!(file.name, "青色申告決算書の金額一覧_2026_03-03.csv");
+        let content = text(&file);
+        assert!(content.starts_with(
+            "損益計算書\r\n番号,項目,金額\r\n①,売上（収入）金額（雑収入を含む）,300000\r\n"
+        ));
+        assert!(content.contains("\r\n貸借対照表\r\n項目,期首,期末\r\n"));
+        assert!(content
+            .contains("\r\n月別の売上（収入）金額と仕入金額\r\n月,売上（収入）金額,仕入金額\r\n"));
+    }
+
+    #[test]
     fn trial_balance_and_expense_book_csv() {
         let db = sample_books();
         let conn = db.conn();
@@ -301,6 +327,7 @@ mod tests {
             ExportTarget::CashBook { account_id: cash },
             ExportTarget::ExpenseBook,
             ExportTarget::TrialBalance,
+            ExportTarget::Statement,
         ] {
             let file = build(&conn, &request(target, ExportFormat::Pdf)).unwrap();
             assert!(file.bytes.starts_with(b"%PDF-"), "{target:?}");

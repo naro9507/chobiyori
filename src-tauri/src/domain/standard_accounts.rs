@@ -1,7 +1,7 @@
 //! 標準の勘定科目。青色申告決算書（一般用）の科目に合わせる。
 //!
 //! `statement_line` は決算書のどの行に載せるかを表すキー。行の名前と順番は
-//! 年度ごとのデータ（`statement_layouts`、フェーズ 7）で持ち、ここでは対応だけを決める。
+//! 年度ごとのデータ（`domain/data/blue_general.json`）で持ち、ここでは対応だけを決める。
 //! 決算書に専用の行がない科目は `None` にし、空欄の行に割り当てる。
 
 use super::master::{AccountCategory, TaxCategory};

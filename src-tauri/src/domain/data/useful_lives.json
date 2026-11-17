@@ -1,0 +1,18 @@
+{
+ "_note": "よくある資産の法定耐用年数の例。選ぶ手間を減らすための候補で、実際の耐用年数は国税庁の耐用年数表と税理士に確認すること",
+ "items": [
+  {"ja": "パソコン（サーバー以外）", "en": "Personal computer (not a server)", "years": 4},
+  {"ja": "サーバー", "en": "Server", "years": 5},
+  {"ja": "複合機・コピー機", "en": "Copier or multifunction printer", "years": 5},
+  {"ja": "エアコン（冷暖房用の機器）", "en": "Air conditioner", "years": 6},
+  {"ja": "普通自動車", "en": "Car", "years": 6},
+  {"ja": "軽自動車", "en": "Light car (kei)", "years": 4},
+  {"ja": "二輪車（バイク）", "en": "Motorcycle", "years": 3},
+  {"ja": "金属製の事務机・いす・キャビネット", "en": "Metal desk, chair or cabinet", "years": 15},
+  {"ja": "その他の事務机・いす・キャビネット", "en": "Other desk, chair or cabinet", "years": 8},
+  {"ja": "木造の店舗・事務所", "en": "Wooden shop or office building", "years": 22},
+  {"ja": "鉄筋コンクリート造の事務所", "en": "Reinforced concrete office building", "years": 50},
+  {"ja": "建物の電気設備（照明など）", "en": "Building electrical fixtures", "years": 15},
+  {"ja": "建物の給排水・衛生設備", "en": "Building plumbing", "years": 15}
+ ]
+}
