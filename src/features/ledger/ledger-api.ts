@@ -63,6 +63,24 @@ export function useLedger(period: Period, accountId: number | null) {
 	})
 }
 
+/** Rust 側 `db::books::PartnerLedger` と同じ形。 */
+export type PartnerLedger = {
+	/** null は取引先を付けていない行と期首残高 */
+	partnerId: number | null
+	ledger: Ledger
+}
+
+/** 売掛帳・買掛帳。科目（売掛金・買掛金）の動きを取引先ごとに分ける。 */
+export function usePartnerLedgers(period: Period, accountId: number | null) {
+	return useQuery({
+		queryKey: ["books", "partners", period, accountId],
+		queryFn: () =>
+			callCommand<PartnerLedger[]>("partner_ledgers", { ...period, accountId }),
+		enabled: enabled(period) && accountId !== null,
+		retry: false,
+	})
+}
+
 export function useExpenseBook(period: Period) {
 	return useQuery({
 		queryKey: ["books", "expense", period],

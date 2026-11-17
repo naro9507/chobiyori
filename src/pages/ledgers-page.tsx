@@ -21,13 +21,14 @@ import {
 	useExpenseBook,
 	useJournalBook,
 	useLedger,
+	usePartnerLedgers,
 } from "@/features/ledger/ledger-api"
 import { currentMonth } from "@/features/reports/reports-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
 import { NotInTauriError } from "@/lib/tauri"
 
-const books = ["journal", "ledger", "cash", "expense"] as const
+const books = ["journal", "ledger", "cash", "expense", "partners"] as const
 type Book = (typeof books)[number]
 const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
@@ -49,6 +50,14 @@ export function LedgersPage() {
 	const cashAccounts = masters.accounts.filter(
 		(a) => a.isPaymentAccount && a.category === "asset"
 	)
+	// 売掛帳・買掛帳は、売掛金・買掛金の科目から選ぶ
+	const partnerAccounts = masters.accounts.filter(
+		(a) =>
+			a.statementLine === "bs.accounts_receivable" ||
+			a.statementLine === "bs.accounts_payable"
+	)
+	const [partnerAccount, setPartnerAccount] = useState<number | null>(null)
+	const partnerAccountId = partnerAccount ?? partnerAccounts[0]?.id ?? null
 	const [ledgerAccount, setLedgerAccount] = useState<number | null>(null)
 	const [cashAccount, setCashAccount] = useState<number | null>(null)
 	const ledgerId = ledgerAccount ?? ledgerAccounts[0]?.id ?? null
@@ -63,6 +72,8 @@ export function LedgersPage() {
 		cash:
 			cashId === null ? null : { kind: "cashBook" as const, accountId: cashId },
 		expense: { kind: "expenseBook" } as const,
+		// 売掛帳・買掛帳の書き出しはまだない
+		partners: null,
 	}[book]
 
 	const monthSelect = (
@@ -143,6 +154,12 @@ export function LedgersPage() {
 									accountSelect(ledgerAccounts, ledgerId, setLedgerAccount)}
 								{book === "cash" &&
 									accountSelect(cashAccounts, cashId, setCashAccount)}
+								{book === "partners" &&
+									accountSelect(
+										partnerAccounts,
+										partnerAccountId,
+										setPartnerAccount
+									)}
 							</div>
 							<ExportButtons target={target} period={period} />
 						</div>
@@ -162,6 +179,9 @@ export function LedgersPage() {
 						</Tabs.Content>
 						<Tabs.Content value="expense" className="outline-none">
 							<ExpenseView period={period} />
+						</Tabs.Content>
+						<Tabs.Content value="partners" className="outline-none">
+							<PartnerView period={period} accountId={partnerAccountId} />
 						</Tabs.Content>
 					</CardContent>
 				</Card>
@@ -394,6 +414,7 @@ function JournalView({ period }: { period: Period }) {
 
 type LedgerLine =
 	| { kind: "heading"; key: string; accountId: number }
+	| { kind: "partnerHeading"; key: string; label: string }
 	| { kind: "carried"; key: string; amount: number }
 	| { kind: "entry"; key: string; row: Ledger["rows"][number] }
 	| { kind: "total"; key: string; ledger: Ledger }
@@ -401,12 +422,19 @@ type LedgerLine =
 function ledgerLines(
 	ledger: Ledger,
 	withHeading: boolean,
-	withTotal: boolean
+	withTotal: boolean,
+	keyPrefix: string = String(ledger.accountId)
 ): LedgerLine[] {
-	const id = ledger.accountId
+	const id = keyPrefix
 	return [
 		...(withHeading
-			? [{ kind: "heading" as const, key: `${id}-h`, accountId: id }]
+			? [
+					{
+						kind: "heading" as const,
+						key: `${id}-h`,
+						accountId: ledger.accountId,
+					},
+				]
 			: []),
 		{ kind: "carried" as const, key: `${id}-c`, amount: ledger.broughtForward },
 		...ledger.rows.map((row, i) => ({
@@ -433,6 +461,8 @@ function useLedgerColumns(
 			header: t("date"),
 			className: "w-16",
 			cell: (l) => {
+				if (l.kind === "partnerHeading")
+					return <span className="font-bold">{l.label}</span>
 				if (l.kind === "heading")
 					return (
 						<span className="font-bold">
@@ -504,7 +534,7 @@ function useLedgerColumns(
 const lineClass = (l: LedgerLine) =>
 	l.kind === "entry"
 		? undefined
-		: l.kind === "heading"
+		: l.kind === "heading" || l.kind === "partnerHeading"
 			? "bg-muted/50"
 			: "bg-muted/30 font-bold"
 
@@ -553,6 +583,48 @@ function ExpenseView({ period }: { period: Period }) {
 				<BookTable
 					label={t("expense")}
 					rows={ledgers.flatMap((l) => ledgerLines(l, true, true))}
+					columns={columns}
+					rowKey={(l) => l.key}
+					rowClassName={lineClass}
+				/>
+			)}
+		</QueryState>
+	)
+}
+
+/** 売掛帳・買掛帳。取引先ごとに見出しを置き、繰越・動き・残高を出す。 */
+function PartnerView({
+	period,
+	accountId,
+}: {
+	period: Period
+	accountId: number | null
+}) {
+	const t = useTranslations("ledgers")
+	const masters = useJournalMasters()
+	const query = usePartnerLedgers(period, accountId)
+	const columns = useLedgerColumns(period, false)
+	if (accountId === null) return <Message>{t("noPartnerAccounts")}</Message>
+	return (
+		<QueryState
+			query={query}
+			period={period}
+			isEmpty={(ledgers) => ledgers.length === 0}
+		>
+			{(ledgers) => (
+				<BookTable
+					label={t("partners")}
+					rows={ledgers.flatMap((p) => {
+						const prefix = `p${p.partnerId ?? "none"}`
+						const label =
+							p.partnerId === null
+								? t("noPartner")
+								: masters.partnerLabel(p.partnerId)
+						return [
+							{ kind: "partnerHeading" as const, key: `${prefix}-h`, label },
+							...ledgerLines(p.ledger, false, true, prefix),
+						]
+					})}
 					columns={columns}
 					rowKey={(l) => l.key}
 					rowClassName={lineClass}

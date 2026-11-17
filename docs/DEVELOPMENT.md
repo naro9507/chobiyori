@@ -170,6 +170,12 @@ dcs-accounting-app/
 - アプリから国税庁へは何も送らない。公表サイトは `open_invoice_site` で開くだけで、開く先は Rust 側に固定してある。
 - どの画面にも、金額の入れ先・特例の条件・期限は税理士か税務署で確かめるよう添える（`AccountantNote`）。
 
+## 定期売上と売掛帳・買掛帳
+
+- 定期売上は `db/recurring.rs`（プラン・休みの月・入金の記録）と `domain/recurring.rs`（月ごとの予定額と状態の判定）。予定と入金の突き合わせは保存せず、プランと `recurring_payments` から毎回作る。
+- 入金は `transactions::insert_kind` で記録するので、検証・締め・変更履歴は他の入力と同じに働く。
+- 売掛帳・買掛帳は `db/books.rs` の `partner_ledgers`。売掛金・買掛金の科目の明細行を取引先ごとに分け、`domain/ledger` で残高を出す。
+
 ## UI 部品
 
 shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコードとして編集してよい。
