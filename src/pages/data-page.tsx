@@ -26,17 +26,21 @@ import { useFiscalYear } from "@/features/journal/journal-api"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { ExportButtons } from "@/features/ledger/export-buttons"
 import type { CsvEncoding, ExportTarget } from "@/features/ledger/ledger-api"
+import { BackupCard } from "@/features/security/backup-card"
+import { HistoryCard } from "@/features/security/history-card"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
 import { useErrorMessage } from "@/lib/use-error-message"
 
-/** データ。帳簿の取込と書き出し。 */
+/** データ。帳簿の取込と書き出し、バックアップと復元、変更履歴。 */
 export function DataPage() {
 	return (
 		<Page screen="data">
+			<BackupCard />
 			<ImportCard />
 			<ExportCard />
+			<HistoryCard />
 		</Page>
 	)
 }

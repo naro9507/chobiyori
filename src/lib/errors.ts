@@ -36,6 +36,11 @@ export type ErrorCode =
 	| "readFailed"
 	| "consentRequired"
 	| "openingConfirmed"
+	| "monthLocked"
+	| "wrongPassword"
+	| "weakPassword"
+	| "booksLocked"
+	| "backupInvalid"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

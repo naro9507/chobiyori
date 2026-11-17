@@ -11,6 +11,7 @@ import {
 	InventoryPanel,
 } from "@/features/closing/year-end-panels"
 import { useFiscalYear } from "@/features/journal/journal-api"
+import { LockPanel } from "@/features/security/lock-panel"
 import { useTranslations } from "@/i18n/use-translations"
 
 const tabs = [
@@ -20,6 +21,7 @@ const tabs = [
 	"inventory",
 	"statement",
 	"carry",
+	"locks",
 ] as const
 type Tab = (typeof tabs)[number]
 
@@ -72,6 +74,9 @@ export function ClosingPage() {
 						</Tabs.Content>
 						<Tabs.Content value="carry" className="outline-none">
 							<CarryForwardPanel fiscalYear={fiscalYear} />
+						</Tabs.Content>
+						<Tabs.Content value="locks" className="outline-none">
+							<LockPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 					</CardContent>
 				</Card>

@@ -14,6 +14,8 @@ import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import {
 	type FilingType,
 	filingTypes,
+	type IndustryTemplate,
+	industryTemplates,
 	type SetupInput,
 	type TaxStatus,
 	taxStatuses,
@@ -45,6 +47,7 @@ type Form = {
 	filingType: FilingType
 	taxStatus: TaxStatus
 	fiscalYear: string
+	template: IndustryTemplate
 }
 
 function toInput(form: Form): SetupInput {
@@ -59,7 +62,7 @@ function toInput(form: Form): SetupInput {
 		fiscalYear: Number(form.fiscalYear),
 		filingType: form.filingType,
 		taxStatus: form.taxStatus,
-		template: "general",
+		template: form.template,
 	}
 }
 
@@ -81,10 +84,12 @@ export function SetupPage() {
 		filingType: "blue65",
 		taxStatus: "exempt",
 		fiscalYear: String(new Date().getFullYear()),
+		template: "general",
 	})
 	const [missingOwner, setMissingOwner] = useState(false)
 	const filingId = useId()
 	const taxId = useId()
+	const templateId = useId()
 
 	const index = steps.indexOf(step)
 	const error = complete.error
@@ -294,9 +299,36 @@ export function SetupPage() {
 									className="num"
 								/>
 							</Field>
-							<div className="rounded-lg border bg-background px-4 py-3 text-sm">
-								<p className="font-bold">{t("templateTitle")}</p>
-								<p className="text-muted-foreground">{t("templateBody")}</p>
+							<div className="flex flex-col gap-2">
+								<p id={templateId} className="font-medium text-sm">
+									{t("templateTitle")}
+								</p>
+								<p className="text-muted-foreground text-xs">
+									{t("templateBody")}
+								</p>
+								<RadioCards
+									aria-labelledby={templateId}
+									value={form.template}
+									onValueChange={(value) =>
+										update({ template: value as IndustryTemplate })
+									}
+									className="sm:grid-cols-2"
+								>
+									{industryTemplates.map((template) => (
+										<RadioCardsItem
+											key={template}
+											value={template}
+											className="py-2"
+										>
+											<span className="flex flex-col gap-0.5 text-left">
+												<span>{t(`template_${template}`)}</span>
+												<span className="font-normal text-muted-foreground text-xs">
+													{t(`template_${template}Hint`)}
+												</span>
+											</span>
+										</RadioCardsItem>
+									))}
+								</RadioCards>
 							</div>
 						</CardContent>
 					</Card>
