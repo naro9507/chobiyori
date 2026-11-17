@@ -39,6 +39,7 @@ jobs:
       - name: アップデート用の公開鍵と検証スクリプトを確かめる
         run: |
           node --test scripts/check-signing-key.test.mjs
+          node --test scripts/signing-preflight.test.mjs
           node scripts/check-signing-key.mjs
 
       - name: 依存の既知の脆弱性を確かめる（npm）
