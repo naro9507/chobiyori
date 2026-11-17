@@ -80,6 +80,8 @@ export type ExportTarget =
 	| { kind: "cashBook"; accountId: number }
 	| { kind: "expenseBook" }
 	| { kind: "trialBalance" }
+	/** 青色申告決算書の金額一覧（いつも 1 年分） */
+	| { kind: "statement" }
 	| { kind: "accounts" }
 	| { kind: "partners" }
 

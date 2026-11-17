@@ -35,6 +35,7 @@ export type ErrorCode =
 	| "rateLimited"
 	| "readFailed"
 	| "consentRequired"
+	| "openingConfirmed"
 
 export function isAppError(error: unknown): error is AppError {
 	return (
