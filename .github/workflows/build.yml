@@ -59,6 +59,26 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      - name: 署名鍵の形式を確かめる
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: node scripts/check-signing-key.mjs
+
+      - name: ビルド前にテスト用ファイルへ署名する
+        if: steps.signing.outputs.args == ''
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          probe=$(mktemp)
+          trap 'rm -f "$probe" "$probe.sig"' EXIT
+          printf 'signing preflight\n' > "$probe"
+          if ! pnpm tauri signer sign "$probe" > /dev/null 2>&1; then
+            echo "::error::署名テストに失敗しました。TAURI_SIGNING_PRIVATE_KEY と TAURI_SIGNING_PRIVATE_KEY_PASSWORD を確認してください。"
+            exit 1
+          fi
+
       - name: この版の変更点を CHANGELOG.md から取り出す
         id: notes
         if: startsWith(github.ref, 'refs/tags/')

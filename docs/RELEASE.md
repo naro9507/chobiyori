@@ -41,7 +41,7 @@
 
 秘密鍵を GitHub に登録する。
 
-1. 秘密鍵のファイル（`dcs-updater.key`）の中身をすべてコピーする。
+1. 秘密鍵のファイル（`dcs-updater.key`）の中身をすべてコピーする。端末の表示からコピーすると、末尾に `%` などのプロンプトが混ざることがある。ファイルの内容だけを使う。
 2. GitHub のリポジトリで Settings → Secrets and variables → Actions → New repository secret を開く。
 3. 名前を `TAURI_SIGNING_PRIVATE_KEY` にし、コピーした中身を貼って保存する。
 4. 秘密鍵のファイルは、パスワード管理ソフトなど安全な場所にも保管する。
@@ -81,3 +81,19 @@ git push --follow-tags
 
 - 自動アップデートが確かめに行く URL は、リポジトリが公開（public）のときだけ誰でも読める。非公開にする場合は、更新ファイルの置き場所を別に用意する。
 - インストーラには、まだ OS の署名がない。初回のインストールでは警告が出る（[プラットフォーム対応](./PLATFORM_SUPPORT.md) を参照）。自動アップデートのときに警告が出るかは、Windows と macOS の実機で確かめる。
+
+## 署名エラーからの復旧
+
+`failed to decode base64 key: Invalid symbol 37` は、鍵に Base64 では使えない `%` が入っていることを示す。秘密鍵のエラーなら、元の鍵ファイルを使って `TAURI_SIGNING_PRIVATE_KEY` を登録し直す。鍵を新しく生成する必要はない。
+
+GitHub CLI が使える場合は、ファイルから直接登録するとコピー時の混入を防げる。
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY --repo naro9507/dcs-accounting-app < ~/.tauri/dcs-updater.key
+```
+
+`plugins.updater.pubkey` にも余分な文字がないか確認する。公開鍵は同じ秘密鍵と対になる `.pub` ファイルの内容を使う。
+
+CI は公開鍵の Base64 形式を検査する。インストーラのビルドでは、秘密鍵の形式とテスト用ファイルの署名も先に検査し、鍵やパスワードが不正なら Rust のビルド前に止める。検証中も秘密鍵とパスワードはログに出さない。
+
+Secrets だけの修正は失敗した実行の再実行で反映される。ただし、コードや公開鍵の修正は古いタグの再実行には反映されない。修正したブランチを「Run workflow」で検証し、リリースには修正を含む新しいバージョンのタグを使う。
