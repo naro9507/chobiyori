@@ -128,3 +128,13 @@ export function useSaveFeatureSettings() {
 export function useFeatures() {
 	return useFeatureSettings().data ?? defaultFeatures
 }
+
+export function useIndustryTemplate() {
+	return useQuery({
+		queryKey: ["industry-template"],
+		queryFn: () => callCommand<IndustryTemplate>("get_industry_template"),
+		retry: false,
+		retryOnMount: false,
+		staleTime: Number.POSITIVE_INFINITY,
+	})
+}

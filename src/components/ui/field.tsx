@@ -1,4 +1,5 @@
 import { cloneElement, type ReactElement, useId } from "react"
+import { type GlossaryTerm, TermHelp } from "@/features/help/term-help"
 import { cn } from "@/lib/utils"
 
 /**
@@ -7,12 +8,14 @@ import { cn } from "@/lib/utils"
  */
 export function Field({
 	label,
+	term,
 	hint,
 	error,
 	className,
 	children,
 }: {
 	label: string
+	term?: GlossaryTerm
 	hint?: string
 	error?: string
 	className?: string
@@ -26,9 +29,12 @@ export function Field({
 
 	return (
 		<div className={cn("flex flex-col gap-1.5", className)}>
-			<label htmlFor={id} className="font-medium text-sm">
-				{label}
-			</label>
+			<div className="flex min-h-7 items-center gap-1">
+				<label htmlFor={id} className="font-medium text-sm">
+					{label}
+				</label>
+				{term && <TermHelp term={term} />}
+			</div>
 			{cloneElement(children, {
 				id,
 				"aria-describedby": describedBy,

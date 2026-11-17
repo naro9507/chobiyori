@@ -8,6 +8,7 @@ import type { Account } from "@/features/master/master-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { defaultFeatures } from "@/features/setup/setup"
 import { useEntryIntent } from "@/stores/entry-intent-store"
+import { useHelpPreferences } from "@/stores/help-preferences-store"
 import { useSettingsStore } from "@/stores/settings-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
@@ -56,6 +57,7 @@ function renderApp(path = "/help") {
 	return router
 }
 beforeEach(() => {
+	useHelpPreferences.setState({ dismissedScreens: {} })
 	useSettingsStore.setState({ locale: "ja" })
 	useYearStore.setState({ selected: null })
 	useEntryIntent.setState({
@@ -81,6 +83,8 @@ beforeEach(() => {
 						taxableFrom: null,
 					},
 				]
+			case "get_industry_template":
+				return "general"
 			case "get_feature_settings":
 				return { ...defaultFeatures }
 			case "save_feature_settings":
@@ -166,6 +170,9 @@ describe("v1 の操作導線", () => {
 			await screen.findByRole("searchbox", { name: "ヘルプを検索" })
 		).toHaveValue("借方")
 		expect(screen.getByText(/仕訳の左側です/)).toBeInTheDocument()
+		expect(
+			screen.queryByRole("heading", { name: "現金で文房具を購入" })
+		).not.toBeInTheDocument()
 	})
 	it("機能の設定を保存するとサイドメニューとパレットから対象を隠せる", async () => {
 		const user = userEvent.setup()
@@ -274,4 +281,104 @@ it("登録した摘要で科目を確認し、日付・金額を入力して記�
 	)
 	expect(await within(form).findByText("記録しました")).toBeInTheDocument()
 	expect(within(form).getByLabelText("金額")).toHaveValue("")
+})
+
+it("閉じた初回案内は画面の行き来とストレージからの復元後も出さない", async () => {
+	const user = userEvent.setup()
+	renderApp()
+	const guide = await screen.findByRole("complementary", {
+		name: "ヘルプの使い方",
+	})
+	await user.click(
+		within(guide).getByRole("button", { name: "ヘルプの案内を閉じる" })
+	)
+	expect(
+		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
+	).not.toBeInTheDocument()
+	const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+	await user.click(within(nav).getByRole("link", { name: "帳簿" }))
+	expect(
+		await screen.findByRole("complementary", { name: "帳簿の使い方" })
+	).toBeInTheDocument()
+	await user.click(within(nav).getByRole("link", { name: "ヘルプ" }))
+	expect(
+		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
+	).not.toBeInTheDocument()
+	const stored = localStorage.getItem("dcs-help-preferences")
+	expect(stored).toContain('"help":true')
+	// 再起動時のように、メモリの状態を空にして保存済みの値から読み直す。
+	useHelpPreferences.setState({ dismissedScreens: {} })
+	localStorage.setItem("dcs-help-preferences", stored ?? "")
+	await useHelpPreferences.persist.rehydrate()
+	expect(
+		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
+	).not.toBeInTheDocument()
+})
+
+it("学校の入力例は学校の科目を引き継ぎ、使わない定期売上の例は表示しない", async () => {
+	const previous = mocks.callCommand.getMockImplementation()
+	mocks.callCommand.mockImplementation(async (command, args) => {
+		if (command === "get_industry_template") return "school"
+		if (command === "get_feature_settings")
+			return { ...defaultFeatures, recurring: false }
+		if (command === "list_accounts")
+			return [...accounts, account(11, "620", "教材費", "expense")]
+		return previous?.(command, args)
+	})
+	const user = userEvent.setup()
+	renderApp()
+	const title = await screen.findByRole("heading", {
+		name: "教室で使う教材を現金で購入",
+	})
+	expect(
+		screen.queryByRole("heading", { name: "毎月の月謝を振込で受け取った" })
+	).not.toBeInTheDocument()
+	const card = title.closest('[data-slot="card"]') as HTMLElement
+	await user.click(within(card).getByRole("button", { name: "この形で入力" }))
+	const form = await screen.findByRole("form", { name: "かんたん入力" })
+	expect(within(form).getByLabelText("何に使ったか")).toHaveValue("11")
+	expect(within(form).getByLabelText("どこから払ったか")).toHaveValue("1")
+})
+
+it("無効な科目を使う入力例は読めるが、入力には渡さない", async () => {
+	const previous = mocks.callCommand.getMockImplementation()
+	mocks.callCommand.mockImplementation(async (command, args) => {
+		if (command === "list_accounts")
+			return accounts.map((a) =>
+				a.code === "610" ? { ...a, isActive: false } : a
+			)
+		return previous?.(command, args)
+	})
+	renderApp("/help?q=現金で文房具")
+	const title = await screen.findByRole("heading", {
+		name: "現金で文房具を購入",
+	})
+	const card = title.closest('[data-slot="card"]') as HTMLElement
+	expect(
+		within(card).getByRole("button", { name: "この形で入力" })
+	).toBeDisabled()
+	expect(within(card).getByText(/科目・口座を使えません/)).toBeInTheDocument()
+})
+
+it("案内を閉じても F1 でその画面の説明を開け、検索欄の編集で全体検索に戻れる", async () => {
+	const user = userEvent.setup()
+	renderApp("/transactions")
+	await user.click(
+		await screen.findByRole("button", { name: "取引入力の案内を閉じる" })
+	)
+	expect(
+		screen.getByRole("heading", { level: 1, name: "取引入力" })
+	).toHaveFocus()
+	await user.keyboard("{F1}")
+	await screen.findByRole("heading", { level: 1, name: "ヘルプ" })
+	expect(screen.getByRole("heading", { name: "取引入力" })).toBeInTheDocument()
+	expect(
+		screen.queryByRole("heading", { name: "現金で文房具を購入" })
+	).not.toBeInTheDocument()
+	const search = screen.getByRole("searchbox", { name: "ヘルプを検索" })
+	await user.clear(search)
+	await user.type(search, "現金で文房具")
+	expect(
+		screen.getByRole("heading", { name: "現金で文房具を購入" })
+	).toBeInTheDocument()
 })

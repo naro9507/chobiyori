@@ -23,7 +23,8 @@ import { TransactionsPage } from "@/pages/transactions-page"
 import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
-const useHelpSearch = () => useSearch({ strict: false }) as { q?: string }
+const useHelpSearch = () =>
+	useSearch({ strict: false }) as { q?: string; article?: string }
 
 const rootRoute = createRootRoute({ component: AppRoot })
 
@@ -32,7 +33,7 @@ const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	home: HomePage,
 	help: () => {
 		const search = useHelpSearch()
-		return <HelpPage key={search.q ?? ""} />
+		return <HelpPage key={`${search.q ?? ""}-${search.article ?? ""}`} />
 	},
 	transactions: TransactionsPage,
 	inbox: InboxPage,
@@ -51,8 +52,11 @@ const screenRoutes = navItems.map((item) => {
 	return createRoute({
 		getParentRoute: () => rootRoute,
 		path: item.path,
-		validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+		validateSearch: (
+			search: Record<string, unknown>
+		): { q?: string; article?: string } => ({
 			q: typeof search.q === "string" ? search.q : undefined,
+			article: typeof search.article === "string" ? search.article : undefined,
 		}),
 		component: Screen ?? (() => <PlaceholderPage screen={item.id} />),
 	})

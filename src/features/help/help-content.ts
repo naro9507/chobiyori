@@ -1,8 +1,14 @@
-import { navItems } from "@/app/navigation"
+import {
+	type NavItem,
+	navItems,
+	type ScreenId,
+	screenEnabled,
+} from "@/app/navigation"
+import type { FeatureSettings, IndustryTemplate } from "@/features/setup/setup"
 import type { Messages } from "@/i18n/i18n"
+import { glossaryTerms } from "./glossary"
 
 type HelpKey = keyof Messages["help"]
-
 export const helpSections = [
 	"start",
 	"tasks",
@@ -10,7 +16,23 @@ export const helpSections = [
 	"glossary",
 	"keyboard",
 ] as const
-export const helpArticles = [
+export type HelpExample = {
+	kind: "expense" | "income"
+	accountCode: string
+	paymentCode: string
+}
+export type HelpArticle = {
+	id: HelpKey
+	section: (typeof helpSections)[number]
+	body: HelpKey
+	reading?: HelpKey
+	path?: NavItem["path"]
+	screen?: ScreenId
+	example?: HelpExample
+	templates?: readonly IndustryTemplate[]
+	feature?: keyof FeatureSettings
+}
+export const helpArticles: readonly HelpArticle[] = [
 	...navItems
 		.filter((item) => item.id !== "help")
 		.map((item) => ({
@@ -18,52 +40,95 @@ export const helpArticles = [
 			section: "tasks" as const,
 			body: `screen_${item.id}Body` as HelpKey,
 			path: item.path,
+			screen: item.id,
 		})),
 	{ id: "start", section: "start", body: "startBody", path: "/settings" },
 	{ id: "sales", section: "tasks", body: "salesBody", path: "/transactions" },
 	{ id: "receipt", section: "tasks", body: "receiptBody", path: "/inbox" },
 	{ id: "closing", section: "tasks", body: "closingBody", path: "/closing" },
 	{
+		id: "sharedExpenses",
+		section: "tasks",
+		body: "sharedExpensesBody",
+		path: "/master",
+		feature: "allocation",
+	},
+	{
 		id: "supplies",
 		section: "examples",
 		body: "suppliesBody",
-		example: "expense",
-		code: "610",
+		example: { kind: "expense", accountCode: "610", paymentCode: "101" },
 	},
 	{
 		id: "cashSales",
 		section: "examples",
 		body: "cashSalesBody",
-		example: "income",
-		code: "401",
+		example: { kind: "income", accountCode: "401", paymentCode: "101" },
 	},
-	...(
-		[
-			"journal",
-			"debit",
-			"credit",
-			"account",
-			"draw",
-			"contribution",
-			"allocation",
-			"depreciation",
-			"capital",
-		] as const
-	).map((id) => ({
+	{
+		id: "teachingMaterials",
+		section: "examples",
+		body: "teachingMaterialsBody",
+		templates: ["school"],
+		example: { kind: "expense", accountCode: "620", paymentCode: "101" },
+	},
+	{
+		id: "tuition",
+		section: "examples",
+		body: "tuitionBody",
+		templates: ["school"],
+		feature: "recurring",
+		example: { kind: "income", accountCode: "401", paymentCode: "104" },
+	},
+	{
+		id: "referenceBooks",
+		section: "examples",
+		body: "referenceBooksBody",
+		templates: ["service"],
+		example: { kind: "expense", accountCode: "621", paymentCode: "101" },
+	},
+	{
+		id: "stockPurchase",
+		section: "examples",
+		body: "stockPurchaseBody",
+		templates: ["retailFood"],
+		feature: "inventory",
+		example: { kind: "expense", accountCode: "502", paymentCode: "101" },
+	},
+	{
+		id: "collectReceivable",
+		section: "examples",
+		body: "collectReceivableBody",
+		feature: "receivables",
+		example: { kind: "income", accountCode: "106", paymentCode: "104" },
+	},
+	...glossaryTerms.map((id) => ({
 		id,
 		section: "glossary" as const,
 		body: `${id}Body` as HelpKey,
 		reading: `${id}Reading` as HelpKey,
 	})),
 	{ id: "keyboard", section: "keyboard", body: "keysBody" },
-] as const
+]
+
+export function visibleHelpArticles(
+	template: IndustryTemplate,
+	features: FeatureSettings
+) {
+	return helpArticles.filter(
+		(article) =>
+			(!article.templates || article.templates.includes(template)) &&
+			(!article.feature || features[article.feature]) &&
+			(!article.screen || screenEnabled(article.screen, features))
+	)
+}
+
 export function matchesHelp(query: string, ...texts: string[]) {
+	const text = texts.join(" ").normalize("NFKC").toLocaleLowerCase()
 	return query
 		.normalize("NFKC")
 		.toLocaleLowerCase()
 		.trim()
 		.split(/\s+/)
-		.every((word) =>
-			texts.join(" ").normalize("NFKC").toLocaleLowerCase().includes(word)
-		)
+		.every((word) => text.includes(word))
 }

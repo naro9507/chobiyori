@@ -377,6 +377,7 @@ function AssetForm({
 					/>
 				</Field>
 				<Field
+					term="depreciation"
 					label={t("method")}
 					hint={t(`methodHint_${form.method}`)}
 					error={error("method")}
@@ -409,6 +410,7 @@ function AssetForm({
 					</Field>
 				)}
 				<Field
+					term="allocation"
 					label={t("businessPercent")}
 					hint={t("businessPercentHint")}
 					error={error("businessPercent")}
