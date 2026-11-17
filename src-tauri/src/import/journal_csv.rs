@@ -9,7 +9,7 @@
 use super::{parse_amount, AccountRef, Draft, DraftLine, Issue, IssueCode, Parsed, PartnerRef};
 use crate::domain::journal::Side;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::export::csv::JOURNAL_COLUMNS;
+use crate::export::csv::{unneutralize, JOURNAL_COLUMNS};
 use crate::export::labels as l;
 use std::collections::HashMap;
 
@@ -142,11 +142,14 @@ pub fn parse(bytes: &[u8]) -> AppResult<Parsed> {
             continue;
         };
         let get = |role: Role| -> &str {
-            columns
-                .get(&role)
-                .and_then(|&i| record.get(i))
-                .unwrap_or("")
-                .trim()
+            // 出力で数式よけに付けた ' を外す
+            unneutralize(
+                columns
+                    .get(&role)
+                    .and_then(|&i| record.get(i))
+                    .unwrap_or("")
+                    .trim(),
+            )
         };
 
         let key = get(Role::TransactionNo).to_string();
@@ -315,6 +318,16 @@ mod tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn memos_neutralized_on_export_read_back_as_written() {
+        let csv = "取引番号,日付,貸借,科目コード,金額,取引のメモ\n\
+                   1,2026-03-01,借方,610,1200,'=HYPERLINK(1)\n\
+                   1,2026-03-01,貸方,101,1200,'=HYPERLINK(1)\n";
+        let parsed = parse(csv.as_bytes()).unwrap();
+        assert!(parsed.issues.is_empty(), "{:?}", parsed.issues);
+        assert_eq!(parsed.drafts[0].memo, "=HYPERLINK(1)");
     }
 
     /// 課税事業者の帳簿に、普通預金の補助科目「A銀行」（コード 1）を作る。

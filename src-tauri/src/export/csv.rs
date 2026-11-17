@@ -42,12 +42,34 @@ pub fn encode(text: &str, encoding: Encoding) -> AppResult<Vec<u8>> {
     }
 }
 
+/// Excel などが数式として読む先頭の文字。
+const FORMULA_STARTS: [char; 6] = ['=', '+', '-', '@', '\t', '\r'];
+
+/// 表計算ソフトで開いたときに数式として動かないよう、先頭が `=` などの文字列に `'` を付ける。
+/// 明細の店名など、外から来た文字列も書き出すため。整数（マイナスの金額）はそのまま。
+fn neutralize(field: &str) -> String {
+    if field.starts_with(FORMULA_STARTS) && field.parse::<i64>().is_err() {
+        format!("'{field}")
+    } else {
+        field.to_string()
+    }
+}
+
+/// `neutralize` で付けた `'` を外す。取込で、書き出したときの文字列に戻すために使う。
+pub fn unneutralize(field: &str) -> &str {
+    match field.strip_prefix('\'') {
+        Some(rest) if rest.starts_with(FORMULA_STARTS) => rest,
+        _ => field,
+    }
+}
+
 fn write(records: impl IntoIterator<Item = Vec<String>>) -> AppResult<String> {
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
         .flexible(true)
         .from_writer(Vec::new());
     for record in records {
+        let record: Vec<String> = record.iter().map(|f| neutralize(f)).collect();
         writer
             .write_record(&record)
             .map_err(|_| AppError::new(ErrorCode::FileWrite))?;
@@ -274,5 +296,28 @@ mod tests {
         ]])
         .unwrap();
         assert_eq!(text, "\"a,b\",\"\"\"x\"\"\",c\r\n");
+    }
+
+    #[test]
+    fn formulas_are_neutralized_but_negative_amounts_are_not() {
+        let fields = [
+            "=HYPERLINK(\"x\")",
+            "+1+1",
+            "-x",
+            "@SUM(A1)",
+            "-500",
+            "0",
+            "店",
+        ];
+        let text = write([fields.iter().map(|f| f.to_string()).collect()]).unwrap();
+        assert_eq!(
+            text,
+            "\"'=HYPERLINK(\"\"x\"\")\",'+1+1,'-x,'@SUM(A1),-500,0,店\r\n"
+        );
+        for field in fields {
+            assert_eq!(unneutralize(&neutralize(field)), field);
+        }
+        // 利用者が自分で ' を付けた文字列はそのまま
+        assert_eq!(unneutralize("'abc"), "'abc");
     }
 }
