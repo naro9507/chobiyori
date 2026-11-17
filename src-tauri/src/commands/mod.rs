@@ -4,6 +4,7 @@
 pub mod app;
 pub mod books;
 pub mod closing;
+pub mod deposits;
 pub mod documents;
 pub mod export;
 mod files;

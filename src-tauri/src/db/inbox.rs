@@ -6,7 +6,7 @@
 
 use super::formats::ImportFormat;
 use super::transactions::{self, Transaction};
-use super::{rules, Database};
+use super::{deposits, rules, Database};
 use crate::domain::allocation;
 use crate::domain::journal::{self, EntryMode, LineInput, Side, TransactionInput, TransactionKind};
 use crate::domain::master::{self, TaxCategory, MEMO_MAX};
@@ -305,6 +305,9 @@ pub struct ConfirmInput {
     /// 「次回から同じ店はこの科目にする」
     #[serde(default)]
     pub save_rule: bool,
+    /// 入金の行を、請求書か定期売上の月に結び付けて記録する。このときは `account_id` などは使わない
+    #[serde(default)]
+    pub deposit: Option<deposits::DepositTarget>,
 }
 
 impl ConfirmInput {
@@ -318,6 +321,7 @@ impl ConfirmInput {
             allocation_percent: result.allocation_percent,
             date: None,
             save_rule: false,
+            deposit: None,
         })
     }
 }
@@ -418,14 +422,40 @@ fn confirm_in(conn: &Connection, id: i64, input: &ConfirmInput) -> AppResult<Tra
     if item.status == InboxStatus::Posted {
         return Err(AppError::new(ErrorCode::AlreadyRecorded));
     }
-    let (year, transaction) = to_transaction(conn, &item, input)?;
-    let saved = transactions::insert_kind(conn, year, &transaction, TransactionKind::Normal)?;
+    let saved = match &input.deposit {
+        Some(target) => {
+            // 入金（明細では出ていったお金がマイナス）だけを、請求書・定期売上に結び付けられる
+            if item.spend >= 0 {
+                return Err(AppError::field(ErrorCode::InvalidFormat, "deposit"));
+            }
+            let memo = master::optional(&input.memo, MEMO_MAX, "memo")?;
+            deposits::post_in(
+                conn,
+                &deposits::DepositInput {
+                    target: target.clone(),
+                    date: input.date.clone().unwrap_or_else(|| item.date.clone()),
+                    amount: -item.spend,
+                    account_id: item.payment_account_id,
+                    sub_account_id: item.payment_sub_account_id,
+                    memo,
+                },
+                match item.source {
+                    InboxSource::Statement => EntryMode::Card,
+                    InboxSource::Receipt => EntryMode::Receipt,
+                },
+            )?
+        }
+        None => {
+            let (year, transaction) = to_transaction(conn, &item, input)?;
+            transactions::insert_kind(conn, year, &transaction, TransactionKind::Normal)?
+        }
+    };
     conn.execute(
         "UPDATE inbox_items SET transaction_id = ?2, ignored = 0, linked = 0 WHERE id = ?1",
         params![id, saved.id],
     )?;
     attach_receipt(conn, &item, saved.id)?;
-    if input.save_rule && !item.merchant.trim().is_empty() {
+    if input.save_rule && input.deposit.is_none() && !item.merchant.trim().is_empty() {
         rules::learn(
             conn,
             &item.merchant,
@@ -686,7 +716,90 @@ pub(crate) mod tests {
             allocation_percent: None,
             date: None,
             save_rule: false,
+            deposit: None,
         }
+    }
+
+    #[test]
+    fn a_bank_deposit_can_be_confirmed_as_a_recurring_payment() {
+        let db = set_up_db();
+        let (bank_format, partner, plan) = {
+            let conn = db.conn();
+            let format = crate::db::formats::tests::bank_format(&conn);
+            let partner =
+                crate::db::deposits::tests::partner(&conn, "1", "山田 太郎", "やまだ たろう");
+            let plan = crate::db::recurring::create(
+                &conn,
+                &crate::db::recurring::PlanInput {
+                    partner_id: partner,
+                    name: "月謝".into(),
+                    amount: 8_000,
+                    revenue_account_id: account(&conn, "401"),
+                    start_month: "2026-01".into(),
+                    end_month: None,
+                    memo: String::new(),
+                },
+            )
+            .unwrap()
+            .id;
+            add_statement(
+                &conn,
+                &format,
+                "10月.csv",
+                &[
+                    row("2026-10-05", -8_000, "ﾌﾘｺﾐ ﾔﾏﾀﾞ ﾀﾛｳ"),
+                    row("2026-10-06", 1_000, "店"),
+                ],
+            )
+            .unwrap();
+            (format, partner, plan)
+        };
+        let items = list(&db.conn(), None).unwrap();
+        let deposit = items.iter().find(|i| i.spend < 0).unwrap();
+        let spend = items.iter().find(|i| i.spend > 0).unwrap();
+        let target = crate::db::deposits::DepositTarget::Plan {
+            plan_id: plan,
+            month: "2026-10".into(),
+        };
+        // 出ていったお金の行は、入金として結び付けられない
+        assert_eq!(
+            confirm(
+                &db,
+                spend.id,
+                &ConfirmInput {
+                    deposit: Some(target.clone()),
+                    ..input(0)
+                }
+            )
+            .unwrap_err(),
+            AppError::field(ErrorCode::InvalidFormat, "deposit")
+        );
+        let t = confirm(
+            &db,
+            deposit.id,
+            &ConfirmInput {
+                deposit: Some(target),
+                ..input(0)
+            },
+        )
+        .unwrap();
+        assert_eq!(t.entry_mode, EntryMode::Card);
+        assert!(t.lines.iter().all(|l| l.partner_id == Some(partner)));
+        assert_eq!(
+            t.lines
+                .iter()
+                .find(|l| l.side == Side::Debit)
+                .unwrap()
+                .account_id,
+            bank_format.payment_account_id.unwrap()
+        );
+        let conn = db.conn();
+        assert_eq!(get(&conn, deposit.id).unwrap().status, InboxStatus::Posted);
+        let october = crate::db::recurring::monthly(&conn, 2026, 10).unwrap();
+        assert_eq!(
+            october.rows[0].cell.status,
+            crate::domain::recurring::PaymentStatus::Paid
+        );
     }
 
     #[test]

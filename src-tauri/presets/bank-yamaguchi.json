@@ -1,0 +1,30 @@
+{
+  "app": "dcs-accounting",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "山口銀行",
+  "sourceKind": "bank",
+  "definition": {
+    "encoding": "shiftJis",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": [
+      "date",
+      "merchant",
+      "withdrawal",
+      "deposit",
+      "ignore",
+      "memo"
+    ],
+    "sign": "spendNegative",
+    "skipUnreadableDates": true,
+    "header": [
+      "取引日",
+      "摘要",
+      "出金額",
+      "入金額",
+      "残高",
+      "備考"
+    ]
+  }
+}

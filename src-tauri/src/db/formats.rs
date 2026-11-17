@@ -10,7 +10,23 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 
 /// 同梱のプリセット。キーと、形式のファイルの中身。
-const PRESETS: &[(&str, &str)] = &[("amex", include_str!("../../presets/amex.json"))];
+/// 銀行のプリセットは、公開されている情報から様式を推測して作った。実物の明細（個人情報を伏せたもの）で
+/// 見出しを確かめるまでは、見出しが違えば自動では当てはまらず、形式エディタが開く。
+const PRESETS: &[(&str, &str)] = &[
+    ("amex", include_str!("../../presets/amex.json")),
+    ("bank-yucho", include_str!("../../presets/bank-yucho.json")),
+    ("bank-mufg", include_str!("../../presets/bank-mufg.json")),
+    ("bank-smbc", include_str!("../../presets/bank-smbc.json")),
+    (
+        "bank-rakuten",
+        include_str!("../../presets/bank-rakuten.json"),
+    ),
+    ("bank-sbi", include_str!("../../presets/bank-sbi.json")),
+    (
+        "bank-yamaguchi",
+        include_str!("../../presets/bank-yamaguchi.json"),
+    ),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -261,6 +277,28 @@ pub(crate) mod tests {
             },
         )
         .unwrap()
+    }
+
+    /// 普通預金を取込先にした銀行の形式。
+    pub(crate) fn bank_format(conn: &Connection) -> ImportFormat {
+        create(
+            conn,
+            &FormatInput {
+                name: "テスト銀行".into(),
+                source_kind: SourceKind::Bank,
+                payment_account_id: account(conn, "104"),
+                payment_sub_account_id: None,
+                definition: definition(),
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn every_preset_is_a_valid_format() {
+        for p in presets() {
+            assert!(validate_definition(&p.definition).is_ok(), "{}", p.name);
+        }
     }
 
     #[test]

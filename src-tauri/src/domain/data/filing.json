@@ -8,5 +8,11 @@
  },
  "special20": {"first_year": 2023, "last_year": 2026},
  "deemed_purchase_rates": {"1": 90, "2": 80, "3": 70, "4": 60, "5": 50, "6": 40},
- "paper_deduction_cap": 550000
+ "paper_deduction_cap": 550000,
+ "_transitional_note": "本則課税の目安で、登録番号のない仕入先（インボイスの印のない仕入れ）から引ける割合。期間より前（インボイス制度の前）は 100%、期間の後は 0%",
+ "invoice_start": "2023-10-01",
+ "transitional": [
+  {"from": "2023-10-01", "to": "2026-09-30", "percent": 80},
+  {"from": "2026-10-01", "to": "2029-09-30", "percent": 50}
+ ]
 }

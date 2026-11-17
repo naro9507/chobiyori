@@ -1,0 +1,36 @@
+{
+  "app": "dcs-accounting",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "三菱UFJ銀行",
+  "sourceKind": "bank",
+  "definition": {
+    "encoding": "shiftJis",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": [
+      "date",
+      "memo",
+      "merchant",
+      "withdrawal",
+      "deposit",
+      "ignore",
+      "ignore",
+      "ignore",
+      "ignore"
+    ],
+    "sign": "spendNegative",
+    "skipUnreadableDates": true,
+    "header": [
+      "日付",
+      "摘要",
+      "摘要内容",
+      "支払い金額",
+      "預かり金額",
+      "差引残高",
+      "メモ",
+      "未資金化区分",
+      "入払区分"
+    ]
+  }
+}

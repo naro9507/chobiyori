@@ -1,0 +1,30 @@
+{
+  "app": "dcs-accounting",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "ゆうちょ銀行",
+  "sourceKind": "bank",
+  "definition": {
+    "encoding": "shiftJis",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": [
+      "date",
+      "deposit",
+      "withdrawal",
+      "merchant",
+      "memo",
+      "ignore"
+    ],
+    "sign": "spendNegative",
+    "skipUnreadableDates": true,
+    "header": [
+      "取引日",
+      "受入金額（円）",
+      "払出金額（円）",
+      "詳細１",
+      "詳細２",
+      "現在（貸付）高"
+    ]
+  }
+}

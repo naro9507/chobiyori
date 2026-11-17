@@ -51,6 +51,8 @@ pub enum ErrorCode {
     ImportBlocked,
     /// 定型仕訳のその月の分は、もう記録してある（見送ってある）
     AlreadyRecorded,
+    /// 定期売上のその月は請求書で請求している（入金は請求書に記録する）
+    MonthInvoiced,
     /// OS の資格情報ストア（API キーの保管場所）を使えない
     SecretStore,
     /// レシートの読み取りの API キーが登録されていない
