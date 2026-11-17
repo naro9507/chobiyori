@@ -37,3 +37,15 @@ pub async fn expense_book(
 ) -> AppResult<Vec<Ledger>> {
     books::expense_book(&db.conn(), fiscal_year, from_month, to_month)
 }
+
+/// 売掛帳・買掛帳。科目（売掛金・買掛金）の動きを取引先ごとに分ける。
+#[tauri::command]
+pub async fn partner_ledgers(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    from_month: u32,
+    to_month: u32,
+    account_id: i64,
+) -> AppResult<Vec<books::PartnerLedger>> {
+    books::partner_ledgers(&db.conn(), fiscal_year, from_month, to_month, account_id)
+}

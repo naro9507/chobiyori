@@ -11,6 +11,7 @@ pub mod journal;
 pub mod ledger;
 pub mod master;
 pub mod receipt;
+pub mod recurring;
 pub mod rules;
 pub mod standard_accounts;
 pub mod statement;
