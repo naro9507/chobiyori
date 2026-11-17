@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFFQzA5MDUzMzc4N0NFMjYKUldRbXpvYzNVNURBcnFsTVQ1R1lKM1AxV3Ixb3lkTTRWbHNjbTdtK0NnbWk5ZHJmN0VNOFdlY1cK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1NkY3ODVGOEQyNEVDODcKUldTSDdDU05YM2h2SmRJc052WENjODBiZnFXUEhWQXhCbTMxRWVJZ0RBQUtYczlheVpaOFpad1UK%",
       "endpoints": [
         "https://github.com/naro9507/dcs-accounting-app/releases/latest/download/latest.json"
       ],
