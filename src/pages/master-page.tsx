@@ -4,6 +4,7 @@ import { Page } from "@/components/layout/page"
 import { Badge } from "@/components/ui/badge"
 import { Field } from "@/components/ui/field"
 import { Checkbox, Input, NativeSelect } from "@/components/ui/input"
+import { PartnerChecksCard } from "@/features/filing/partner-checks-card"
 import {
 	type Account,
 	type AccountCategory,
@@ -59,8 +60,12 @@ export function MasterPage() {
 				<Tabs.Content value="subAccounts" className="outline-none">
 					<SubAccountsSection />
 				</Tabs.Content>
-				<Tabs.Content value="partners" className="outline-none">
+				<Tabs.Content
+					value="partners"
+					className="flex flex-col gap-6 outline-none"
+				>
 					<PartnersSection />
+					<PartnerChecksCard />
 				</Tabs.Content>
 				<Tabs.Content value="allocationRules" className="outline-none">
 					<AllocationRulesSection />

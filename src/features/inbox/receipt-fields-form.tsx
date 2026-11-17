@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
 import { Input, NativeSelect } from "@/components/ui/input"
+import { InvoiceNumberCheck } from "@/features/filing/invoice-number-check"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError } from "@/lib/errors"
@@ -155,6 +156,9 @@ export function ReceiptFieldsForm({
 					onChange={(e) => setInvoiceNo(e.target.value)}
 				/>
 			</Field>
+			{/^T\d{13}$/.test(invoiceNo.trim()) && (
+				<InvoiceNumberCheck registrationNo={invoiceNo.trim()} />
+			)}
 			{save.error && !(isAppError(save.error) && save.error.field) && (
 				<p role="alert" className="text-destructive text-sm">
 					{errorMessage(save.error)}

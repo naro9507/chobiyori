@@ -81,11 +81,15 @@ export type SimpleInput = {
 
 /**
  * その年度で税区分を記録するか。免税事業者の年度は記録しない（税区分の欄を出さない）。
+ * 年の途中でインボイスに登録した年は記録する（登録日の前の取引は Rust 側で「対象外」にする）。
  */
 export function useRecordsTax(fiscalYear: number | null) {
 	const years = useFiscalYears().data
 	const year = years?.find((y) => y.year === fiscalYear)
-	return year !== undefined && year.taxStatus !== "exempt"
+	return (
+		year !== undefined &&
+		(year.taxStatus !== "exempt" || (year.taxableFrom ?? null) !== null)
+	)
 }
 
 /** いま開いている年度。サイドメニューで選べる。初期設定の前は null。 */
