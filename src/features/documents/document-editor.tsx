@@ -292,9 +292,14 @@ export function DocumentEditor({
 						<div
 							// biome-ignore lint/suspicious/noArrayIndexKey: 行は入力の順で並ぶ
 							key={index}
-							className="grid grid-cols-[1fr_5rem_4rem_7rem_6rem_auto] items-start gap-2"
+							// 横にプレビューが並ぶと狭くなるので、品名は 1 行を使い、数量などは次の行に並べる
+							className="grid grid-cols-[5rem_4rem_minmax(6rem,1fr)_7rem_auto] items-start gap-2 border-b pb-3 last-of-type:border-b-0"
 						>
-							<Field label={t("itemName")} error={lineErrorFor(index, "name")}>
+							<Field
+								label={t("itemName")}
+								error={lineErrorFor(index, "name")}
+								className="col-span-full"
+							>
 								<Input
 									value={line.name}
 									onChange={(e) => setLine(index, { name: e.target.value })}
