@@ -45,6 +45,8 @@ pub struct FiscalYear {
     pub filing_type: FilingType,
     pub tax_status: TaxStatus,
     pub closed: bool,
+    /// 課税として扱う最初の日。年の途中でインボイスに登録した年は登録日。免税の年度は `None`
+    pub taxable_from: Option<String>,
 }
 
 impl BusinessProfile {
@@ -206,12 +208,20 @@ pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
     let mut stmt = conn.prepare(
         "SELECT year, filing_type, tax_status, status = 'closed' FROM fiscal_years ORDER BY year DESC",
     )?;
+    let registered_on = crate::db::filing::registered_on(conn)?;
     let rows = stmt.query_map([], |row| {
+        let year: i64 = row.get(0)?;
+        let tax_status: TaxStatus = row.get(2)?;
         Ok(FiscalYear {
-            year: row.get(0)?,
+            year,
             filing_type: row.get(1)?,
-            tax_status: row.get(2)?,
+            tax_status,
             closed: row.get(3)?,
+            taxable_from: crate::domain::filing::taxable_from(
+                year,
+                tax_status == TaxStatus::Exempt,
+                registered_on.as_deref(),
+            ),
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)

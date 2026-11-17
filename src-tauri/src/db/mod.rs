@@ -11,6 +11,7 @@ pub mod backup;
 pub mod books;
 pub mod closing;
 pub mod documents;
+pub mod filing;
 pub mod fixed_assets;
 pub mod formats;
 pub mod inbox;
@@ -41,6 +42,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0006_closing.sql"),
     include_str!("migrations/0007_security.sql"),
     include_str!("migrations/0008_documents.sql"),
+    include_str!("migrations/0009_filing.sql"),
 ];
 
 pub struct Database {

@@ -7,6 +7,7 @@ pub mod closing;
 pub mod documents;
 pub mod export;
 mod files;
+pub mod filing;
 pub mod import;
 pub mod inbox;
 pub mod journal;

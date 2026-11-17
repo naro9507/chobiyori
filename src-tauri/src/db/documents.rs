@@ -259,12 +259,12 @@ pub fn save_mail_settings(conn: &Connection, input: &MailSettings) -> AppResult<
     Ok(valid)
 }
 
-/// 発行日の年度で、様式を決める。課税の年度で、登録番号があるときだけ適格請求書。
+/// 発行日で様式を決める。課税の日（年の途中で登録した年は登録日から）で、登録番号があるときだけ適格請求書。
 fn tax_mode_for(conn: &Connection, issue_date: &str) -> AppResult<TaxMode> {
-    let year = journal::parse_date(issue_date)
-        .map(|(y, _, _)| y)
-        .ok_or(AppError::field(ErrorCode::InvalidFormat, "issueDate"))?;
-    let exempt = transactions::year_is_exempt(conn, year)?;
+    if journal::parse_date(issue_date).is_none() {
+        return Err(AppError::field(ErrorCode::InvalidFormat, "issueDate"));
+    }
+    let exempt = transactions::date_is_exempt(conn, issue_date)?;
     let registered = setup::profile(conn)?.invoice_registration_no.is_some();
     Ok(if !exempt && registered {
         TaxMode::Qualified

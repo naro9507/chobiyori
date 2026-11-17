@@ -273,8 +273,9 @@ pub trait MasterLookup {
     fn account_tax(&self, _id: i64) -> Option<TaxCategory> {
         None
     }
-    /// 年度が免税事業者か。免税なら税区分は「対象外」で保存し、インボイスの印も付けない。
-    fn tax_exempt(&self) -> bool {
+    /// その日の取引が免税か。免税なら税区分は「対象外」で保存し、インボイスの印も付けない。
+    /// 年の途中でインボイスに登録した年は、登録日の前が免税（F12-3）。
+    fn tax_exempt(&self, _date: &str) -> bool {
         false
     }
 }
@@ -361,7 +362,7 @@ pub fn validate(
         }
         let line_memo = super::master::optional(&line.memo, MEMO_MAX, "memo")
             .map_err(|e| AppError::line(e.code, index, "memo"))?;
-        let exempt = masters.tax_exempt();
+        let exempt = masters.tax_exempt(input.date.trim());
         lines.push(LineInput {
             memo: line_memo,
             tax_category: Some(resolve_tax(
@@ -609,7 +610,7 @@ mod tests {
         fn account_tax(&self, id: i64) -> Option<TaxCategory> {
             (id == 10).then_some(TaxCategory::TaxablePurchase10)
         }
-        fn tax_exempt(&self) -> bool {
+        fn tax_exempt(&self, _date: &str) -> bool {
             self.exempt
         }
     }
