@@ -32,8 +32,17 @@ export type SetupInput = {
 	fiscalYear: number
 	filingType: FilingType
 	taxStatus: TaxStatus
-	template: "general"
+	template: IndustryTemplate
 }
+
+/** Rust 側 `domain::industry::IndustryTemplate` と同じ文字列。 */
+export const industryTemplates = [
+	"general",
+	"school",
+	"service",
+	"retailFood",
+] as const
+export type IndustryTemplate = (typeof industryTemplates)[number]
 
 const statusKey = ["setup-status"]
 const profileKey = ["business-profile"]

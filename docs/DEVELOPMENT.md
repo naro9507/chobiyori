@@ -109,9 +109,10 @@ dcs-accounting-app/
 - 接続は 1 本だけ持ち、`Database::transaction` で書き込みをまとめる。
 - スキーマの変更は `src-tauri/src/db/migrations/` に番号付きの SQL を足し、`db/mod.rs` の `MIGRATIONS` に登録する。配布した SQL は書き換えない。適用済みの番号は `PRAGMA user_version` に入る。
 - 金額は円単位の整数。集計値は保存せず、仕訳から計算する。
-- 暗号化: `Database::open` に鍵を渡すと SQLCipher で暗号化する（テストで確認済み）。鍵の保管（OS の資格情報ストアや起動時パスワード）はフェーズ 8 で入れる。それまでのアプリは鍵なしで開く。
-- エラーは `error::AppError`（`code` と入力欄の `field`）で返す。画面は `i18n` の `errors` から文を選ぶ。エラーやログに個人名・金額を入れない。
-- 開発中に DB を作り直したいときは、アプリを閉じて `books.db`（と `-wal`・`-shm`）を消す。次の起動で初期設定ウィザードが出る。
+- 暗号化（フェーズ 8）: 帳簿は SQLCipher で暗号化し、鍵は起動時のパスワード（`db/vault.rs`）。パスワードはどこにも保存しない。帳簿（`Database`）はパスワードで開けたときに初めて `app.manage` するので、それまで帳簿を使うコマンドは動かない（画面はパスワードの画面だけを出す）。前の版の暗号化していない帳簿は、暗号化した写しを作って行の数を確かめてから入れ替える。
+- バックアップと復元（`db/backup.rs`）: `sqlcipher_export` で暗号化したまま書き出し、開き直して行の数を確かめる（`sqlcipher_export` は `user_version` を写さないので手で写す）。終了時の自動バックアップは `RunEvent::Exit` で作る。
+- 月締めと変更履歴（`db/locks.rs`・`db/audit.rs`）: 取引を書く処理は `transactions::insert_kind`・`insert_many`・`update`・`remove` を通し、そこで締めを確かめて履歴を残す。取引を直接 `DELETE` しない。- エラーは `error::AppError`（`code` と入力欄の `field`）で返す。画面は `i18n` の `errors` から文を選ぶ。エラーやログに個人名・金額を入れない。
+- 開発中に DB を作り直したいときは、アプリを閉じて `books.db`（と `-wal`・`-shm`）を消す。次の起動でパスワードを決める画面と初期設定ウィザードが出る。開発中にパスワードを忘れたときも同じ（帳簿は開けない）。
 
 ## 家事按分・定型仕訳・税区分
 
