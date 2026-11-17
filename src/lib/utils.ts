@@ -1,7 +1,6 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassNameValue, twMerge } from "tailwind-merge"
 
 /** Tailwind のクラスを、後から指定したものが勝つように結合する。 */
-export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs))
+export function cn(...inputs: ClassNameValue[]) {
+	return twMerge(inputs)
 }
