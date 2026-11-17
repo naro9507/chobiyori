@@ -14,6 +14,7 @@ import { InboxPage } from "@/pages/inbox-page"
 import { LedgersPage } from "@/pages/ledgers-page"
 import { MasterPage } from "@/pages/master-page"
 import { PlaceholderPage } from "@/pages/placeholder-page"
+import { ReceivablesPage } from "@/pages/receivables-page"
 import { ReportsPage } from "@/pages/reports-page"
 import { SettingsPage } from "@/pages/settings-page"
 import { TransactionsPage } from "@/pages/transactions-page"
@@ -29,6 +30,7 @@ const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	inbox: InboxPage,
 	ledgers: LedgersPage,
 	reports: ReportsPage,
+	receivables: ReceivablesPage,
 	closing: ClosingPage,
 	documents: DocumentsPage,
 	master: MasterPage,

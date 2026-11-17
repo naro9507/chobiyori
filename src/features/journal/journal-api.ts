@@ -117,6 +117,7 @@ export function useInvalidateBooks() {
 			queryClient.invalidateQueries({ queryKey: ["trial-balance"] }),
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
 			queryClient.invalidateQueries({ queryKey: ["templates"] }),
+			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }
