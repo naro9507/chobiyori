@@ -50,7 +50,9 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<p className="text-muted-foreground text-sm">{t("incomeIntro")}</p>
+			<p className="text-muted-foreground text-sm">
+				{t(guide.filingType === "white" ? "whiteIntro" : "incomeIntro")}
+			</p>
 			<AccountantNote />
 			{guide.issueCount > 0 && (
 				<p role="alert" className="flex items-start gap-2 text-sm text-warning">
@@ -61,10 +63,20 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 			<dl className="grid gap-x-8 gap-y-1.5 text-sm sm:grid-cols-[auto_auto] sm:justify-start">
 				<dt className="text-muted-foreground">{t("businessRevenue")}</dt>
 				<dd className="num font-bold">{formatAmount(guide.businessRevenue)}</dd>
-				<dt className="text-muted-foreground">{t("incomeBeforeDeduction")}</dt>
+				<dt className="text-muted-foreground">
+					{t(
+						guide.filingType === "white"
+							? "whiteBeforeDeduction"
+							: "incomeBeforeDeduction"
+					)}
+				</dt>
 				<dd className="num">{formatAmount(guide.incomeBeforeDeduction)}</dd>
-				<dt className="text-muted-foreground">{t("deduction")}</dt>
-				<dd className="num">{formatAmount(guide.deduction)}</dd>
+				{guide.filingType !== "white" && (
+					<>
+						<dt className="text-muted-foreground">{t("deduction")}</dt>
+						<dd className="num">{formatAmount(guide.deduction)}</dd>
+					</>
+				)}
 				<dt className="text-muted-foreground">{t("businessIncome")}</dt>
 				<dd className="num font-bold">{formatAmount(guide.income)}</dd>
 			</dl>
@@ -75,18 +87,32 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 					})}
 				</p>
 			)}
-			{guide.sections.map((section) => (
-				<section key={section.key} className="flex flex-col gap-2">
-					<h3 className="font-bold text-sm">{t(`section_${section.key}`)}</h3>
-					<p className="text-muted-foreground text-xs">
-						{t(`section_${section.key}Hint`)}
-					</p>
-					<ValueList
-						rows={rowsOf(section)}
-						label={t(`section_${section.key}`)}
-					/>
-				</section>
-			))}
+			{guide.sections
+				.filter(
+					(s) =>
+						guide.filingType !== "white" ||
+						(s.key !== "bs" && s.key !== "monthly")
+				)
+				.map((section) => (
+					<section key={section.key} className="flex flex-col gap-2">
+						<h3 className="font-bold text-sm">
+							{guide.filingType === "white" && section.key === "pl"
+								? t("whiteTitle")
+								: t(`section_${section.key}`)}
+						</h3>
+						<p className="text-muted-foreground text-xs">
+							{t(`section_${section.key}Hint`)}
+						</p>
+						<ValueList
+							rows={rowsOf(section)}
+							label={
+								guide.filingType === "white" && section.key === "pl"
+									? t("whiteTitle")
+									: t(`section_${section.key}`)
+							}
+						/>
+					</section>
+				))}
 			<p className="text-muted-foreground text-sm">{t("notInApp")}</p>
 			<FilingChecklist fiscalYear={fiscalYear} group="income" />
 		</div>

@@ -1,5 +1,5 @@
 import { CircleCheck, Loader2 } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -19,9 +19,11 @@ import {
 	useRecordDeposit,
 } from "@/features/deposits/deposits-api"
 import { type AccountCategory, displayName } from "@/features/master/master-api"
+import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount } from "@/lib/amount"
 import { fieldError, isAppError } from "@/lib/errors"
+import { useEntryIntent } from "@/stores/entry-intent-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
 	type SimpleKind,
@@ -67,6 +69,20 @@ function today() {
  * 保存すると Rust 側で仕訳（借方 1 行 + 貸方 1 行）になる。
  */
 export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
+	const masters = useJournalMasters()
+	const draft = useEntryIntent.getState().draft
+	const errorMessage = useJournalErrorMessage(fiscalYear)
+	const t = useTranslations("app")
+	if (draft && masters.accounts.length === 0)
+		return (
+			<p role="status">
+				{masters.error ? errorMessage(masters.error) : t("loading")}
+			</p>
+		)
+	return <SimpleEntryForm fiscalYear={fiscalYear} />
+}
+
+function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("journal")
 	const tMaster = useTranslations("master")
 	const locale = useSettingsStore((state) => state.locale)
@@ -75,19 +91,32 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 	const create = useCreateSimpleTransaction(fiscalYear)
 	const [saved, setSaved] = useState<Transaction | null>(null)
 
+	const features = useFeatures()
+	const [draft] = useState(() => useEntryIntent.getState().draft)
+	useEffect(() => {
+		useEntryIntent.setState({ draft: null })
+	}, [])
 	const initialDate =
 		fiscalYear !== null && !today().startsWith(String(fiscalYear))
 			? `${fiscalYear}-01-01`
 			: today()
 	const [form, setFormState] = useState<Form>({
-		choice: "expense",
+		choice: draft?.kind ?? "expense",
 		ownerKind: "owner_draw",
 		date: initialDate,
 		amount: "",
-		accountId: "",
-		paymentAccountId: "",
+		accountId: draft
+			? String(
+					masters.accounts.find((a) => a.code === draft.accountCode)?.id ?? ""
+				)
+			: "",
+		paymentAccountId: draft
+			? String(
+					masters.accounts.find((a) => a.code === draft.paymentCode)?.id ?? ""
+				)
+			: "",
 		partnerId: "",
-		memo: "",
+		memo: draft?.memo ?? "",
 		allocate: false,
 		allocationPercent: "",
 		depositKey: "",
@@ -109,12 +138,12 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 
 	// 経費の科目に按分ルールがあれば、按分の欄を出す（割合はルールのものを初めに入れる）
 	const rulePercent =
-		form.choice === "expense" && form.accountId
+		features.allocation && form.choice === "expense" && form.accountId
 			? masters.allocationPercentOf(Number(form.accountId))
 			: null
 	const onAccountChange = (accountId: string) => {
 		const percent =
-			form.choice === "expense" && accountId
+			features.allocation && form.choice === "expense" && accountId
 				? masters.allocationPercentOf(Number(accountId))
 				: null
 		setForm({
@@ -281,7 +310,8 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 						</p>
 					)}
 
-					{form.choice === "income" &&
+					{features.receivables &&
+						form.choice === "income" &&
 						((targets.data?.invoices.length ?? 0) > 0 ||
 							(targets.data?.planMonths.length ?? 0) > 0) && (
 							<Field

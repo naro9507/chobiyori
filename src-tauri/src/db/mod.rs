@@ -18,6 +18,7 @@ pub mod formats;
 pub mod inbox;
 pub mod locks;
 pub mod partners;
+pub mod purposes;
 pub mod receipts;
 pub mod recurring;
 pub mod reports;

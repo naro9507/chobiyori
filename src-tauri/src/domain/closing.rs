@@ -218,7 +218,15 @@ pub fn statement(
     figures: &[AccountFigure],
     pre_tax_income: i64,
 ) -> Statement {
-    let layout = layout_for(year);
+    let layout = if filing_type == FilingType::White {
+        static WHITE: OnceLock<Layout> = OnceLock::new();
+        WHITE.get_or_init(|| {
+            serde_json::from_str(include_str!("data/white_general.json"))
+                .expect("同梱の収支内訳書の様式が読めない")
+        })
+    } else {
+        layout_for(year)
+    };
     let mut issues = Vec::new();
 
     // 科目を行に割り当てる。決算書の行のキーが様式にない科目は、区分ごとの受け皿へ
@@ -233,7 +241,8 @@ pub fn statement(
         matches!(
             f.category,
             AccountCategory::Revenue | AccountCategory::Cogs | AccountCategory::Expense
-        )
+        ) && !(filing_type == FilingType::White
+            && f.statement_line.as_deref() == Some("pl.family_employee_salaries"))
     }) {
         let line = f
             .statement_line
@@ -336,10 +345,21 @@ pub fn statement(
     let income_before_deduction = values.get("income_before_deduction").copied().unwrap_or(0);
     let deduction = values.get("deduction").copied().unwrap_or(0);
     let income = values.get("income").copied().unwrap_or(0);
-    if income_before_deduction != pre_tax_income {
+    let family_salaries: i64 = figures
+        .iter()
+        .filter(|f| f.statement_line.as_deref() == Some("pl.family_employee_salaries"))
+        .map(|f| f.closing)
+        .sum();
+    let expected_income = pre_tax_income
+        + if filing_type == FilingType::White {
+            family_salaries
+        } else {
+            0
+        };
+    if income_before_deduction != expected_income {
         issues.push(issue(StatementIssueCode::IncomeMismatch, None));
     }
-    if filing_type == FilingType::White {
+    if filing_type == FilingType::White && family_salaries != 0 {
         issues.push(issue(StatementIssueCode::WhiteFiling, None));
     }
 
@@ -393,7 +413,14 @@ pub fn statement(
             .cloned()
             .unwrap_or_default();
         let (opening, closing) = if def.income {
-            (None, income_before_deduction)
+            (
+                None,
+                if filing_type == FilingType::White {
+                    pre_tax_income
+                } else {
+                    income_before_deduction
+                },
+            )
         } else {
             let opening: i64 = accounts.iter().map(|f| f.opening).sum();
             let closing: i64 = accounts.iter().map(|f| f.closing).sum();
@@ -527,6 +554,12 @@ mod tests {
         assert_eq!((s.deduction, s.income), (100_000, 453_000));
         let white = statement(2026, FilingType::White, &figures, 553_000);
         assert_eq!(white.deduction, 0);
+        assert_eq!(white.income, 653_000);
+        assert_eq!(white.liability_total, s.liability_total);
+        assert!(!white
+            .issues
+            .iter()
+            .any(|i| matches!(i.code, StatementIssueCode::IncomeMismatch)));
         assert!(white
             .issues
             .iter()
@@ -600,5 +633,48 @@ mod tests {
         assert!(!opening_totals(&[(Asset, 1)]).balanced);
         // 期末元入金 150,000 + 所得 553,000 + 事業主借 30,000 − 事業主貸 200,000
         assert_eq!(next_capital(150_000, 553_000, 30_000, 200_000), 533_000);
+    }
+}
+
+#[cfg(test)]
+mod white_tests {
+    use super::*;
+    #[test]
+    fn white_statement_uses_white_lines_without_a_blue_deduction() {
+        let figures = vec![
+            AccountFigure {
+                account_id: 1,
+                category: AccountCategory::Revenue,
+                statement_line: Some("pl.sales".into()),
+                name_ja: "Sales".into(),
+                name_en: "Sales".into(),
+                opening: 0,
+                closing: 1_000_000,
+            },
+            AccountFigure {
+                account_id: 2,
+                category: AccountCategory::Expense,
+                statement_line: Some("pl.supplies".into()),
+                name_ja: "Supplies".into(),
+                name_en: "Supplies".into(),
+                opening: 0,
+                closing: 10_000,
+            },
+        ];
+        let s = statement(2026, FilingType::White, &figures, 990_000);
+        assert_eq!((s.deduction, s.income), (0, 990_000));
+        assert!(!s.issues.iter().any(|issue| matches!(
+            issue.code,
+            StatementIssueCode::IncomeMismatch | StatementIssueCode::WhiteFiling
+        )));
+        assert!(s
+            .pl
+            .iter()
+            .any(|l| l.key == "sales_only" && l.no == "①" && l.amount == 1_000_000));
+        assert!(s
+            .pl
+            .iter()
+            .any(|l| l.key == "family_deduction" && l.no == "⑲"));
+        assert!(!s.pl.iter().any(|l| l.key == "deduction"));
     }
 }

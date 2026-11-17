@@ -24,11 +24,20 @@ import {
 	usePartnerLedgers,
 } from "@/features/ledger/ledger-api"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useFiscalYears } from "@/features/setup/fiscal-years"
+import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
 import { NotInTauriError } from "@/lib/tauri"
 
-const books = ["journal", "ledger", "cash", "expense", "partners"] as const
+const books = [
+	"journal",
+	"ledger",
+	"cash",
+	"expense",
+	"sales",
+	"partners",
+] as const
 type Book = (typeof books)[number]
 const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
@@ -38,7 +47,20 @@ export function LedgersPage() {
 	const tJournal = useTranslations("journal")
 	const fiscalYear = useFiscalYear()
 	const masters = useJournalMasters()
-	const [book, setBook] = useState<Book>("journal")
+	const features = useFeatures()
+	const white =
+		useFiscalYears().data?.find((y) => y.year === fiscalYear)?.filingType ===
+		"white"
+	const [chosenBook, setBook] = useState<Book | null>(null)
+	const book =
+		chosenBook === "partners" && !features.receivables
+			? white
+				? "cash"
+				: "journal"
+			: (chosenBook ?? (white ? "cash" : "journal"))
+	const orderedBooks: Book[] = white
+		? ["cash", "expense", "sales", "journal", "ledger", "partners"]
+		: [...books]
 	const [fromMonth, setFromMonth] = useState(1)
 	// 選ぶまでは、年度のはじめから今月まで（過去の年度なら 12 月まで）
 	const [chosenToMonth, setToMonth] = useState<number | null>(null)
@@ -72,6 +94,7 @@ export function LedgersPage() {
 		cash:
 			cashId === null ? null : { kind: "cashBook" as const, accountId: cashId },
 		expense: { kind: "expenseBook" } as const,
+		sales: { kind: "salesBook" } as const,
 		// 売掛帳・買掛帳の書き出しはまだない
 		partners: null,
 	}[book]
@@ -126,15 +149,17 @@ export function LedgersPage() {
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
 				>
-					{books.map((value) => (
-						<Tabs.Trigger
-							key={value}
-							value={value}
-							className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-						>
-							{t(value)}
-						</Tabs.Trigger>
-					))}
+					{orderedBooks
+						.filter((value) => value !== "partners" || features.receivables)
+						.map((value) => (
+							<Tabs.Trigger
+								key={value}
+								value={value}
+								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+							>
+								{t(value)}
+							</Tabs.Trigger>
+						))}
 				</Tabs.List>
 
 				<Card>
@@ -179,6 +204,9 @@ export function LedgersPage() {
 						</Tabs.Content>
 						<Tabs.Content value="expense" className="outline-none">
 							<ExpenseView period={period} />
+						</Tabs.Content>
+						<Tabs.Content value="sales" className="outline-none">
+							<ExpenseView period={period} sales />
 						</Tabs.Content>
 						<Tabs.Content value="partners" className="outline-none">
 							<PartnerView period={period} accountId={partnerAccountId} />
@@ -569,9 +597,15 @@ function LedgerView({
 	)
 }
 
-function ExpenseView({ period }: { period: Period }) {
+function ExpenseView({
+	period,
+	sales = false,
+}: {
+	period: Period
+	sales?: boolean
+}) {
 	const t = useTranslations("ledgers")
-	const query = useExpenseBook(period)
+	const query = useExpenseBook(period, sales)
 	const columns = useLedgerColumns(period, false)
 	return (
 		<QueryState
@@ -581,7 +615,7 @@ function ExpenseView({ period }: { period: Period }) {
 		>
 			{(ledgers) => (
 				<BookTable
-					label={t("expense")}
+					label={t(sales ? "sales" : "expense")}
 					rows={ledgers.flatMap((l) => ledgerLines(l, true, true))}
 					columns={columns}
 					rowKey={(l) => l.key}

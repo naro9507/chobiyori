@@ -71,7 +71,7 @@ describe("初期設定ウィザード", () => {
 		)
 	})
 
-	it("3 つの手順を終えると設定を保存し、ホームを出す", async () => {
+	it("6 つの手順を終えると設定を保存し、ホームを出す", async () => {
 		const user = userEvent.setup()
 		renderApp()
 
@@ -88,6 +88,8 @@ describe("初期設定ウィザード", () => {
 		const year = screen.getByLabelText("年度（西暦）")
 		await user.clear(year)
 		await user.type(year, "2025")
+		for (let i = 0; i < 3; i++)
+			await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "はじめる" }))
 
 		expect(
@@ -106,6 +108,14 @@ describe("初期設定ウィザード", () => {
 				filingType: "white",
 				taxStatus: "special20",
 				template: "general",
+				accounts: [{ name: "現金", kind: "cash", balance: 0 }],
+				openingBalances: [],
+				features: {
+					inventory: true,
+					receivables: true,
+					recurring: true,
+					allocation: true,
+				},
 			},
 		})
 	})
@@ -118,6 +128,8 @@ describe("初期設定ウィザード", () => {
 		await user.type(screen.getByLabelText("インボイスの登録番号"), "T1")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "次へ" }))
+		for (let i = 0; i < 3; i++)
+			await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "はじめる" }))
 
 		expect(

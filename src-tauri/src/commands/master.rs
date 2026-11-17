@@ -160,3 +160,47 @@ pub async fn set_allocation_rule_active(
 pub async fn delete_allocation_rule(db: State<'_, Database>, id: i64) -> AppResult<()> {
     allocation_rules::delete(&db.conn(), id)
 }
+
+#[tauri::command]
+pub async fn list_purposes(
+    db: State<'_, Database>,
+) -> AppResult<Vec<crate::db::purposes::Purpose>> {
+    crate::db::purposes::list(&db.conn())
+}
+#[tauri::command]
+pub async fn create_purpose(
+    db: State<'_, Database>,
+    input: crate::db::purposes::PurposeInput,
+) -> AppResult<crate::db::purposes::Purpose> {
+    crate::db::purposes::create(&db.conn(), &input)
+}
+#[tauri::command]
+pub async fn update_purpose(
+    db: State<'_, Database>,
+    id: i64,
+    input: crate::db::purposes::PurposeInput,
+) -> AppResult<crate::db::purposes::Purpose> {
+    crate::db::purposes::update(&db.conn(), id, &input)
+}
+#[tauri::command]
+pub async fn set_purpose_active(
+    db: State<'_, Database>,
+    id: i64,
+    active: bool,
+) -> AppResult<crate::db::purposes::Purpose> {
+    crate::db::purposes::set_active(&db.conn(), id, active)
+}
+#[tauri::command]
+pub async fn delete_purpose(db: State<'_, Database>, id: i64) -> AppResult<()> {
+    crate::db::purposes::delete(&db.conn(), id)
+}
+#[tauri::command]
+pub async fn post_purpose(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    id: i64,
+    date: String,
+    amount: i64,
+) -> AppResult<crate::db::transactions::Transaction> {
+    crate::db::purposes::post(&db, fiscal_year, id, &date, amount)
+}

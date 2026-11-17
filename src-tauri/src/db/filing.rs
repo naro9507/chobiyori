@@ -451,11 +451,14 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         .find(|l| l.key == "sales")
         .map_or(0, |l| l.amount);
     let deduction_on_paper = st.deduction.min(filing::paper_deduction_cap());
-    let returns = vec![
+    let mut returns = vec![
         item("return_revenue", "ア", "", "", business_revenue, false),
         item("return_income", "①", "", "", st.income, false),
         item("return_deduction", "", "", "", st.deduction, false),
     ];
+    if amounts.filing_type == crate::domain::master::FilingType::White {
+        returns.retain(|item| item.key != "return_deduction");
+    }
     Ok(IncomeGuide {
         fiscal_year: year,
         filing_type: amounts.filing_type,

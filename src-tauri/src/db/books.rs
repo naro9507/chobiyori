@@ -75,6 +75,20 @@ pub fn expense_book(
     non_empty(ledgers_for(conn, year, from_month, to_month, &expenses)?)
 }
 
+/// 売上帳。売上高の科目ごとの元帳。
+pub fn sales_book(
+    conn: &Connection,
+    year: i64,
+    from_month: u32,
+    to_month: u32,
+) -> AppResult<Vec<Ledger>> {
+    let sales: Vec<Account> = accounts::list(conn)?
+        .into_iter()
+        .filter(|a| a.statement_line.as_deref() == Some("pl.sales"))
+        .collect();
+    non_empty(ledgers_for(conn, year, from_month, to_month, &sales)?)
+}
+
 /// すべての科目の元帳（動きのない科目は除く）。総勘定元帳をまとめて出力するときに使う。
 pub fn all_ledgers(
     conn: &Connection,

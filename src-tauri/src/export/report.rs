@@ -472,6 +472,7 @@ pub fn statement(amounts: &StatementAmounts, names: &Names, ctx: &Context) -> Re
             ja.to_string()
         }
     };
+    let white = amounts.filing_type == crate::domain::master::FilingType::White;
     let s = &amounts.statement;
     let mut sections = Vec::new();
 
@@ -491,7 +492,11 @@ pub fn statement(amounts: &StatementAmounts, names: &Names, ctx: &Context) -> Re
             })
             .collect();
     sections.push(simple_section(
-        &l::PROFIT_AND_LOSS,
+        if white {
+            &l::WHITE_STATEMENT
+        } else {
+            &l::PROFIT_AND_LOSS
+        },
         locale,
         vec![
             column(&l::LINE_NO, locale, 8.0, ColumnKind::Text),
@@ -709,8 +714,30 @@ pub fn statement(amounts: &StatementAmounts, names: &Names, ctx: &Context) -> Re
         bs,
     ));
 
-    let mut r = report(&l::STATEMENT, ctx, sections);
-    r.footnote = Some(l::STATEMENT_NOTE.get(locale).to_string());
+    if white {
+        sections.retain(|section| {
+            section.heading.as_deref() != Some(l::BALANCE_SHEET.get(locale))
+                && section.heading.as_deref() != Some(l::MONTHLY_SALES.get(locale))
+        });
+    }
+    let mut r = report(
+        if white {
+            &l::WHITE_STATEMENT
+        } else {
+            &l::STATEMENT
+        },
+        ctx,
+        sections,
+    );
+    r.footnote = Some(
+        if white {
+            l::WHITE_NOTE
+        } else {
+            l::STATEMENT_NOTE
+        }
+        .get(locale)
+        .to_string(),
+    );
     r
 }
 

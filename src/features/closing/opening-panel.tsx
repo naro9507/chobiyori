@@ -7,7 +7,11 @@ import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import type { AccountCategory } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
-import { amountForCommand, formatAmount, parseAmount } from "@/lib/amount"
+import {
+	formatAmount,
+	parseSignedAmount,
+	signedAmountForCommand,
+} from "@/lib/amount"
 import { isAppError } from "@/lib/errors"
 import {
 	type OpeningBalances,
@@ -62,7 +66,7 @@ function OpeningForm({
 			(a.isActive || texts[a.id] !== undefined)
 	)
 	const value = (id: number) => {
-		const amount = parseAmount(texts[id] ?? "")
+		const amount = parseSignedAmount(texts[id] ?? "")
 		return amount === null || Number.isNaN(amount) ? 0 : amount
 	}
 	const sum = (debit: boolean) =>
@@ -79,7 +83,7 @@ function OpeningForm({
 		.filter((a) => (texts[a.id] ?? "").trim() !== "")
 		.map((a) => ({
 			accountId: a.id,
-			amount: amountForCommand(texts[a.id] ?? ""),
+			amount: signedAmountForCommand(texts[a.id] ?? ""),
 		}))
 	const error = save.error ?? confirm.error
 	const errorLine =

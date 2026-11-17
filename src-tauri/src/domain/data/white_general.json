@@ -1,0 +1,637 @@
+{
+  "_note": "白色申告の収支内訳書（一般用）の金額一覧。事業専従者控除の要件・金額は利用者が確認して入力する。",
+  "form": "white_general",
+  "from_year": 2020,
+  "deduction": {},
+  "fallback": {
+    "revenue": "sales_only",
+    "cogs": "purchases"
+  },
+  "pl": [
+    {
+      "key": "sales_only",
+      "no": "①",
+      "ja": "売上（収入）金額",
+      "en": "Sales revenue",
+      "sum": [
+        "pl.sales"
+      ]
+    },
+    {
+      "key": "personal_consumption",
+      "no": "②",
+      "ja": "家事消費等",
+      "en": "Personal consumption",
+      "sum": [
+        "pl.personal_consumption"
+      ]
+    },
+    {
+      "key": "misc_income",
+      "no": "③",
+      "ja": "その他の収入",
+      "en": "Other income",
+      "sum": [
+        "pl.misc_income"
+      ]
+    },
+    {
+      "key": "sales",
+      "no": "④",
+      "ja": "収入金額の計",
+      "en": "Total revenue",
+      "formula": [
+        "+sales_only",
+        "+personal_consumption",
+        "+misc_income"
+      ],
+      "total": true
+    },
+    {
+      "key": "opening_inventory",
+      "no": "⑤",
+      "ja": "期首商品（製品）棚卸高",
+      "en": "Opening inventory",
+      "sum": [
+        "pl.opening_inventory"
+      ]
+    },
+    {
+      "key": "purchases",
+      "no": "⑥",
+      "ja": "仕入金額（製品製造原価）",
+      "en": "Purchases",
+      "sum": [
+        "pl.purchases"
+      ]
+    },
+    {
+      "key": "cogs_subtotal",
+      "no": "⑦",
+      "ja": "小計",
+      "en": "Subtotal",
+      "formula": [
+        "+opening_inventory",
+        "+purchases"
+      ],
+      "total": true
+    },
+    {
+      "key": "closing_inventory",
+      "no": "⑧",
+      "ja": "期末商品（製品）棚卸高",
+      "en": "Closing inventory",
+      "sum": [
+        "pl.closing_inventory"
+      ],
+      "negate": true
+    },
+    {
+      "key": "cogs",
+      "no": "⑨",
+      "ja": "差引原価",
+      "en": "Cost of sales",
+      "formula": [
+        "+cogs_subtotal",
+        "-closing_inventory"
+      ],
+      "total": true
+    },
+    {
+      "key": "gross_profit",
+      "no": "⑩",
+      "ja": "差引金額",
+      "en": "Gross profit",
+      "formula": [
+        "+sales",
+        "-cogs"
+      ],
+      "total": true
+    },
+    {
+      "key": "wages",
+      "no": "⑪",
+      "ja": "給料賃金",
+      "en": "Salaries and wages",
+      "sum": [
+        "pl.wages"
+      ],
+      "expense": true
+    },
+    {
+      "key": "outsourcing",
+      "no": "⑫",
+      "ja": "外注工賃",
+      "en": "Outsourcing",
+      "sum": [
+        "pl.outsourcing"
+      ],
+      "expense": true
+    },
+    {
+      "key": "depreciation",
+      "no": "⑬",
+      "ja": "減価償却費",
+      "en": "Depreciation",
+      "sum": [
+        "pl.depreciation"
+      ],
+      "expense": true
+    },
+    {
+      "key": "bad_debts",
+      "no": "⑭",
+      "ja": "貸倒金",
+      "en": "Bad debts",
+      "sum": [
+        "pl.bad_debts"
+      ],
+      "expense": true
+    },
+    {
+      "key": "rent",
+      "no": "⑮",
+      "ja": "地代家賃",
+      "en": "Rent",
+      "sum": [
+        "pl.rent"
+      ],
+      "expense": true
+    },
+    {
+      "key": "interest",
+      "no": "⑯",
+      "ja": "利子割引料",
+      "en": "Interest and discounts",
+      "sum": [
+        "pl.interest"
+      ],
+      "expense": true
+    },
+    {
+      "key": "taxes_dues",
+      "no": "ア",
+      "ja": "租税公課",
+      "en": "Taxes and dues",
+      "sum": [
+        "pl.taxes_dues"
+      ],
+      "expense": true
+    },
+    {
+      "key": "freight",
+      "no": "イ",
+      "ja": "荷造運賃",
+      "en": "Packing and freight",
+      "sum": [
+        "pl.freight"
+      ],
+      "expense": true
+    },
+    {
+      "key": "utilities",
+      "no": "ウ",
+      "ja": "水道光熱費",
+      "en": "Utilities",
+      "sum": [
+        "pl.utilities"
+      ],
+      "expense": true
+    },
+    {
+      "key": "travel",
+      "no": "エ",
+      "ja": "旅費交通費",
+      "en": "Travel and transportation",
+      "sum": [
+        "pl.travel"
+      ],
+      "expense": true
+    },
+    {
+      "key": "communication",
+      "no": "オ",
+      "ja": "通信費",
+      "en": "Communication",
+      "sum": [
+        "pl.communication"
+      ],
+      "expense": true
+    },
+    {
+      "key": "advertising",
+      "no": "カ",
+      "ja": "広告宣伝費",
+      "en": "Advertising",
+      "sum": [
+        "pl.advertising"
+      ],
+      "expense": true
+    },
+    {
+      "key": "entertainment",
+      "no": "キ",
+      "ja": "接待交際費",
+      "en": "Entertainment",
+      "sum": [
+        "pl.entertainment"
+      ],
+      "expense": true
+    },
+    {
+      "key": "insurance",
+      "no": "ク",
+      "ja": "損害保険料",
+      "en": "Insurance",
+      "sum": [
+        "pl.insurance"
+      ],
+      "expense": true
+    },
+    {
+      "key": "repairs",
+      "no": "ケ",
+      "ja": "修繕費",
+      "en": "Repairs",
+      "sum": [
+        "pl.repairs"
+      ],
+      "expense": true
+    },
+    {
+      "key": "supplies",
+      "no": "コ",
+      "ja": "消耗品費",
+      "en": "Supplies",
+      "sum": [
+        "pl.supplies"
+      ],
+      "expense": true
+    },
+    {
+      "key": "welfare",
+      "no": "サ",
+      "ja": "福利厚生費",
+      "en": "Employee benefits",
+      "sum": [
+        "pl.welfare"
+      ],
+      "expense": true
+    },
+    {
+      "key": "blank1",
+      "no": "シ",
+      "ja": "",
+      "en": "",
+      "blank": true,
+      "expense": true
+    },
+    {
+      "key": "blank2",
+      "no": "ス",
+      "ja": "",
+      "en": "",
+      "blank": true,
+      "expense": true
+    },
+    {
+      "key": "blank3",
+      "no": "セ",
+      "ja": "",
+      "en": "",
+      "blank": true,
+      "expense": true
+    },
+    {
+      "key": "blank4",
+      "no": "ソ",
+      "ja": "",
+      "en": "",
+      "blank": true,
+      "expense": true
+    },
+    {
+      "key": "blank5",
+      "no": "タ",
+      "ja": "",
+      "en": "",
+      "blank": true,
+      "expense": true
+    },
+    {
+      "key": "misc_expenses",
+      "no": "チ",
+      "ja": "雑費",
+      "en": "Miscellaneous expenses",
+      "sum": [
+        "pl.misc_expenses"
+      ],
+      "expense": true,
+      "overflow": true
+    },
+    {
+      "key": "expenses",
+      "no": "⑰",
+      "ja": "経費の計",
+      "en": "Total expenses",
+      "sum_of_expenses": true,
+      "total": true
+    },
+    {
+      "key": "net",
+      "no": "⑱",
+      "ja": "専従者控除前の所得金額",
+      "en": "Income before family worker deduction",
+      "formula": [
+        "+gross_profit",
+        "-expenses"
+      ],
+      "total": true
+    },
+    {
+      "key": "income_before_deduction",
+      "no": "",
+      "ja": "専従者控除前の所得金額",
+      "en": "Income before family worker deduction",
+      "formula": [
+        "+net"
+      ],
+      "total": true
+    },
+    {
+      "key": "family_deduction",
+      "no": "⑲",
+      "ja": "事業専従者控除額（確認して入力）",
+      "en": "Family worker deduction (entered after confirmation)",
+      "total": false
+    },
+    {
+      "key": "income",
+      "no": "⑳",
+      "ja": "所得金額",
+      "en": "Business income",
+      "formula": [
+        "+income_before_deduction",
+        "-family_deduction"
+      ],
+      "total": true
+    }
+  ],
+  "bs": [
+    {
+      "key": "cash",
+      "side": "asset",
+      "ja": "現金",
+      "en": "Cash",
+      "sum": [
+        "bs.cash"
+      ]
+    },
+    {
+      "key": "checking",
+      "side": "asset",
+      "ja": "当座預金",
+      "en": "Checking account",
+      "sum": [
+        "bs.checking"
+      ]
+    },
+    {
+      "key": "time_deposits",
+      "side": "asset",
+      "ja": "定期預金",
+      "en": "Time deposits",
+      "sum": [
+        "bs.time_deposits"
+      ]
+    },
+    {
+      "key": "other_deposits",
+      "side": "asset",
+      "ja": "その他の預金",
+      "en": "Other deposits",
+      "sum": [
+        "bs.other_deposits"
+      ]
+    },
+    {
+      "key": "notes_receivable",
+      "side": "asset",
+      "ja": "受取手形",
+      "en": "Notes receivable",
+      "sum": [
+        "bs.notes_receivable"
+      ]
+    },
+    {
+      "key": "accounts_receivable",
+      "side": "asset",
+      "ja": "売掛金",
+      "en": "Accounts receivable",
+      "sum": [
+        "bs.accounts_receivable"
+      ]
+    },
+    {
+      "key": "securities",
+      "side": "asset",
+      "ja": "有価証券",
+      "en": "Securities",
+      "sum": [
+        "bs.securities"
+      ]
+    },
+    {
+      "key": "inventory",
+      "side": "asset",
+      "ja": "棚卸資産",
+      "en": "Inventory",
+      "sum": [
+        "bs.inventory"
+      ]
+    },
+    {
+      "key": "prepayments",
+      "side": "asset",
+      "ja": "前払金",
+      "en": "Prepayments",
+      "sum": [
+        "bs.prepayments"
+      ]
+    },
+    {
+      "key": "loans_receivable",
+      "side": "asset",
+      "ja": "貸付金",
+      "en": "Loans receivable",
+      "sum": [
+        "bs.loans_receivable"
+      ]
+    },
+    {
+      "key": "buildings",
+      "side": "asset",
+      "ja": "建物",
+      "en": "Buildings",
+      "sum": [
+        "bs.buildings"
+      ]
+    },
+    {
+      "key": "building_fixtures",
+      "side": "asset",
+      "ja": "建物附属設備",
+      "en": "Building fixtures",
+      "sum": [
+        "bs.building_fixtures"
+      ]
+    },
+    {
+      "key": "machinery",
+      "side": "asset",
+      "ja": "機械装置",
+      "en": "Machinery",
+      "sum": [
+        "bs.machinery"
+      ]
+    },
+    {
+      "key": "vehicles",
+      "side": "asset",
+      "ja": "車両運搬具",
+      "en": "Vehicles",
+      "sum": [
+        "bs.vehicles"
+      ]
+    },
+    {
+      "key": "tools_equipment",
+      "side": "asset",
+      "ja": "工具器具備品",
+      "en": "Tools and equipment",
+      "sum": [
+        "bs.tools_equipment"
+      ]
+    },
+    {
+      "key": "land",
+      "side": "asset",
+      "ja": "土地",
+      "en": "Land",
+      "sum": [
+        "bs.land"
+      ]
+    },
+    {
+      "key": "other_assets",
+      "side": "asset",
+      "ja": "そのほかの資産（空欄に書く）",
+      "en": "Other assets (write in a blank row)",
+      "unassigned": true
+    },
+    {
+      "key": "owner_drawings",
+      "side": "asset",
+      "ja": "事業主貸",
+      "en": "Owner's drawings",
+      "sum": [
+        "bs.owner_drawings"
+      ]
+    },
+    {
+      "key": "notes_payable",
+      "side": "liability",
+      "ja": "支払手形",
+      "en": "Notes payable",
+      "sum": [
+        "bs.notes_payable"
+      ]
+    },
+    {
+      "key": "accounts_payable",
+      "side": "liability",
+      "ja": "買掛金",
+      "en": "Accounts payable",
+      "sum": [
+        "bs.accounts_payable"
+      ]
+    },
+    {
+      "key": "loans_payable",
+      "side": "liability",
+      "ja": "借入金",
+      "en": "Loans payable",
+      "sum": [
+        "bs.loans_payable"
+      ]
+    },
+    {
+      "key": "accrued_payables",
+      "side": "liability",
+      "ja": "未払金",
+      "en": "Accrued payables",
+      "sum": [
+        "bs.accrued_payables"
+      ]
+    },
+    {
+      "key": "advances_received",
+      "side": "liability",
+      "ja": "前受金",
+      "en": "Advances received",
+      "sum": [
+        "bs.advances_received"
+      ]
+    },
+    {
+      "key": "deposits_received",
+      "side": "liability",
+      "ja": "預り金",
+      "en": "Deposits received",
+      "sum": [
+        "bs.deposits_received"
+      ]
+    },
+    {
+      "key": "bad_debt_allowance",
+      "side": "liability",
+      "ja": "貸倒引当金",
+      "en": "Allowance for bad debts",
+      "sum": [
+        "bs.bad_debt_allowance"
+      ]
+    },
+    {
+      "key": "other_liabilities",
+      "side": "liability",
+      "ja": "そのほかの負債（空欄に書く）",
+      "en": "Other liabilities (write in a blank row)",
+      "unassigned": true
+    },
+    {
+      "key": "owner_contributions",
+      "side": "liability",
+      "ja": "事業主借",
+      "en": "Owner's contributions",
+      "sum": [
+        "bs.owner_contributions"
+      ]
+    },
+    {
+      "key": "capital",
+      "side": "liability",
+      "ja": "元入金",
+      "en": "Owner's capital",
+      "sum": [
+        "bs.capital"
+      ]
+    },
+    {
+      "key": "income_before_deduction",
+      "side": "liability",
+      "ja": "青色申告特別控除前の所得金額",
+      "en": "Income before the blue-return deduction",
+      "income": true
+    }
+  ]
+}

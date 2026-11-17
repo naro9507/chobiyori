@@ -1,16 +1,19 @@
 import { Link, Outlet } from "@tanstack/react-router"
-import { navGroups } from "@/app/navigation"
+import { navGroups, screenEnabled } from "@/app/navigation"
 import { WhatsNewBanner } from "@/features/changelog/whats-new-banner"
+import { CommandPalette } from "@/features/commands/command-palette"
 import {
 	useFiscalYear,
 	useFiscalYears,
 	useYearStore,
 } from "@/features/setup/fiscal-years"
+import { useFeatures } from "@/features/setup/setup"
 import { UpdateBanner } from "@/features/updater/update-banner"
 import { useTranslations } from "@/i18n/use-translations"
 
 /** サイドメニューと本文の枠。すべての画面で共通。 */
 export function AppShell() {
+	const features = useFeatures()
 	const t = useTranslations("nav")
 	const tApp = useTranslations("app")
 	const year = useFiscalYear() ?? new Date().getFullYear()
@@ -52,23 +55,26 @@ export function AppShell() {
 						{tApp("fiscalYear", { year })}
 					</div>
 				)}
+				<CommandPalette />
 				{navGroups.map((group) => (
 					<ul
 						key={group[0].id}
 						className="flex flex-col gap-0.5 border-sidebar-border border-t pt-3 first-of-type:border-t-0 first-of-type:pt-0"
 					>
-						{group.map((item) => (
-							<li key={item.id}>
-								<Link
-									to={item.path}
-									activeOptions={{ exact: item.path === "/" }}
-									className="flex min-h-10 items-center gap-3 rounded-md px-3 font-medium text-sm transition-colors hover:bg-sidebar-accent/60 data-[status=active]:bg-sidebar-accent data-[status=active]:font-bold data-[status=active]:text-sidebar-accent-foreground"
-								>
-									<item.icon aria-hidden="true" className="size-4 shrink-0" />
-									{t(item.id)}
-								</Link>
-							</li>
-						))}
+						{group
+							.filter((item) => screenEnabled(item.id, features))
+							.map((item) => (
+								<li key={item.id}>
+									<Link
+										to={item.path}
+										activeOptions={{ exact: item.path === "/" }}
+										className="flex min-h-10 items-center gap-3 rounded-md px-3 font-medium text-sm transition-colors hover:bg-sidebar-accent/60 data-[status=active]:bg-sidebar-accent data-[status=active]:font-bold data-[status=active]:text-sidebar-accent-foreground"
+									>
+										<item.icon aria-hidden="true" className="size-4 shrink-0" />
+										{t(item.id)}
+									</Link>
+								</li>
+							))}
 					</ul>
 				))}
 			</nav>

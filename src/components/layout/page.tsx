@@ -1,4 +1,5 @@
-import type { ReactNode } from "react"
+import { Link, useNavigate } from "@tanstack/react-router"
+import { type ReactNode, useEffect } from "react"
 import type { ScreenId } from "@/app/navigation"
 import { useTranslations } from "@/i18n/use-translations"
 
@@ -12,6 +13,19 @@ export function Page({
 	actions?: ReactNode
 	children?: ReactNode
 }) {
+	const navigate = useNavigate()
+	const nav = useTranslations("nav")
+	useEffect(() => {
+		const listener = (e: KeyboardEvent) => {
+			if (e.key === "F1" && screen !== "help") {
+				e.preventDefault()
+				void navigate({ to: "/help", search: { q: nav(screen) } })
+			}
+		}
+		window.addEventListener("keydown", listener)
+		return () => window.removeEventListener("keydown", listener)
+	}, [navigate, screen, nav])
+	const tHelp = useTranslations("help")
 	const tNav = useTranslations("nav")
 	const tDesc = useTranslations("descriptions")
 
@@ -22,7 +36,18 @@ export function Page({
 					<h1 className="font-bold text-2xl leading-snug">{tNav(screen)}</h1>
 					<p className="text-muted-foreground text-sm">{tDesc(screen)}</p>
 				</div>
-				{actions}
+				<div className="flex items-center gap-3">
+					{actions}
+					{screen !== "help" && (
+						<Link
+							to="/help"
+							search={{ q: nav(screen) }}
+							className="text-primary text-sm underline"
+						>
+							{tHelp("context")}
+						</Link>
+					)}
+				</div>
 			</header>
 			{children}
 		</div>

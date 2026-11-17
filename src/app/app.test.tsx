@@ -42,7 +42,9 @@ describe("アプリの枠", () => {
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ヘルプ" })
 		).toBeInTheDocument()
-		expect(screen.getByText("この画面は準備中です")).toBeInTheDocument()
+		expect(
+			screen.getByRole("heading", { level: 2, name: "はじめての方へ" })
+		).toBeInTheDocument()
 		expect(router.state.location.pathname).toBe("/help")
 	})
 

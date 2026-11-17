@@ -36,6 +36,79 @@ pub struct SetupInput {
     pub filing_type: FilingType,
     pub tax_status: TaxStatus,
     pub template: IndustryTemplate,
+    #[serde(default)]
+    pub accounts: Vec<SetupAccount>,
+    #[serde(default)]
+    pub opening_balances: Vec<SetupOpening>,
+    #[serde(default)]
+    pub features: FeatureSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupAccount {
+    pub name: String,
+    pub kind: SetupAccountKind,
+    pub balance: i64,
+}
+
+crate::domain::string_enum! {
+    pub enum SetupAccountKind {
+        Cash => "cash",
+        Bank => "bank",
+        Card => "card",
+        EMoney => "eMoney",
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupOpening {
+    pub account_code: String,
+    pub amount: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeatureSettings {
+    pub inventory: bool,
+    pub receivables: bool,
+    pub recurring: bool,
+    pub allocation: bool,
+}
+
+impl Default for FeatureSettings {
+    fn default() -> Self {
+        Self {
+            inventory: true,
+            receivables: true,
+            recurring: true,
+            allocation: true,
+        }
+    }
+}
+
+pub fn features(conn: &Connection) -> AppResult<FeatureSettings> {
+    let value: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'features'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    match value {
+        Some(value) => {
+            serde_json::from_str(&value).map_err(|_| AppError::new(ErrorCode::InvalidFormat))
+        }
+        None => Ok(FeatureSettings::default()),
+    }
+}
+
+pub fn save_features(conn: &Connection, input: &FeatureSettings) -> AppResult<FeatureSettings> {
+    let value =
+        serde_json::to_string(input).map_err(|_| AppError::new(ErrorCode::InvalidFormat))?;
+    conn.execute("INSERT INTO settings (key, value) VALUES ('features', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [value])?;
+    Ok(input.clone())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -89,6 +162,9 @@ pub fn status(conn: &Connection) -> AppResult<SetupStatus> {
 pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
     let profile = input.profile.validated()?;
     let year = validate_year(input.fiscal_year)?;
+    if input.accounts.len() + input.opening_balances.len() > 100 {
+        return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+    }
 
     db.transaction(|tx| {
         if status(tx)?.completed {
@@ -110,6 +186,51 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
             params![year, input.filing_type, input.tax_status],
         )?;
         seed_accounts(tx, input.template)?;
+        let mut asset_total = 0_i64;
+        let mut liability_total = 0_i64;
+        for (index, account) in input.accounts.iter().enumerate() {
+            let name = master::required(&account.name, NAME_MAX, "accountName")?;
+            if account.balance.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+                return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+            }
+            let (category, line) = match account.kind {
+                SetupAccountKind::Cash => ("asset", "bs.cash"),
+                SetupAccountKind::Bank => ("asset", "bs.other_deposits"),
+                SetupAccountKind::Card => ("liability", "bs.accrued_payables"),
+                SetupAccountKind::EMoney => ("asset", "bs.other_assets"),
+            };
+            let id = if account.kind == SetupAccountKind::Cash && index == 0 {
+                tx.execute("UPDATE accounts SET name_ja = ?1 WHERE code = '101'", [&name])?;
+                tx.query_row("SELECT id FROM accounts WHERE code = '101'", [], |r| r.get::<_, i64>(0))?
+            } else {
+                tx.execute("INSERT INTO accounts (code, name_ja, category, statement_line, is_payment_account, sort) VALUES (?1, ?2, ?3, ?4, 1, ?5)", params![format!("W{:03}", index + 1), name, category, line, index as i64 + 1])?;
+                tx.last_insert_rowid()
+            };
+            tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, account.balance])?;
+            if category == "asset" { asset_total += account.balance; } else { liability_total += account.balance; }
+        }
+        let mut seen = std::collections::HashSet::new();
+        for row in &input.opening_balances {
+            if !seen.insert(row.account_code.clone()) || row.account_code == "302" {
+                return Err(AppError::field(ErrorCode::InvalidFormat, "openingBalance"));
+            }
+            if row.amount.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+                return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+            }
+            let (id, category): (i64, String) = tx.query_row("SELECT id, category FROM accounts WHERE code = ?1 AND category IN ('asset', 'liability', 'equity')", [&row.account_code], |r| Ok((r.get(0)?, r.get(1)?))).optional()?.ok_or(AppError::field(ErrorCode::NotFound, "openingBalance"))?;
+            let exists: bool = tx.query_row("SELECT EXISTS (SELECT 1 FROM opening_balances WHERE fiscal_year = ?1 AND account_id = ?2)", params![year, id], |r| r.get(0))?;
+            if exists { return Err(AppError::field(ErrorCode::DuplicateCode, "openingBalance")); }
+            tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, row.amount])?;
+            if category == "asset" { asset_total += row.amount; } else { liability_total += row.amount; }
+        }
+        if (asset_total - liability_total).abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+            return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+        }
+        if !input.accounts.is_empty() || !input.opening_balances.is_empty() {
+            tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) SELECT ?1, id, ?2 FROM accounts WHERE code = '302'", params![year, asset_total - liability_total])?;
+        }
+        save_features(tx, &input.features)?;
+        tx.execute("INSERT INTO settings (key, value) VALUES ('industry_template', ?1)", [input.template.as_str()])?;
         status(tx)
     })
 }
@@ -244,6 +365,9 @@ pub(crate) mod tests {
             filing_type: FilingType::Blue65,
             tax_status: TaxStatus::Exempt,
             template: IndustryTemplate::General,
+            accounts: vec![],
+            opening_balances: vec![],
+            features: FeatureSettings::default(),
         }
     }
 
@@ -395,5 +519,100 @@ pub(crate) mod tests {
         let input: SetupInput = serde_json::from_value(json).unwrap();
         assert_eq!(input.filing_type, FilingType::Blue10);
         assert_eq!(input.tax_status, TaxStatus::Special20);
+    }
+}
+
+#[cfg(test)]
+mod extended_tests {
+    use super::tests::input;
+    use super::*;
+    #[test]
+    fn accounts_opening_capital_and_features_are_saved_together() {
+        let db = Database::open_in_memory().unwrap();
+        let mut i = input();
+        i.accounts = vec![
+            SetupAccount {
+                name: "Cash".into(),
+                kind: SetupAccountKind::Cash,
+                balance: 20_000,
+            },
+            SetupAccount {
+                name: "Bank".into(),
+                kind: SetupAccountKind::Bank,
+                balance: 100_000,
+            },
+            SetupAccount {
+                name: "Card".into(),
+                kind: SetupAccountKind::Card,
+                balance: 5_000,
+            },
+            SetupAccount {
+                name: "E-money".into(),
+                kind: SetupAccountKind::EMoney,
+                balance: 3_000,
+            },
+        ];
+        i.opening_balances = vec![SetupOpening {
+            account_code: "203".into(),
+            amount: 30_000,
+        }];
+        i.features.recurring = false;
+        complete(&db, &i).unwrap();
+        let conn = db.conn();
+        let opening = super::super::closing::opening(&conn, 2026).unwrap();
+        assert!(opening.totals.balanced);
+        let capital:i64=conn.query_row("SELECT b.amount FROM opening_balances b JOIN accounts a ON a.id=b.account_id WHERE a.code='302'",[],|r|r.get(0)).unwrap();
+        assert_eq!(capital, 88_000);
+        assert!(!features(&conn).unwrap().recurring);
+        let accounts = super::super::accounts::list(&conn).unwrap();
+        assert!(accounts.iter().any(|a| a.name_ja == "Card"
+            && a.is_payment_account
+            && a.category == master::AccountCategory::Liability));
+    }
+    #[test]
+    fn invalid_opening_rolls_back_the_entire_setup() {
+        let db = Database::open_in_memory().unwrap();
+        let mut i = input();
+        i.accounts = vec![
+            SetupAccount {
+                name: "Cash".into(),
+                kind: SetupAccountKind::Cash,
+                balance: 500,
+            },
+            SetupAccount {
+                name: "Bank".into(),
+                kind: SetupAccountKind::Bank,
+                balance: crate::domain::journal::AMOUNT_MAX + 1,
+            },
+        ];
+        assert!(complete(&db, &i).is_err());
+        assert!(!status(&db.conn()).unwrap().completed);
+        assert!(super::super::accounts::list(&db.conn()).unwrap().is_empty());
+        i.accounts.clear();
+        i.opening_balances = vec![
+            SetupOpening {
+                account_code: "106".into(),
+                amount: 100,
+            },
+            SetupOpening {
+                account_code: "106".into(),
+                amount: 200,
+            },
+        ];
+        assert!(complete(&db, &i).is_err());
+        assert!(!status(&db.conn()).unwrap().completed);
+    }
+    #[test]
+    fn existing_books_have_all_features_and_can_change_them() {
+        let db = Database::open_in_memory().unwrap();
+        assert_eq!(features(&db.conn()).unwrap(), FeatureSettings::default());
+        let features = FeatureSettings {
+            inventory: false,
+            receivables: false,
+            recurring: false,
+            allocation: false,
+        };
+        save_features(&db.conn(), &features).unwrap();
+        assert_eq!(super::features(&db.conn()).unwrap(), features);
     }
 }

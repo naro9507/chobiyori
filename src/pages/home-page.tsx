@@ -20,12 +20,14 @@ import { useInboxPendingCount } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { NotInTauriError } from "@/lib/tauri"
 import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function HomePage() {
+	const features = useFeatures()
 	const t = useTranslations("home")
 	const fiscalYear = useFiscalYear()
 	const month = currentMonth(fiscalYear)
@@ -49,7 +51,9 @@ export function HomePage() {
 				</Card>
 			</div>
 			<DeadlineNotices />
-			<PendingRecurring fiscalYear={fiscalYear} month={month} />
+			{features.recurring && (
+				<PendingRecurring fiscalYear={fiscalYear} month={month} />
+			)}
 			<PendingInbox />
 			<Card>
 				<CardHeader>

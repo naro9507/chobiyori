@@ -34,3 +34,16 @@ pub async fn update_business_profile(
 pub async fn list_fiscal_years(db: State<'_, Database>) -> AppResult<Vec<FiscalYear>> {
     setup::fiscal_years(&db.conn())
 }
+
+#[tauri::command]
+pub async fn get_feature_settings(db: State<'_, Database>) -> AppResult<setup::FeatureSettings> {
+    setup::features(&db.conn())
+}
+
+#[tauri::command]
+pub async fn save_feature_settings(
+    db: State<'_, Database>,
+    input: setup::FeatureSettings,
+) -> AppResult<setup::FeatureSettings> {
+    setup::save_features(&db.conn(), &input)
+}
