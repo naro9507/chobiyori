@@ -305,7 +305,9 @@
 		"allocate": "事業で使った割合だけを経費にし、残りは私用（事業主貸）にする",
 		"businessPercent": "事業で使った割合（%）",
 		"businessPercentHint": "0〜100 の整数。割合は税理士に確かめて決めてください。",
-		"recordedLines": "記録しました（仕訳: {entry}）"
+		"recordedLines": "記録しました（仕訳: {entry}）",
+		"depositTarget": "入金をつなげる",
+		"depositTargetHint": "請求書や定期売上の入金なら選んでください。売掛金の消し込みや、その月の入金として記録します。"
 	},
 	"reports": {
 		"trialBalance": "合計残高試算表",
@@ -373,7 +375,8 @@
 		"saleNotRecorded": "入金の前に、この請求書の売上を記帳してください（「売上を記帳する」）。",
 		"mailNotConfigured": "メールの送信の設定がまだです。設定の画面の「メールの送信」で、アドレスとパスワードを登録してください。",
 		"mailAuth": "メールのサーバーにログインできませんでした。設定の画面で、送信に使うアドレスとパスワード（Gmail はアプリ パスワード）を確かめてください。",
-		"mailFailed": "メールを送れませんでした。インターネットにつながっているか、宛先のアドレスと送信サーバーの設定を確かめてください。「メールソフトで開く」でも送れます。"
+		"mailFailed": "メールを送れませんでした。インターネットにつながっているか、宛先のアドレスと送信サーバーの設定を確かめてください。「メールソフトで開く」でも送れます。",
+		"monthInvoiced": "この月は請求書で請求しています。入金は請求書の入金として記録してください。"
 	},
 	"ledgers": {
 		"tabsLabel": "帳簿の種類",
@@ -1273,7 +1276,7 @@
 		"simplified": "簡易課税",
 		"simplifiedHint": "事業の区分ごとのみなし仕入率で計算します。使うには前もって届出が要ります。",
 		"needsCategory": "事業の区分が決まっていない売上があります。事業の区分を選んでください。",
-		"methodsChoose": "どちらで申告するかは、条件を確かめて決めてください。本則課税（仕入れの消費税を引く計算）はこのアプリでは計算しません。",
+		"methodsChoose": "どれで申告するかは、条件を確かめて決めてください。本則課税は目安です。",
 		"deductible": "引ける額",
 		"payNational": "消費税",
 		"payLocal": "地方消費税",
@@ -1370,7 +1373,13 @@
 		"check_consumption_submitted": "消費税の申告書を出した",
 		"check_consumption_submittedHint": "所得税と一緒でなくてもかまいません。",
 		"check_consumption_paid": "消費税を納めた",
-		"check_consumption_paidHint": "期限は消費税の申告の期限と同じです。"
+		"check_consumption_paidHint": "期限は消費税の申告の期限と同じです。",
+		"standardEstimate": "本則課税（目安）",
+		"standardEstimateHint": "仕入れや経費の消費税を引いて計算した目安です。インボイスのない仕入れは、経過措置の割合（80% または 50%）だけ引きます。課税売上割合 95% 未満の扱いなどは計算していません。申告の前に税理士に確認してください。",
+		"purchaseGroup": "仕入れ {rate}・{invoice}",
+		"withInvoice": "インボイスあり",
+		"withoutInvoice": "インボイスなし（{percent}% を引く）",
+		"purchaseGroupAmounts": "税込 {included} 円 → 引ける税 {deductible} 円"
 	},
 	"receivables": {
 		"tabsLabel": "売上管理の表示",
@@ -1433,6 +1442,30 @@
 		"endMonth": "終わりの月",
 		"endMonthHint": "続くなら空のまま",
 		"save": "保存",
-		"noCustomers": "取引先がありません。マスタ画面で取引先を登録してください。"
+		"noCustomers": "取引先がありません。マスタ画面で取引先を登録してください。",
+		"invoiced": "請求書 {number}",
+		"draft": "下書き",
+		"draftInvoicesTitle": "定期売上から請求書を作る",
+		"draftInvoicesHint": "選んだ月の定期売上から、取引先ごとに請求書の下書きを作ります。発行の前に、書類の画面で中身を確かめてください。同じ月の請求書は二度作りません。",
+		"draftInvoices": "{month}月分の下書きを作る",
+		"draftInvoicesDone": "下書きを {count} 件作りました。請求書があって作らなかった分: {invoiced} 件、入金済みで作らなかった分: {paid} 件。",
+		"assignPlan": "定期売上",
+		"assignMonth": "対象の月",
+		"assign": "この月の入金にする"
+	},
+	"deposits": {
+		"noTarget": "つなげない",
+		"invoices": "請求書（未入金）",
+		"invoiceOption": "{number} {name}（残り {amount} 円）",
+		"saleNotRecorded": "（先に請求書を発行して売上を記録してください）",
+		"plans": "定期売上",
+		"planOption": "{partner} {name} {month}（残り {amount} 円）",
+		"linkTitle": "入金をつなげる",
+		"linkHint": "請求書か定期売上の入金なら、選ぶと「預金 / 売掛金」または売上として記録します。選ばなければ、ふだんどおり科目を選んで登録します。",
+		"suggestions": "候補",
+		"remaining": "残り {amount} 円",
+		"sameAmount": "金額が同じ",
+		"sameName": "名前が同じ",
+		"chooseTarget": "ほかから選ぶ"
 	}
 }

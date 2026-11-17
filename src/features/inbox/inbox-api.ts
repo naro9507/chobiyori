@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { DepositTarget } from "@/features/deposits/deposits-api"
 import { useInvalidateBooks } from "@/features/journal/journal-api"
 import type { TaxCategory } from "@/features/master/master-api"
 import { callCommand } from "@/lib/tauri"
@@ -158,6 +159,8 @@ export type ConfirmInput = {
 	allocationPercent: number | null
 	date: string | null
 	saveRule: boolean
+	/** 入金の行を、請求書か定期売上の月に結び付けて記録する */
+	deposit?: DepositTarget | null
 }
 
 export type MatchKind = "contains" | "equals"

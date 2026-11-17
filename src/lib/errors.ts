@@ -28,6 +28,7 @@ export type ErrorCode =
 	| "fileWrite"
 	| "importBlocked"
 	| "alreadyRecorded"
+	| "monthInvoiced"
 	| "secretStore"
 	| "noApiKey"
 	| "badApiKey"

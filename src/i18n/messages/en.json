@@ -305,7 +305,9 @@
 		"allocate": "Count only the business share as an expense and the rest as personal (owner's drawings)",
 		"businessPercent": "Business share (%)",
 		"businessPercentHint": "A whole number from 0 to 100. Check the share with your tax accountant.",
-		"recordedLines": "Recorded (journal entry: {entry})"
+		"recordedLines": "Recorded (journal entry: {entry})",
+		"depositTarget": "Link a payment",
+		"depositTargetHint": "Choose it if this is a payment for an invoice or a recurring sale. It clears the receivable or records the payment for that month."
 	},
 	"reports": {
 		"trialBalance": "Trial balance",
@@ -373,7 +375,8 @@
 		"saleNotRecorded": "Record the sale for this invoice first (\"Record the sale\").",
 		"mailNotConfigured": "Email sending isn't set up yet. Add your address and password under \"Sending email\" in Settings.",
 		"mailAuth": "Couldn't sign in to the mail server. In Settings, check the sending address and password (for Gmail, an app password).",
-		"mailFailed": "The email couldn't be sent. Check your internet connection, the recipient address and the server settings. You can also send it with \"Open in mail app\"."
+		"mailFailed": "The email couldn't be sent. Check your internet connection, the recipient address and the server settings. You can also send it with \"Open in mail app\".",
+		"monthInvoiced": "This month is billed by an invoice. Record the payment as a payment for the invoice."
 	},
 	"ledgers": {
 		"tabsLabel": "Book",
@@ -1273,7 +1276,7 @@
 		"simplified": "Simplified method",
 		"simplifiedHint": "Calculated with the deemed purchase rate of each business category. A notification must be filed in advance.",
 		"needsCategory": "Some sales have no business category. Choose a business category.",
-		"methodsChoose": "Check the conditions and decide which method to file with. The standard method (deducting tax on purchases) is not calculated in this app.",
+		"methodsChoose": "Check the conditions and decide which method to file with. The standard method is an estimate.",
 		"deductible": "Deductible",
 		"payNational": "Consumption tax",
 		"payLocal": "Local consumption tax",
@@ -1370,7 +1373,13 @@
 		"check_consumption_submitted": "Filed the consumption tax return",
 		"check_consumption_submittedHint": "It doesn't have to be filed together with the income tax return.",
 		"check_consumption_paid": "Paid the consumption tax",
-		"check_consumption_paidHint": "The deadline is the same as the consumption tax return."
+		"check_consumption_paidHint": "The deadline is the same as the consumption tax return.",
+		"standardEstimate": "Standard method (estimate)",
+		"standardEstimateHint": "An estimate that deducts the tax on purchases and expenses. Purchases without a qualified invoice deduct only the transitional share (80% or 50%). Cases such as a taxable sales ratio below 95% are not calculated. Confirm with a tax accountant before filing.",
+		"purchaseGroup": "Purchases {rate}, {invoice}",
+		"withInvoice": "with invoice",
+		"withoutInvoice": "without invoice ({percent}% deducted)",
+		"purchaseGroupAmounts": "{included} yen incl. tax → {deductible} yen deductible"
 	},
 	"receivables": {
 		"tabsLabel": "Sales view",
@@ -1433,6 +1442,30 @@
 		"endMonth": "End month",
 		"endMonthHint": "Leave empty if it continues",
 		"save": "Save",
-		"noCustomers": "There are no partners. Add one on the Master screen."
+		"noCustomers": "There are no partners. Add one on the Master screen.",
+		"invoiced": "Invoice {number}",
+		"draft": "draft",
+		"draftInvoicesTitle": "Make invoices from recurring sales",
+		"draftInvoicesHint": "Makes one draft invoice per partner from the recurring sales of the chosen month. Check them on the documents screen before issuing. Invoices for the same month are never made twice.",
+		"draftInvoices": "Make drafts for month {month}",
+		"draftInvoicesDone": "Made {count} drafts. Skipped because already invoiced: {invoiced}. Skipped because already paid: {paid}.",
+		"assignPlan": "Recurring sale",
+		"assignMonth": "Target month",
+		"assign": "Count as this month's payment"
+	},
+	"deposits": {
+		"noTarget": "Do not link",
+		"invoices": "Invoices (unpaid)",
+		"invoiceOption": "{number} {name} ({amount} yen left)",
+		"saleNotRecorded": "(issue the invoice first to record the sale)",
+		"plans": "Recurring sales",
+		"planOption": "{partner} {name} {month} ({amount} yen left)",
+		"linkTitle": "Link this deposit",
+		"linkHint": "If this is a payment for an invoice or a recurring sale, choose it to record it as \"bank / accounts receivable\" or as the sale. Otherwise choose an account as usual.",
+		"suggestions": "Suggestions",
+		"remaining": "{amount} yen left",
+		"sameAmount": "Same amount",
+		"sameName": "Same name",
+		"chooseTarget": "Choose another"
 	}
 }

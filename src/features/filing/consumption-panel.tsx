@@ -105,7 +105,7 @@ function PayableList({ payable, label }: { payable: Payable; label: string }) {
 	)
 }
 
-/** 2 割特例と簡易課税で納める額を並べる。どちらにするかは利用者が決める。 */
+/** 2 割特例・簡易課税・本則課税（目安）で納める額を並べる。どれにするかは利用者が決める。 */
 function Methods({ report }: { report: ConsumptionReport }) {
 	const t = useTranslations("filing")
 	return (
@@ -147,8 +147,52 @@ function Methods({ report }: { report: ConsumptionReport }) {
 					)}
 				</div>
 			</div>
+			<StandardEstimate report={report} />
 			<p className="text-muted-foreground text-xs">{t("methodsChoose")}</p>
 		</section>
+	)
+}
+
+/** 本則課税の目安。仕入れの税区分とインボイスの印から、引ける額を割戻しで計算する。 */
+function StandardEstimate({ report }: { report: ConsumptionReport }) {
+	const t = useTranslations("filing")
+	const groups = report.standard.groups
+	return (
+		<div className="flex flex-col gap-2 rounded-lg border p-4">
+			<p className="font-bold text-sm">{t("standardEstimate")}</p>
+			<p className="text-muted-foreground text-xs">
+				{t("standardEstimateHint")}
+			</p>
+			{groups.length > 0 && (
+				<ul className="flex flex-col gap-1 text-sm">
+					{groups.map((g) => (
+						<li
+							key={`${g.rate}-${g.qualified}-${g.percent}`}
+							className="flex flex-wrap justify-between gap-2"
+						>
+							<span>
+								{t("purchaseGroup", {
+									rate: t(`rate_${g.rate}`),
+									invoice: g.qualified
+										? t("withInvoice")
+										: t("withoutInvoice", { percent: g.percent }),
+								})}
+							</span>
+							<span className="num">
+								{t("purchaseGroupAmounts", {
+									included: formatAmount(g.taxIncluded),
+									deductible: formatAmount(g.deductible),
+								})}
+							</span>
+						</li>
+					))}
+				</ul>
+			)}
+			<PayableList
+				payable={report.standard.payable}
+				label={t("standardEstimate")}
+			/>
+		</div>
 	)
 }
 

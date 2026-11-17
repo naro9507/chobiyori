@@ -78,12 +78,16 @@ const monthly: MonthlyList = {
 			partnerId: 10,
 			name: "月謝",
 			cell: cell("2026-04", 8000, 8000, "paid"),
+			invoiceId: null,
+			invoiceNumber: null,
 		},
 		{
 			planId: 2,
 			partnerId: 11,
 			name: "月謝",
 			cell: cell("2026-04", 10000, 6000, "partial"),
+			invoiceId: null,
+			invoiceNumber: null,
 		},
 	],
 	totalScheduled: 18000,
@@ -244,5 +248,58 @@ describe("売上管理", () => {
 		const row = within(table).getByRole("row", { name: /生徒B/ })
 		expect(within(row).getAllByText("未入金")).toHaveLength(8)
 		expect(within(row).getByText("一部入金")).toBeInTheDocument()
+	})
+
+	it("定期売上から請求書の下書きを作り、未割当の入金をプランの月に割り当てる", async () => {
+		const base = mocks.callCommand.getMockImplementation()
+		mocks.callCommand.mockImplementation(async (command: string, args) => {
+			switch (command) {
+				case "list_recurring_plans":
+					return [
+						{
+							id: 2,
+							partnerId: 11,
+							name: "月謝",
+							amount: 10000,
+							revenueAccountId: 4,
+							startMonth: "2026-04",
+							endMonth: null,
+							memo: "",
+							skippedMonths: [],
+							inUse: true,
+						},
+					]
+				case "draft_recurring_invoices":
+					return { documents: [{}], alreadyInvoiced: 1, alreadyPaid: 0 }
+				case "assign_recurring_payment":
+					return { id: 9 }
+				default:
+					return base?.(command, args)
+			}
+		})
+		const user = userEvent.setup()
+		renderPage()
+		await user.selectOptions(await screen.findByLabelText("月"), "4月")
+		await user.click(
+			await screen.findByRole("button", { name: "4月分の下書きを作る" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("draft_recurring_invoices", {
+			fiscalYear: 2026,
+			month: 4,
+		})
+		expect(
+			await screen.findByText(
+				"下書きを 1 件作りました。請求書があって作らなかった分: 1 件、入金済みで作らなかった分: 0 件。"
+			)
+		).toBeInTheDocument()
+
+		await user.click(
+			await screen.findByRole("button", { name: "この月の入金にする" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("assign_recurring_payment", {
+			transactionId: 9,
+			planId: 2,
+			month: "2026-04",
+		})
 	})
 })

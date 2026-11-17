@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { DocumentRecord } from "@/features/documents/documents-api"
 import {
 	type Transaction,
 	useInvalidateBooks,
@@ -43,7 +44,15 @@ export type MonthCell = {
 
 export type MonthlyList = {
 	month: string
-	rows: { planId: number; partnerId: number; name: string; cell: MonthCell }[]
+	rows: {
+		planId: number
+		partnerId: number
+		name: string
+		cell: MonthCell
+		/** この月を請求した請求書。入金は請求書に記録する */
+		invoiceId: number | null
+		invoiceNumber: string | null
+	}[]
 	totalScheduled: number
 	totalNet: number
 	unpaidCount: number
@@ -156,6 +165,44 @@ export function useRecordPayments(fiscalYear: number | null) {
 		mutationFn: (inputs: PaymentInput[]) =>
 			callCommand<number>("record_recurring_payments", { fiscalYear, inputs }),
 		onSuccess,
+	})
+}
+
+/** 未割当の入金を、プランと対象月に割り当てる。 */
+export function useAssignPayment() {
+	const onSuccess = useInvalidateBooks()
+	return useMutation({
+		mutationFn: (args: {
+			transactionId: number
+			planId: number
+			month: string
+		}) => callCommand<Transaction>("assign_recurring_payment", args),
+		onSuccess,
+	})
+}
+
+/** Rust 側 `db::recurring::DraftInvoices` と同じ形。 */
+export type DraftInvoices = {
+	documents: DocumentRecord[]
+	alreadyInvoiced: number
+	alreadyPaid: number
+}
+
+/** その月に予定のあるプランから、取引先ごとに請求書の下書きを作る。 */
+export function useDraftInvoices(fiscalYear: number | null) {
+	const queryClient = useQueryClient()
+	const invalidate = useInvalidateBooks()
+	return useMutation({
+		mutationFn: (month: number) =>
+			callCommand<DraftInvoices>("draft_recurring_invoices", {
+				fiscalYear,
+				month,
+			}),
+		onSuccess: () =>
+			Promise.all([
+				invalidate(),
+				queryClient.invalidateQueries({ queryKey: ["documents"] }),
+			]),
 	})
 }
 
