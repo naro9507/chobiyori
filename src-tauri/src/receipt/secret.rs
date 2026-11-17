@@ -13,11 +13,44 @@ pub trait SecretStore {
     fn delete(&self) -> AppResult<()>;
 }
 
-/// OS の資格情報ストア。
+/// OS の資格情報ストアの Gemini の API キー。
 pub struct Keyring;
 
+/// メールの送信に使うパスワード（請求書のメール送信、F11）。
+pub const SMTP_PASSWORD: &str = "smtp-password";
+
+/// OS の資格情報ストアの、名前 `0` の項目。
+pub struct KeyringItem(pub &'static str);
+
 fn entry() -> AppResult<keyring::Entry> {
-    keyring::Entry::new(SERVICE, GEMINI_KEY).map_err(|_| AppError::new(ErrorCode::SecretStore))
+    entry_for(GEMINI_KEY)
+}
+
+fn entry_for(name: &str) -> AppResult<keyring::Entry> {
+    keyring::Entry::new(SERVICE, name).map_err(|_| AppError::new(ErrorCode::SecretStore))
+}
+
+impl SecretStore for KeyringItem {
+    fn get(&self) -> AppResult<Option<String>> {
+        match entry_for(self.0)?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(AppError::new(ErrorCode::SecretStore)),
+        }
+    }
+
+    fn set(&self, value: &str) -> AppResult<()> {
+        entry_for(self.0)?
+            .set_password(value)
+            .map_err(|_| AppError::new(ErrorCode::SecretStore))
+    }
+
+    fn delete(&self) -> AppResult<()> {
+        match entry_for(self.0)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err(AppError::new(ErrorCode::SecretStore)),
+        }
+    }
 }
 
 impl SecretStore for Keyring {

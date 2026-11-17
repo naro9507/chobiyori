@@ -27,8 +27,8 @@ use std::sync::Arc;
 /// PDF に使うフォント。ファイルの中身と、コレクション（.ttc）の中の番号。
 #[derive(Clone)]
 pub struct PdfFont {
-    data: Arc<Vec<u8>>,
-    index: u32,
+    pub(crate) data: Arc<Vec<u8>>,
+    pub(crate) index: u32,
 }
 
 /// 帳簿に出てくる文字。これが全部あるフォントだけを使う。
@@ -182,19 +182,19 @@ fn table_top(has_heading: bool) -> f32 {
 }
 
 /// 文字の幅を測る。
-struct Measure<'a> {
+pub(crate) struct Measure<'a> {
     face: ttf_parser::Face<'a>,
     units_per_em: f32,
 }
 
 impl<'a> Measure<'a> {
-    fn new(font: &'a PdfFont) -> Self {
+    pub(crate) fn new(font: &'a PdfFont) -> Self {
         let face = font.face();
         let units_per_em = f32::from(face.units_per_em());
         Self { face, units_per_em }
     }
 
-    fn width(&self, text: &str, size: f32) -> f32 {
+    pub(crate) fn width(&self, text: &str, size: f32) -> f32 {
         let units: u32 = text
             .chars()
             .map(|c| {
@@ -206,7 +206,7 @@ impl<'a> Measure<'a> {
     }
 
     /// 幅に収まるよう、はみ出す分を「…」にする。
-    fn fit(&self, text: &str, size: f32, max: f32) -> String {
+    pub(crate) fn fit(&self, text: &str, size: f32, max: f32) -> String {
         if self.width(text, size) <= max {
             return text.to_string();
         }

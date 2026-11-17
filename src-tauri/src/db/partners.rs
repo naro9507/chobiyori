@@ -20,6 +20,10 @@ pub struct Partner {
     pub memo: String,
     pub is_active: bool,
     pub in_use: bool,
+    /// 書類の宛名（空なら名前を使う）・メールアドレス・住所（請求書などの送り先、F11）
+    pub billing_name: String,
+    pub email: String,
+    pub address: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -39,6 +43,12 @@ pub struct PartnerInput {
     pub invoice_registration_no: Option<String>,
     #[serde(default)]
     pub memo: String,
+    #[serde(default)]
+    pub billing_name: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub address: String,
 }
 
 struct Valid {
@@ -48,6 +58,9 @@ struct Valid {
     kana: String,
     invoice_registration_no: Option<String>,
     memo: String,
+    billing_name: String,
+    email: String,
+    address: String,
 }
 
 fn validate(input: &PartnerInput) -> AppResult<Valid> {
@@ -60,15 +73,19 @@ fn validate(input: &PartnerInput) -> AppResult<Valid> {
             input.invoice_registration_no.as_deref(),
         )?,
         memo: master::optional(&input.memo, MEMO_MAX, "memo")?,
+        billing_name: master::optional(&input.billing_name, NAME_MAX * 2, "billingName")?,
+        email: crate::domain::document::email(&input.email, "email")?,
+        address: master::optional(&input.address, 200, "address")?,
     })
 }
 
 const SELECT: &str = "
     SELECT p.id, p.code, p.name_ja, p.name_en, p.kana, p.is_customer, p.is_vendor,
-           p.invoice_registration_no, p.memo, p.is_active,
+           p.invoice_registration_no, p.memo, p.is_active, p.billing_name, p.email, p.address,
            EXISTS (SELECT 1 FROM journal_lines WHERE partner_id = p.id)
            OR EXISTS (SELECT 1 FROM purposes WHERE default_partner_id = p.id)
            OR EXISTS (SELECT 1 FROM templates WHERE partner_id = p.id)
+           OR EXISTS (SELECT 1 FROM documents WHERE partner_id = p.id)
     FROM partners p";
 
 fn from_row(row: &Row<'_>) -> rusqlite::Result<Partner> {
@@ -83,7 +100,10 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Partner> {
         invoice_registration_no: row.get(7)?,
         memo: row.get(8)?,
         is_active: row.get(9)?,
-        in_use: row.get(10)?,
+        billing_name: row.get(10)?,
+        email: row.get(11)?,
+        address: row.get(12)?,
+        in_use: row.get(13)?,
     })
 }
 
@@ -100,8 +120,9 @@ pub fn get(conn: &Connection, id: i64) -> AppResult<Partner> {
 pub fn create(conn: &Connection, input: &PartnerInput) -> AppResult<Partner> {
     let v = validate(input)?;
     conn.execute(
-        "INSERT INTO partners (code, name_ja, name_en, kana, is_customer, is_vendor, invoice_registration_no, memo, sort)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, (SELECT coalesce(max(sort), 0) + 10 FROM partners))",
+        "INSERT INTO partners (code, name_ja, name_en, kana, is_customer, is_vendor, invoice_registration_no, memo,
+                               billing_name, email, address, sort)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, (SELECT coalesce(max(sort), 0) + 10 FROM partners))",
         params![
             v.code,
             v.name_ja,
@@ -110,7 +131,10 @@ pub fn create(conn: &Connection, input: &PartnerInput) -> AppResult<Partner> {
             flag(input.is_customer),
             flag(input.is_vendor),
             v.invoice_registration_no,
-            v.memo
+            v.memo,
+            v.billing_name,
+            v.email,
+            v.address
         ],
     )?;
     get(conn, conn.last_insert_rowid())
@@ -120,7 +144,8 @@ pub fn update(conn: &Connection, id: i64, input: &PartnerInput) -> AppResult<Par
     let v = validate(input)?;
     let changed = conn.execute(
         "UPDATE partners SET code = ?2, name_ja = ?3, name_en = ?4, kana = ?5, is_customer = ?6,
-                is_vendor = ?7, invoice_registration_no = ?8, memo = ?9
+                is_vendor = ?7, invoice_registration_no = ?8, memo = ?9, billing_name = ?10, email = ?11,
+                address = ?12
          WHERE id = ?1",
         params![
             id,
@@ -131,7 +156,10 @@ pub fn update(conn: &Connection, id: i64, input: &PartnerInput) -> AppResult<Par
             flag(input.is_customer),
             flag(input.is_vendor),
             v.invoice_registration_no,
-            v.memo
+            v.memo,
+            v.billing_name,
+            v.email,
+            v.address
         ],
     )?;
     if changed == 0 {
@@ -174,6 +202,9 @@ mod tests {
             is_vendor: false,
             invoice_registration_no: None,
             memo: "".into(),
+            billing_name: String::new(),
+            email: String::new(),
+            address: String::new(),
         }
     }
 
