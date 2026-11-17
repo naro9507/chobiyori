@@ -9,6 +9,8 @@ export type FiscalYear = {
 	year: number
 	filingType: FilingType
 	taxStatus: TaxStatus
+	/** 課税として扱う最初の日（年の途中でインボイスに登録した年は登録日）。免税の年度は null */
+	taxableFrom: string | null
 	closed: boolean
 }
 

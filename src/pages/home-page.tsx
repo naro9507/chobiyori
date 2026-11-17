@@ -15,6 +15,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
+import { DeadlineNotices } from "@/features/filing/deadline-notices"
 import { useInboxPendingCount } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
@@ -47,6 +48,7 @@ export function HomePage() {
 					</CardContent>
 				</Card>
 			</div>
+			<DeadlineNotices />
 			<PendingRecurring fiscalYear={fiscalYear} month={month} />
 			<PendingInbox />
 			<Card>

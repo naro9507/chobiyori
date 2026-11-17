@@ -10,6 +10,8 @@ import {
 	ChecklistPanel,
 	InventoryPanel,
 } from "@/features/closing/year-end-panels"
+import { ConsumptionPanel } from "@/features/filing/consumption-panel"
+import { IncomePanel } from "@/features/filing/income-panel"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { LockPanel } from "@/features/security/lock-panel"
 import { useTranslations } from "@/i18n/use-translations"
@@ -21,6 +23,8 @@ const tabs = [
 	"inventory",
 	"statement",
 	"carry",
+	"income",
+	"consumption",
 	"locks",
 ] as const
 type Tab = (typeof tabs)[number]
@@ -74,6 +78,12 @@ export function ClosingPage() {
 						</Tabs.Content>
 						<Tabs.Content value="carry" className="outline-none">
 							<CarryForwardPanel fiscalYear={fiscalYear} />
+						</Tabs.Content>
+						<Tabs.Content value="income" className="outline-none">
+							<IncomePanel fiscalYear={fiscalYear} />
+						</Tabs.Content>
+						<Tabs.Content value="consumption" className="outline-none">
+							<ConsumptionPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="locks" className="outline-none">
 							<LockPanel fiscalYear={fiscalYear} />

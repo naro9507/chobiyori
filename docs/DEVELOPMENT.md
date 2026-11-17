@@ -162,6 +162,14 @@ dcs-accounting-app/
 - 期首残高（`opening_balances`）は、試算表（`db/reports.rs`）と元帳の繰越（`db/books.rs`）に足す。
 - 欄の番号・控除額・償却率の正しさは、最新の様式と税理士に確認すること。
 
+## 確定申告・消費税・インボイスの登録の補助
+
+- 計算は `domain/filing.rs`（期限、チェックディジット、免税と課税の切り替え、消費税の額）、帳簿からの集計と記録は `db/filing.rs`、コマンドは `commands/filing.rs`。
+- 期限・2 割特例の期間・みなし仕入率は `domain/data/filing.json` に年度ごとに持つ。毎年見直し、足した年の期限が土日でないことはテストで確かめる。
+- その日の取引を免税として扱うかは `db::transactions::date_is_exempt`（年度の区分と登録日から決める）を使う。年度だけで判断しない。
+- アプリから国税庁へは何も送らない。公表サイトは `open_invoice_site` で開くだけで、開く先は Rust 側に固定してある。
+- どの画面にも、金額の入れ先・特例の条件・期限は税理士か税務署で確かめるよう添える（`AccountantNote`）。
+
 ## UI 部品
 
 shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコードとして編集してよい。
