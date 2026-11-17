@@ -11,6 +11,17 @@ function Input({ className, ...props }: React.ComponentProps<"input">) {
 	)
 }
 
+/** 複数行の入力欄（住所・備考・メールの本文）。 */
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+	return (
+		<textarea
+			data-slot="textarea"
+			className={cn(fieldClass, "h-auto min-h-20 py-2", className)}
+			{...props}
+		/>
+	)
+}
+
 /** OS 標準のセレクト。キーボードと読み上げに強く、軽い。 */
 function NativeSelect({ className, ...props }: React.ComponentProps<"select">) {
 	return (
@@ -54,4 +65,4 @@ function LabeledCheckbox({
 	)
 }
 
-export { Checkbox, Input, LabeledCheckbox, NativeSelect }
+export { Checkbox, Input, LabeledCheckbox, NativeSelect, Textarea }

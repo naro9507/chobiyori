@@ -41,6 +41,12 @@ export type ErrorCode =
 	| "weakPassword"
 	| "booksLocked"
 	| "backupInvalid"
+	| "documentIssued"
+	| "hasPayments"
+	| "saleNotRecorded"
+	| "mailNotConfigured"
+	| "mailAuth"
+	| "mailFailed"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
+import { DocumentSettingsCard } from "@/features/documents/document-settings-card"
+import { MailSettingsCard } from "@/features/documents/mail-settings-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
 import { PasswordCard } from "@/features/security/password-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
@@ -34,6 +36,8 @@ export function SettingsPage() {
 			<BusinessProfileCard />
 			<PasswordCard />
 			<ReceiptSettingsCard />
+			<DocumentSettingsCard />
+			<MailSettingsCard />
 			<Card>
 				<CardHeader>
 					<CardTitle id={languageId}>{t("language")}</CardTitle>

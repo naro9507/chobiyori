@@ -76,6 +76,10 @@ export type Partner = MasterRecord & {
 	isVendor: boolean
 	invoiceRegistrationNo: string | null
 	memo: string
+	/** 書類の宛名（空なら名前）・メールアドレス・住所 */
+	billingName: string
+	email: string
+	address: string
 }
 
 export type PartnerInput = {
@@ -87,6 +91,9 @@ export type PartnerInput = {
 	isVendor: boolean
 	invoiceRegistrationNo: string | null
 	memo: string
+	billingName: string
+	email: string
+	address: string
 }
 
 export type AllocationRule = MasterRecord & {

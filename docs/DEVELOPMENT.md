@@ -71,6 +71,7 @@ dcs-accounting-app/
 │   │   ├── export/             # 帳簿の CSV・PDF 出力
 │   │   ├── import/             # 仕訳 CSV・Excel 帳簿・カードや口座の明細の取込
 │   │   ├── receipt/            # レシートの読み取り（Gemini API）と API キーの保管
+│   │   ├── mail.rs             # 請求書などのメール送信（SMTP）
 │   │   ├── error.rs            # 画面に返すエラー
 │   │   ├── lib.rs              # アプリの組み立て
 │   │   └── main.rs
@@ -145,6 +146,13 @@ dcs-accounting-app/
 - API キーは `receipt/secret.rs` で OS の資格情報ストア（`keyring`。Windows の資格情報マネージャー、macOS のキーチェーン、Linux の keyutils）に置く。DB・ファイル・ログに書かず、画面には「登録済みかどうか」だけを返す。テストではメモリの中の偽物を使う。
 - HTTP は `reqwest`（自動アップデートと同じ版・機能。TLS は rustls と ring）。送るのはレシートの画像と固定の指示の文だけ。ログに画像・キー・金額・名前を出さない。
 - 証憑（画像・PDF）は `db/attachments.rs`。中身は DB の BLOB に置く（帳簿と一緒に暗号化される）。レシートの状態は `db/receipts.rs`、受信箱との紐付けと突合は `db/inbox.rs`。
+
+## 請求書などの書類とメール
+
+- 計算（明細の金額、税率ごとの消費税、状態、番号、メールのひな形の差し込み）は `domain/document.rs`。DB の読み書き・発行・取り消し・売上と入金の記帳は `db/documents.rs`。
+- 紙面の配置は `export/document.rs` の `layout()` で 1 回だけ計算し、PDF（krilla）とプレビュー（画面の SVG）の両方がその結果を描く。見た目を変えるときは `layout()` だけを直す。プレビューの紙は画面の配色に合わせず白地に黒で固定する（PDF と同じ見た目にするための例外）。
+- メールは `mail.rs`。送る部分は `MailSender` の向こうに置き、テストでは偽物を使う（本物の SMTP は呼ばない）。パスワードは `receipt/secret.rs` の `KeyringItem` で OS の資格情報ストアに置く。ログにアドレス・金額・パスワード・本文を出さない（エラーは SMTP の応答コードだけ）。
+- メールソフトとフォルダを開くのは `tauri-plugin-opener` の関数（`open_url`・`reveal_item_in_dir`）を Rust から呼ぶ。プラグインとしては登録せず、画面には許可を足していない。
 
 ## 決算
 

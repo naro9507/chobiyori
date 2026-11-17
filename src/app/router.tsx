@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react"
 import { ClosingPage } from "@/pages/closing-page"
 import { DataPage } from "@/pages/data-page"
+import { DocumentsPage } from "@/pages/documents-page"
 import { HomePage } from "@/pages/home-page"
 import { InboxPage } from "@/pages/inbox-page"
 import { LedgersPage } from "@/pages/ledgers-page"
@@ -29,6 +30,7 @@ const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 	ledgers: LedgersPage,
 	reports: ReportsPage,
 	closing: ClosingPage,
+	documents: DocumentsPage,
 	master: MasterPage,
 	data: DataPage,
 	settings: SettingsPage,
