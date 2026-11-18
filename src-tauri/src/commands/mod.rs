@@ -9,6 +9,7 @@ pub mod documents;
 pub mod export;
 mod files;
 pub mod filing;
+pub mod filing_notifications;
 pub mod import;
 pub mod inbox;
 pub mod journal;

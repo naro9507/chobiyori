@@ -237,11 +237,18 @@ export function useSetFilingCheck(fiscalYear: number | null) {
 	})
 }
 
-export function useFilingDeadlines(enabled = true, date = today()) {
+export function useFilingDeadlines(
+	enabled = true,
+	date = today(),
+	includeFuture = false
+) {
 	return useQuery({
-		queryKey: ["filing-deadlines", date],
+		queryKey: ["filing-deadlines", date, includeFuture],
 		queryFn: () =>
-			callCommand<DeadlineNotice[]>("filing_deadlines", { today: date }),
+			callCommand<DeadlineNotice[]>("filing_deadlines", {
+				today: date,
+				...(includeFuture ? { includeFuture } : {}),
+			}),
 		enabled,
 		retry: false,
 		retryOnMount: false,

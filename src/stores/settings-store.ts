@@ -7,7 +7,11 @@ export type Theme = "light" | "dark" | "system"
 export const filingReminderDays = [30, 7, 1] as const
 type FilingReminderDay = (typeof filingReminderDays)[number]
 
+export type FilingScheduleStatus = "ready" | "unavailable" | "failed"
+
 type SettingsState = {
+	filingScheduleStatus: FilingScheduleStatus | null
+	setFilingScheduleStatus: (status: FilingScheduleStatus | null) => void
 	filingReminders: FilingReminderDay[]
 	filingDesktopNotifications: boolean
 	setFilingDesktopNotifications: (enabled: boolean) => void
@@ -33,6 +37,9 @@ export const useSettingsStore = create<SettingsState>()(
 			lastSeenVersion: null,
 			filingReminders: [...filingReminderDays],
 			filingDesktopNotifications: false,
+			filingScheduleStatus: null,
+			setFilingScheduleStatus: (filingScheduleStatus) =>
+				set({ filingScheduleStatus }),
 			setFilingDesktopNotifications: (filingDesktopNotifications) =>
 				set({ filingDesktopNotifications }),
 			setFilingReminder: (day, enabled) =>

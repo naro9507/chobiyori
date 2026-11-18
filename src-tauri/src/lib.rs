@@ -226,6 +226,7 @@ pub fn run() {
             commands::filing::filing_checklist,
             commands::filing::set_filing_check,
             commands::filing::filing_deadlines,
+            commands::filing_notifications::sync_filing_notifications,
             commands::filing::partner_invoice_checks,
             commands::filing::invoice_number_status,
             commands::filing::record_invoice_check,

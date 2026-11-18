@@ -9,6 +9,7 @@ import type {
 	DeadlineNotice,
 	IncomeGuide,
 } from "@/features/filing/filing-api"
+import { today } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
@@ -253,6 +254,8 @@ beforeEach(() => {
 				}
 			case "filing_deadlines":
 				return notices
+			case "sync_filing_notifications":
+				return "ready"
 			case "plugin:notification|notify":
 				return undefined
 			default:
@@ -432,5 +435,53 @@ describe("インボイスの登録と期限", () => {
 		await user.click(checkbox)
 		await user.click(checkbox)
 		expect(calls()).toHaveLength(1)
+	})
+
+	it("75日より先の申告期限も午前9時に予約し、設定変更で予約を取り消す", async () => {
+		const due = new Date()
+		due.setDate(due.getDate() + 90)
+		notices = [
+			{ ...deadline, date: today(due), daysLeft: 90 },
+			{
+				...deadline,
+				date: today(due),
+				daysLeft: 90,
+				kind: "consumption",
+				submitted: true,
+			},
+		]
+		const user = userEvent.setup()
+		renderAt("/settings")
+		const desktop = await screen.findByRole("checkbox", {
+			name: "デスクトップ通知",
+		})
+		const schedules = () =>
+			mocks.callCommand.mock.calls
+				.filter(([name]) => name === "sync_filing_notifications")
+				.map(([, args]) => args.notifications)
+		await user.click(desktop)
+		await waitFor(() => expect(schedules().at(-1)).toHaveLength(3))
+		const reserved = schedules().at(-1)
+		expect(reserved.map(({ id }: { id: string }) => id)).toEqual([
+			"cbf-i-2026-30",
+			"cbf-i-2026-7",
+			"cbf-i-2026-1",
+		])
+		for (const [index, days] of [30, 7, 1].entries()) {
+			const scheduled = new Date(due)
+			scheduled.setHours(9, 0, 0, 0)
+			scheduled.setDate(scheduled.getDate() - days)
+			expect(reserved[index].at).toBe(scheduled.getTime())
+		}
+		expect(mocks.callCommand).toHaveBeenCalledWith("filing_deadlines", {
+			today: today(),
+			includeFuture: true,
+		})
+		await user.click(
+			screen.getByRole("checkbox", { name: "7日前（残り7〜2日）" })
+		)
+		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
+		await user.click(desktop)
+		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
 	})
 })

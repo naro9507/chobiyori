@@ -20,6 +20,7 @@ export function FilingReminderSettings() {
 		(state) => state.setFilingDesktopNotifications
 	)
 	const desktopHintId = useId()
+	const scheduleStatus = useSettingsStore((state) => state.filingScheduleStatus)
 
 	return (
 		<Card>
@@ -48,6 +49,15 @@ export function FilingReminderSettings() {
 					<p id={desktopHintId} className="text-muted-foreground text-sm">
 						{t("reminderDesktopHint")}
 					</p>
+					{desktop && scheduleStatus && scheduleStatus !== "ready" && (
+						<p role="status" className="text-muted-foreground text-sm">
+							{t(
+								scheduleStatus === "failed"
+									? "reminderScheduleFailed"
+									: "reminderScheduleUnavailable"
+							)}
+						</p>
+					)}
 				</div>
 			</CardContent>
 		</Card>
