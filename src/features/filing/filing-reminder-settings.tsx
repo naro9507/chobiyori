@@ -15,6 +15,11 @@ export function FilingReminderSettings() {
 	const titleId = useId()
 	const selected = useSettingsStore((state) => state.filingReminders)
 	const setReminder = useSettingsStore((state) => state.setFilingReminder)
+	const desktop = useSettingsStore((state) => state.filingDesktopNotifications)
+	const setDesktop = useSettingsStore(
+		(state) => state.setFilingDesktopNotifications
+	)
+	const desktopHintId = useId()
 
 	return (
 		<Card>
@@ -22,7 +27,7 @@ export function FilingReminderSettings() {
 				<CardTitle id={titleId}>{t("reminderTitle")}</CardTitle>
 				<CardDescription>{t("reminderDescription")}</CardDescription>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="space-y-4">
 				<fieldset aria-labelledby={titleId} className="flex flex-col gap-3">
 					{filingReminderDays.map((day) => (
 						<LabeledCheckbox
@@ -33,6 +38,17 @@ export function FilingReminderSettings() {
 						/>
 					))}
 				</fieldset>
+				<div className="space-y-1 border-t pt-4">
+					<LabeledCheckbox
+						label={t("reminderDesktop")}
+						checked={desktop}
+						aria-describedby={desktopHintId}
+						onChange={(event) => setDesktop(event.target.checked)}
+					/>
+					<p id={desktopHintId} className="text-muted-foreground text-sm">
+						{t("reminderDesktopHint")}
+					</p>
+				</div>
 			</CardContent>
 		</Card>
 	)

@@ -1365,6 +1365,8 @@
 		"reminderDay30": "30 days before (8–30 days left)",
 		"reminderDay7": "7 days before (2–7 days left)",
 		"reminderDay1": "The day before and the due date",
+		"reminderDesktop": "Desktop notifications",
+		"reminderDesktopHint": "When you open your books, also get desktop notifications for filing deadlines in the selected windows, at most once per deadline per day. If notifications do not appear, check your system notification settings.",
 		"reminderDismiss": "Dismiss reminder",
 		"reminderSettings": "Open settings",
 		"reminderDueToday": "The filing deadline is today ({date}).",

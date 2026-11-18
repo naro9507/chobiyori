@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -194,6 +194,7 @@ beforeEach(() => {
 		locale: "ja",
 		theme: "light",
 		filingReminders: [...filingReminderDays],
+		filingDesktopNotifications: false,
 	})
 	useYearStore.setState({ selected: null })
 	mocks.callCommand.mockReset()
@@ -252,6 +253,8 @@ beforeEach(() => {
 				}
 			case "filing_deadlines":
 				return notices
+			case "plugin:notification|notify":
+				return undefined
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}
@@ -394,5 +397,40 @@ describe("インボイスの登録と期限", () => {
 			})
 		)
 		expect(restored).not.toBeInTheDocument()
+	})
+
+	it("デスクトップ通知はオンにしたときだけ、同じ期限に1日1回送る", async () => {
+		notices = [
+			deadline,
+			{ ...deadline, fiscalYear: 2025, submitted: true },
+			{ ...deadline, fiscalYear: 2024, daysLeft: 31 },
+		]
+		const user = userEvent.setup()
+		renderAt("/settings")
+		await screen.findByRole("region", { name: "申告期限のリマインダー" })
+		const checkbox = screen.getByRole("checkbox", { name: "デスクトップ通知" })
+		const calls = () =>
+			mocks.callCommand.mock.calls.filter(
+				([name]) => name === "plugin:notification|notify"
+			)
+		expect(checkbox).not.toBeChecked()
+		expect(calls()).toHaveLength(0)
+
+		await user.click(checkbox)
+		await waitFor(() => expect(calls()).toHaveLength(1))
+		expect(calls()[0][1]).toEqual({
+			options: {
+				title: "2026年分の確定申告",
+				body: "期限は 2027-03-15、あと 20 日です。",
+			},
+		})
+		const saved = JSON.parse(localStorage.getItem("dcs-settings") ?? "{}")
+		expect(saved.state.filingDesktopNotifications).toBe(true)
+		expect(localStorage.getItem("dcs-filing-desktop-notifications")).toContain(
+			"income-2026-2027-03-15"
+		)
+		await user.click(checkbox)
+		await user.click(checkbox)
+		expect(calls()).toHaveLength(1)
 	})
 })

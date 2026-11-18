@@ -1365,6 +1365,8 @@
 		"reminderDay30": "30日前（残り30〜8日）",
 		"reminderDay7": "7日前（残り7〜2日）",
 		"reminderDay1": "前日と当日",
+		"reminderDesktop": "デスクトップ通知",
+		"reminderDesktopHint": "帳簿を開いたとき、選んだ期間の申告期限をデスクトップにも通知します。同じ期限は1日1回までです。届かない場合はOSの通知設定を確認してください。",
 		"reminderDismiss": "リマインダーを閉じる",
 		"reminderSettings": "設定を開く",
 		"reminderDueToday": "申告期限は本日（{date}）です。",
