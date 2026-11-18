@@ -7,6 +7,7 @@ import { useTranslations } from "@/i18n/use-translations"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 import { type DeadlineNotice, today, useFilingDeadlines } from "./filing-api"
 import { notifyFilingDeadline } from "./filing-desktop-notifications"
+import { deadlineKey } from "./filing-notification-plan"
 
 // 一番短い期間を先に調べ、設定ごとに重ならないようにする。
 const reminderWindows = [...filingReminderDays].reverse()
@@ -44,7 +45,7 @@ function Reminder({ notice, day }: { notice: DeadlineNotice; day: string }) {
 			? t("reminderDueToday", { date: notice.date })
 			: t("deadlineLeft", { date: notice.date, days: notice.daysLeft })) +
 		(notice.estimated ? ` ${t("deadlineEstimated")}` : "")
-	const key = `${notice.kind}-${notice.fiscalYear}-${notice.date}`
+	const key = deadlineKey(notice)
 
 	useEffect(() => {
 		if (desktop) void notifyFilingDeadline({ day, key, title, body })

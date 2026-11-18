@@ -1,4 +1,5 @@
 import { callCommand, isTauri } from "@/lib/tauri"
+import { wasReservedToday } from "./filing-notification-plan"
 
 const storageKey = "dcs-filing-desktop-notifications"
 const pending = new Set<string>()
@@ -28,7 +29,7 @@ export async function notifyFilingDeadline({
 	title: string
 	body: string
 }) {
-	if (!isTauri()) return
+	if (!isTauri() || wasReservedToday(key, day)) return
 	const previous = readDelivered()
 	const pendingKey = `${day}:${key}`
 	if (

@@ -78,8 +78,13 @@ pub async fn set_filing_check(
 pub async fn filing_deadlines(
     db: State<'_, Database>,
     today: String,
+    include_future: Option<bool>,
 ) -> AppResult<Vec<DeadlineNotice>> {
-    filing::deadlines(&db.conn(), &today)
+    if include_future.unwrap_or_default() {
+        filing::upcoming_deadlines(&db.conn(), &today)
+    } else {
+        filing::deadlines(&db.conn(), &today)
+    }
 }
 
 #[tauri::command]

@@ -597,6 +597,19 @@ const NOTICE_AFTER_DAYS: i64 = 30;
 
 /// ホームに出す申告期限のお知らせ。`today` は画面の日付（`YYYY-MM-DD`）。
 pub fn deadlines(conn: &Connection, today: &str) -> AppResult<Vec<DeadlineNotice>> {
+    deadline_notices(conn, today, false)
+}
+
+/// 画面を開いていない期間にも予約できるよう、75 日より先の期限も読む。
+pub fn upcoming_deadlines(conn: &Connection, today: &str) -> AppResult<Vec<DeadlineNotice>> {
+    deadline_notices(conn, today, true)
+}
+
+fn deadline_notices(
+    conn: &Connection,
+    today: &str,
+    include_future: bool,
+) -> AppResult<Vec<DeadlineNotice>> {
     if journal::parse_date(today).is_none() {
         return Err(AppError::field(ErrorCode::InvalidFormat, "today"));
     }
@@ -614,7 +627,8 @@ pub fn deadlines(conn: &Connection, today: &str) -> AppResult<Vec<DeadlineNotice
             };
             let done = items.iter().filter(|i| i.done_at.is_some()).count();
             let total = items.len();
-            let show = (0..=NOTICE_FROM_DAYS).contains(&days_left)
+            let show = (include_future && days_left >= 0)
+                || (0..=NOTICE_FROM_DAYS).contains(&days_left)
                 || ((-NOTICE_AFTER_DAYS..0).contains(&days_left) && done < total);
             if show {
                 let submitted_key = match kind {
@@ -901,6 +915,7 @@ mod tests {
         );
         // 2026 年分の確定申告の期限は 2027-03-15。75 日前（2026-12-30）から知らせる
         assert!(deadlines(&conn, "2026-12-29").unwrap().is_empty());
+        assert_eq!(upcoming_deadlines(&conn, "2026-12-29").unwrap().len(), 1);
         let n = deadlines(&conn, "2027-02-13").unwrap();
         assert_eq!(n.len(), 1);
         assert_eq!(
