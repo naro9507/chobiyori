@@ -197,7 +197,7 @@ shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコード
 | pnpm 本体 | 版とハッシュを固定する | `package.json` の `packageManager` |
 | Rust の crate | `Cargo.lock` と違う版を使わない | `--locked` を付けて実行 |
 | GitHub Actions | 版のタグではなくコミットハッシュで指定する。チェックアウトに認証情報を残さない | `.github/workflows/` |
-| 既知の脆弱性 | CI で `pnpm audit` と `cargo audit` を実行する | `.github/workflows/ci.yml`、`pnpm audit` |
+| 既知の脆弱性 | 毎日の定期監査と手動実行。失敗時は Issue で追跡する | `.github/workflows/security-audit.yml` |
 | 更新 | Dependabot が週に 1 回、公開から 7 日たった版への更新を提案する | `.github/dependabot.yml` |
 
 依存を足すときの注意:
@@ -208,6 +208,20 @@ shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコード
 
 
 `git push` の前に `.husky/pre-push` が、Biome・型チェック・Vitest・rustfmt・Clippy・cargo test を実行する。
+
+
+### 定期的な依存監査
+
+`Security audit` は毎日 9:17（日本時間、UTC 00:17）にデフォルトブランチで実行する。
+スケジュールは混雑などで遅れることがある。マージ後は Actions の「Run workflow」から手動実行もできる。
+`pnpm audit --audit-level high` と `cargo audit` は別々のジョブで実行し、勧告を除外しない。
+通常の CI は PR と main への push で型・テスト・ビルドなどを検査し、監査はマージの必須チェックにしない。
+
+監査や準備処理に失敗したら、実行ログへのリンクと各ジョブの結果を含む Issue を作り、`naro9507` に割り当てる。
+専用マーカー付きの未解決 Issue があれば本文を更新し、重複作成や毎日のコメントはしない。
+Issue を閉じたあとに再び失敗したら新しい Issue を作る。監査成功時に自動では閉じないため、対応内容を確認して閉じる。
+Issue の割り当て通知と Actions の失敗通知を受け取れるよう、GitHub の個人通知設定も確認する。
+Issue 作成・更新自体が失敗した場合は通知ジョブも失敗するので、Actions の失敗通知も有効にしておく。
 
 ## 帳日和への名称変更
 

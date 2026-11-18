@@ -83,7 +83,7 @@
 
 ### 1. インストールする
 
-[Releases](https://github.com/naro9507/chobiyori/releases) から、使っているパソコンに合うファイルをダウンロードして開きます。
+[最新版のダウンロードページ](https://github.com/naro9507/chobiyori/releases/latest) の「Assets」から、使っているパソコンに合うファイルをダウンロードして開きます。
 
 | パソコン | ファイル |
 |---|---|

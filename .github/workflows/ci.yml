@@ -1,9 +1,9 @@
-# プッシュとプルリクエストのたびに、画面と Rust の検査を行う
+# main へのプッシュとプルリクエストで、画面と Rust の検査を行う
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
 
 permissions:
@@ -42,8 +42,8 @@ jobs:
           node --test scripts/signing-preflight.test.mjs
           node scripts/check-signing-key.mjs
 
-      - name: 依存の既知の脆弱性を確かめる（npm）
-        run: pnpm audit --audit-level high
+      - name: 監査 Issue の通知処理を確かめる
+        run: node --test scripts/report-security-audit.test.mjs
 
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
@@ -61,12 +61,6 @@ jobs:
           pnpm check
           pnpm typecheck
           pnpm test
-
-      - name: 依存の既知の脆弱性を確かめる（Rust）
-        working-directory: src-tauri
-        run: |
-          cargo install cargo-audit --locked
-          cargo audit
 
       - name: Rust の検査
         run: |
