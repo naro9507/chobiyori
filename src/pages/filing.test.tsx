@@ -273,7 +273,7 @@ describe("確定申告の補助", () => {
 			screen.getByText(/紙で出すときは控除が 550,000 円/)
 		).toBeInTheDocument()
 		expect(
-			screen.getAllByText(/税理士か税務署で確かめてください/).length
+			screen.getAllByText(/国税庁の様式・手引きで確かめてください/).length
 		).toBeGreaterThan(0)
 
 		await user.click(screen.getByRole("checkbox", { name: "申告書を出した" }))

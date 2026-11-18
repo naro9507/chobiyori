@@ -51,7 +51,7 @@ it("マウスを重ねてもクリックしても説明を開ける", async () =
 	)
 	await user.click(trigger)
 	expect(await screen.findByRole("tooltip")).toHaveTextContent(
-		"税理士か税務署に確認"
+		"使用面積や使用時間などの記録に基づき"
 	)
 })
 it("英語では英語の説明を表示する", async () => {

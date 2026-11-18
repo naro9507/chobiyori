@@ -128,6 +128,7 @@ export type StatementIssueCode =
 	| "expensesMerged"
 	| "ownerOpening"
 	| "whiteFiling"
+	| "whiteDeductionExceedsIncome"
 
 export type StatementAmounts = {
 	fiscalYear: number
