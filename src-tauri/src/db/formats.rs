@@ -14,6 +14,18 @@ use serde::{Deserialize, Serialize};
 /// 見出しを確かめるまでは、見出しが違えば自動では当てはまらず、形式エディタが開く。
 const PRESETS: &[(&str, &str)] = &[
     ("amex", include_str!("../../presets/amex.json")),
+    (
+        "rakuten-card",
+        include_str!("../../presets/rakuten-card.json"),
+    ),
+    (
+        "rakuten-card-11",
+        include_str!("../../presets/rakuten-card-11.json"),
+    ),
+    (
+        "rakuten-card-10",
+        include_str!("../../presets/rakuten-card-10.json"),
+    ),
     ("bank-yucho", include_str!("../../presets/bank-yucho.json")),
     ("bank-mufg", include_str!("../../presets/bank-mufg.json")),
     ("bank-smbc", include_str!("../../presets/bank-smbc.json")),

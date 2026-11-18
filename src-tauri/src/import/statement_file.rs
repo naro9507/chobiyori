@@ -222,6 +222,73 @@ pub(crate) mod tests {
         assert_eq!(diff.added, ["ポイント"]);
     }
 
+    #[test]
+    fn rakuten_card_presets_read_purchase_amounts_and_match_next_month() {
+        // 公開されているヘッダーから作った合成データ。元の明細は使用しない。
+        let prefix =
+            "\u{feff}利用日,利用店名・商品名,利用者,支払方法,利用金額,手数料/利息,支払総額,";
+        let cases = [
+            (
+                "rakuten-card-10",
+                "12月支払金額,1月繰越残高,新規サイン",
+                "620,580,*",
+            ),
+            (
+                "rakuten-card-11",
+                "12月支払金額,当月請求額,1月繰越残高,新規サイン",
+                "620,620,580,*",
+            ),
+            (
+                "rakuten-card",
+                "支払月,12月支払金額,当月請求額,1月繰越残高,1月以降請求額",
+                "12月,620,620,580,580",
+            ),
+        ];
+        let presets = crate::db::formats::presets();
+        for (key, suffix, tail) in cases {
+            let csv = format!(
+                "{prefix}{suffix}\r\n2026/10/03,文具店（テスト）,本人,2回払い,\"1,180\",20,1200,{tail}\r\n2026/10/04,返品（テスト）,本人,1回払い,-300,0,-300,{tail}\r\n,合計\r\n",
+            );
+            let name = "enavi.csv";
+            let found = matching_format(csv.as_bytes(), name, &presets).unwrap();
+            assert_eq!(found.preset.as_deref(), Some(key));
+            assert_eq!(
+                found.source_kind,
+                crate::domain::statement::SourceKind::Card
+            );
+            let original = read_with(csv.as_bytes(), name, &found.definition)
+                .unwrap()
+                .unwrap();
+            assert!(original.errors.is_empty());
+            assert_eq!(original.ignored.len(), 1);
+            assert_eq!(original.totals(), (1180, 300));
+            assert_eq!(original.rows[0].date, "2026-10-03");
+            assert_eq!(original.rows[0].merchant, "文具店（テスト）");
+
+            let mut saved = found.definition.clone();
+            let table = self::table(csv.as_bytes(), name, saved.encoding, saved.delimiter).unwrap();
+            saved.header = statement::header_for_save(&table, &saved);
+            let next_month = csv
+                .replace("12月支払金額", "1月支払金額")
+                .replace("1月繰越残高", "2月繰越残高")
+                .replace("1月以降請求額", "2月以降請求額");
+            assert_eq!(
+                read_with(next_month.as_bytes(), name, &saved)
+                    .unwrap()
+                    .unwrap(),
+                original
+            );
+
+            // 月の範囲と取引に使う列の名前・順序は厳密に確かめる。
+            let bad_month = csv.replace("12月支払金額", "13月支払金額");
+            assert!(matching_format(bad_month.as_bytes(), name, &presets).is_none());
+            let renamed = csv.replace("利用金額,手数料/利息", "手数料/利息,利用金額");
+            assert!(matching_format(renamed.as_bytes(), name, &presets).is_none());
+            let changed = read_with(renamed.as_bytes(), name, &saved).unwrap();
+            assert!(changed.is_err());
+        }
+    }
+
     /// 匿名化した銀行の明細（Shift_JIS）。見出しはプリセットのまま、行は役割から作る。
     /// 様式は公開情報からの推測で、実物の明細での確認が要る。
     fn bank_fixture(def: &FormatDefinition) -> Vec<u8> {
