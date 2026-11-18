@@ -193,7 +193,7 @@ pub async fn preview_statement(
         Ok(StatementPreview {
             rows: table.iter().take(PREVIEW_ROWS).cloned().collect(),
             row_count: table.len(),
-            header: statement::header_of(&table, definition.header_row),
+            header: statement::header_for_save(&table, &definition),
             missing_roles: definition.missing_roles(),
             valid_count: s.rows.len(),
             ignored_count: s.ignored.len(),

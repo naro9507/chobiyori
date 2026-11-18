@@ -1,0 +1,34 @@
+{
+  "app": "chobiyori",
+  "kind": "importFormat",
+  "version": 1,
+  "name": "楽天カード（11列）",
+  "sourceKind": "card",
+  "definition": {
+    "encoding": "utf8",
+    "delimiter": "comma",
+    "headerRow": 1,
+    "columns": [
+      "date",
+      "merchant",
+      "user",
+      "ignore",
+      "amount"
+    ],
+    "sign": "spendPositive",
+    "skipUnreadableDates": true,
+    "header": [
+      "利用日",
+      "利用店名・商品名",
+      "利用者",
+      "支払方法",
+      "利用金額",
+      "手数料/利息",
+      "支払総額",
+      "{month}月支払金額",
+      "当月請求額",
+      "{month}月繰越残高",
+      "新規サイン"
+    ]
+  }
+}

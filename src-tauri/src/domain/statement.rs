@@ -98,7 +98,8 @@ pub struct FormatDefinition {
     /// 日付として読めない行（合計の行・注記など）は、黙って飛ばす
     #[serde(default = "default_true")]
     pub skip_unreadable_dates: bool,
-    /// この形式の目印。保存したときの見出しの行（見出しがなければ空）
+    /// この形式の目印。保存したときの見出しの行（見出しがなければ空）。
+    /// 読まない列は `{month}月` で始まる月別見出しのひな型も使える。
     #[serde(default)]
     pub header: Vec<String>,
 }
@@ -401,6 +402,43 @@ pub struct HeaderDiff {
     pub missing: Vec<String>,
 }
 
+/// 読まない列だけ、見出し先頭の `{month}月` を 1〜12 月の数字として扱う。
+fn header_matches(expected: &str, actual: &str, ignored: bool) -> bool {
+    if expected == actual {
+        return true;
+    }
+    if !ignored {
+        return false;
+    }
+    let Some(suffix) = expected.strip_prefix("{month}月") else {
+        return false;
+    };
+    actual.split_once('月').is_some_and(|(month, rest)| {
+        rest == suffix
+            && matches!(
+                month,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12"
+            )
+    })
+}
+
+fn same_header_cell(def: &FormatDefinition, index: usize, expected: &str, actual: &str) -> bool {
+    let ignored = def
+        .columns
+        .get(index)
+        .is_none_or(|role| *role == ColumnRole::Ignore);
+    header_matches(expected, actual, ignored)
+}
+
+/// 試し読みに使った見出しを保存する。合っている月のひな型は残す。
+pub fn header_for_save(table: &[Vec<String>], def: &FormatDefinition) -> Vec<String> {
+    match check_header(table, def) {
+        Ok(()) if def.header_row > 0 => def.header.clone(),
+        Ok(()) => Vec::new(),
+        Err(diff) => diff.found,
+    }
+}
+
 /// ファイルが保存した形式と合うか。見出しが同じ（並びも同じ）なら合う。
 /// 見出しのない形式は、列の数で比べる。
 pub fn check_header(table: &[Vec<String>], def: &FormatDefinition) -> Result<(), HeaderDiff> {
@@ -412,7 +450,13 @@ pub fn check_header(table: &[Vec<String>], def: &FormatDefinition) -> Result<(),
             .map_or(0, Vec::len);
         width >= def.columns.len()
     } else {
-        found == def.header
+        found.len() == def.header.len()
+            && def
+                .header
+                .iter()
+                .zip(&found)
+                .enumerate()
+                .all(|(index, (expected, actual))| same_header_cell(def, index, expected, actual))
     };
     if same {
         return Ok(());
@@ -420,13 +464,24 @@ pub fn check_header(table: &[Vec<String>], def: &FormatDefinition) -> Result<(),
     Err(HeaderDiff {
         added: found
             .iter()
-            .filter(|c| !def.header.contains(c))
+            .filter(|actual| {
+                !def.header
+                    .iter()
+                    .enumerate()
+                    .any(|(index, expected)| same_header_cell(def, index, expected, actual))
+            })
             .cloned()
             .collect(),
         missing: def
             .header
             .iter()
-            .filter(|c| !found.contains(c))
+            .enumerate()
+            .filter(|(index, expected)| {
+                !found
+                    .iter()
+                    .any(|actual| same_header_cell(def, *index, expected, actual))
+            })
+            .map(|(_, expected)| expected)
             .cloned()
             .collect(),
         expected: def.header.clone(),
