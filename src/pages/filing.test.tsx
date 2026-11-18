@@ -1,5 +1,12 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import {
+	act,
+	render,
+	renderHook,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -11,7 +18,7 @@ import type {
 	InvoiceRegistration,
 	RegistrationInput,
 } from "@/features/filing/filing-api"
-import { today } from "@/features/filing/filing-api"
+import { today, useFilingDay } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
@@ -588,4 +595,18 @@ describe("インボイスの登録と期限", () => {
 			).not.toBeInTheDocument()
 		})
 	})
+})
+
+it("画面を開いたまま午前0時を過ぎると申告期限の照会日が変わる", async () => {
+	vi.useFakeTimers()
+	try {
+		vi.setSystemTime(new Date(2027, 2, 7, 23, 59, 59, 500))
+		const { result, unmount } = renderHook(() => useFilingDay())
+		expect(result.current).toBe("2027-03-07")
+		await act(() => vi.advanceTimersByTimeAsync(500))
+		expect(result.current).toBe("2027-03-08")
+		unmount()
+	} finally {
+		vi.useRealTimers()
+	}
 })

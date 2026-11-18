@@ -189,7 +189,25 @@ beforeEach(() => {
 							taxStatus: "exempt",
 							closed: false,
 						},
+						{
+							year: 2027,
+							filingType: "blue65",
+							taxStatus: "exempt",
+							closed: false,
+						},
 					]
+				case "inventory_status":
+				case "record_inventory":
+					return {
+						fiscalYear: args?.fiscalYear,
+						opening: 0,
+						purchases: 0,
+						closing:
+							args?.closingAmount ?? (args?.fiscalYear === 2027 ? 9000 : null),
+						costOfSales: null,
+						recorded: false,
+						openingRecorded: true,
+					}
 				case "list_accounts":
 					return accounts
 				case "list_partners":
@@ -341,5 +359,26 @@ describe("決算", () => {
 		).toBeInTheDocument()
 		await user.click(screen.getByRole("button", { name: "2027 年度を開く" }))
 		expect(useYearStore.getState().selected).toBe(2027)
+	})
+})
+
+it("年度を切り替えると前の年度の未保存の棚卸高を引き継がない", async () => {
+	const user = userEvent.setup()
+	renderPage()
+	await user.click(await screen.findByRole("tab", { name: "棚卸" }))
+	await user.type(
+		await screen.findByRole("textbox", { name: "年末の棚卸高" }),
+		"1200"
+	)
+	await user.selectOptions(
+		screen.getByRole("combobox", { name: "見る年度" }),
+		"2027"
+	)
+	const input = await screen.findByRole("textbox", { name: "年末の棚卸高" })
+	expect(input).toHaveValue("9000")
+	await user.click(screen.getByRole("button", { name: "棚卸を記録する" }))
+	expect(mocks.callCommand).toHaveBeenCalledWith("record_inventory", {
+		fiscalYear: 2027,
+		closingAmount: 9000,
 	})
 })

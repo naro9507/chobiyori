@@ -66,6 +66,8 @@ pub struct RegistrationInput {
     pub tax_status: TaxStatus,
     #[serde(default)]
     pub simplified_category: Option<i64>,
+    #[serde(default)]
+    pub was_exempt: Option<bool>,
 }
 
 fn valid_category(category: Option<i64>) -> AppResult<Option<i64>> {
@@ -109,6 +111,14 @@ pub fn save_registration(
         if changed == 0 {
             return Err(AppError::new(ErrorCode::NotSetUp));
         }
+        tx.execute(
+            "UPDATE fiscal_years
+             SET invoice_tax_start = CASE WHEN
+                 coalesce(?2, tax_status IN ('exempt', 'special20') OR invoice_tax_start IS NOT NULL)
+                 THEN ?3 END
+             WHERE year = ?1 AND status = 'open'",
+            params![registration_year, input.was_exempt, date],
+        )?;
         tx.execute(
             "UPDATE fiscal_years SET tax_status = ?1
              WHERE year = ?2 AND (year >= ?3 OR tax_status <> 'exempt')",
@@ -215,11 +225,23 @@ fn year_status(conn: &Connection, year: i64) -> AppResult<TaxStatus> {
 
 /// 年度で課税として扱う最初の日。
 pub(crate) fn taxable_from(conn: &Connection, year: i64) -> AppResult<Option<String>> {
-    let status = year_status(conn, year)?;
+    let (status, start) = conn
+        .query_row(
+            "SELECT tax_status, invoice_tax_start FROM fiscal_years WHERE year = ?1",
+            [year],
+            |row| {
+                Ok((
+                    row.get::<_, TaxStatus>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or(AppError::field(ErrorCode::NotFound, "fiscalYear"))?;
     Ok(filing::taxable_from(
         year,
         status == TaxStatus::Exempt,
-        registered_on(conn)?.as_deref(),
+        start.as_deref(),
     ))
 }
 
@@ -828,6 +850,7 @@ mod tests {
                 fiscal_year: 2026,
                 tax_status: status,
                 simplified_category: category,
+                was_exempt: None,
             },
         )
     }
@@ -898,10 +921,7 @@ mod tests {
         );
         let conn = db.conn();
         assert_eq!(year_status(&conn, 2026).unwrap(), TaxStatus::Simplified);
-        assert_eq!(
-            registered_on(&conn).unwrap().as_deref(),
-            Some("2026-10-01")
-        );
+        assert_eq!(registered_on(&conn).unwrap().as_deref(), Some("2026-10-01"));
     }
 
     #[test]

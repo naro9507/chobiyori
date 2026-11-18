@@ -49,6 +49,12 @@ pub enum ErrorCode {
     FileWrite,
     /// 取込の内容に直すところが残っている
     ImportBlocked,
+    /// 明細ファイルの行数が上限を超えた
+    TooManyStatementRows,
+    /// 少額減価償却資産の特例を適用できない
+    SmallAssetIneligible,
+    /// 少額減価償却資産の特例の年間上限を超えた
+    SmallAssetLimit,
     /// 定型仕訳のその月の分は、もう記録してある（見送ってある）
     AlreadyRecorded,
     /// 定期売上のその月は請求書で請求している（入金は請求書に記録する）
@@ -69,6 +75,8 @@ pub enum ErrorCode {
     ConsentRequired,
     /// 期首残高はもう確定している（直すときは確定を取り消す）
     OpeningConfirmed,
+    /// 期首残高が入力途中のため、棚卸や繰越には使えない
+    OpeningNotConfirmed,
     /// 締めた月・年の取引は追加・変更・削除できない
     MonthLocked,
     /// パスワードが違う
@@ -87,6 +95,8 @@ pub enum ErrorCode {
     DocumentIssued,
     /// 入金のある請求書は取り消せない
     HasPayments,
+    /// 紐付いた請求書・入金と矛盾する仕訳変更
+    LinkedPosting,
     /// 入金の前に、請求書の売上を記帳する
     SaleNotRecorded,
     /// メールの送信の設定がまだない

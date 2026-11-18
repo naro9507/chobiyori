@@ -197,6 +197,7 @@ const SELECT: &str = "
            CASE WHEN i.transaction_id IS NULL AND i.ignored = 0 THEN (
                SELECT t.id FROM transactions t JOIN journal_lines l ON l.transaction_id = t.id
                WHERE l.account_id = i.payment_account_id AND l.amount = abs(i.spend)
+                 AND (i.source = 'receipt' OR l.sub_account_id IS i.payment_sub_account_id)
                  AND l.side = CASE WHEN i.spend > 0 THEN 'credit' ELSE 'debit' END
                  AND abs(julianday(t.date) - julianday(i.date)) <= 3
                  AND NOT EXISTS (SELECT 1 FROM inbox_items o WHERE o.transaction_id = t.id AND o.source = i.source)
@@ -454,7 +455,6 @@ fn confirm_in(conn: &Connection, id: i64, input: &ConfirmInput) -> AppResult<Tra
         "UPDATE inbox_items SET transaction_id = ?2, ignored = 0, linked = 0 WHERE id = ?1",
         params![id, saved.id],
     )?;
-    attach_receipt(conn, &item, saved.id)?;
     if input.save_rule && input.deposit.is_none() && !item.merchant.trim().is_empty() {
         rules::learn(
             conn,
@@ -471,18 +471,6 @@ fn confirm_in(conn: &Connection, id: i64, input: &ConfirmInput) -> AppResult<Tra
         )?;
     }
     Ok(saved)
-}
-
-/// レシートの画像を、証憑として取引に付ける。
-fn attach_receipt(conn: &Connection, item: &InboxItem, transaction_id: i64) -> AppResult<()> {
-    if let Some(receipt) = item.receipt_id {
-        conn.execute(
-            "UPDATE attachments SET transaction_id = ?2
-             WHERE id = (SELECT attachment_id FROM receipts WHERE id = ?1)",
-            params![receipt, transaction_id],
-        )?;
-    }
-    Ok(())
 }
 
 /// 新しい取引を作らず、既存の取引に紐付ける（同じ買い物のレシートと明細、手で入力した取引）。
@@ -502,13 +490,16 @@ pub fn link(db: &Database, id: i64, transaction_id: i64) -> AppResult<InboxItem>
             "SELECT EXISTS (
                  SELECT 1 FROM transactions t JOIN journal_lines l ON l.transaction_id = t.id
                  WHERE t.id = ?1 AND l.account_id = ?2 AND l.amount = ?3 AND l.side = ?4
-                   AND abs(julianday(t.date) - julianday(?5)) <= 7)",
+                   AND abs(julianday(t.date) - julianday(?5)) <= 7
+                   AND (?6 OR l.sub_account_id IS ?7))",
             params![
                 transaction_id,
                 item.payment_account_id,
                 item.spend.abs(),
                 side,
-                item.date
+                item.date,
+                item.source == InboxSource::Receipt,
+                item.payment_sub_account_id
             ],
             |r| r.get(0),
         )?;
@@ -528,7 +519,6 @@ pub fn link(db: &Database, id: i64, transaction_id: i64) -> AppResult<InboxItem>
             "UPDATE inbox_items SET transaction_id = ?2, ignored = 0, linked = 1 WHERE id = ?1",
             params![id, transaction_id],
         )?;
-        attach_receipt(tx, &item, transaction_id)?;
         get(tx, id)
     })
 }
@@ -538,14 +528,6 @@ pub fn unlink(conn: &Connection, id: i64) -> AppResult<InboxItem> {
     let item = get(conn, id)?;
     if !item.linked || item.transaction_id.is_none() {
         return Err(AppError::new(ErrorCode::NotFound));
-    }
-    if let (Some(receipt), Some(transaction)) = (item.receipt_id, item.transaction_id) {
-        // その取引のために作った取引でなければ、証憑も外す
-        conn.execute(
-            "UPDATE attachments SET transaction_id = NULL
-             WHERE id = (SELECT attachment_id FROM receipts WHERE id = ?1) AND transaction_id = ?2",
-            params![receipt, transaction],
-        )?;
     }
     conn.execute(
         "UPDATE inbox_items SET transaction_id = NULL, linked = 0 WHERE id = ?1",

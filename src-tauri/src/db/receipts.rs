@@ -281,15 +281,12 @@ pub fn add_files(conn: &Connection, files: &[(String, Vec<u8>)]) -> AppResult<Ad
     for (name, bytes) in files {
         conn.execute_batch("SAVEPOINT receipt_file")?;
         let outcome = (|| -> AppResult<bool> {
-            let (attachment, existed) = attachments::add(conn, name, bytes)?;
-            if existed {
-                return Ok(false);
-            }
-            conn.execute(
-                "INSERT INTO receipts (attachment_id) VALUES (?1)",
+            let (attachment, _) = attachments::add(conn, name, bytes)?;
+            let inserted = conn.execute(
+                "INSERT INTO receipts (attachment_id) VALUES (?1) ON CONFLICT DO NOTHING",
                 [attachment.id],
             )?;
-            Ok(true)
+            Ok(inserted == 1)
         })();
         match outcome {
             Ok(true) => {
@@ -517,10 +514,7 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
             [item],
         )?;
     }
-    conn.execute(
-        "DELETE FROM attachments WHERE id = ?1",
-        [receipt.attachment.id],
-    )?;
+    attachments::remove_unused(conn, receipt.attachment.id)?;
     Ok(())
 }
 

@@ -48,7 +48,9 @@ const FORMULA_STARTS: [char; 6] = ['=', '+', '-', '@', '\t', '\r'];
 /// 表計算ソフトで開いたときに数式として動かないよう、先頭が `=` などの文字列に `'` を付ける。
 /// 明細の店名など、外から来た文字列も書き出すため。整数（マイナスの金額）はそのまま。
 fn neutralize(field: &str) -> String {
-    if field.starts_with(FORMULA_STARTS) && field.parse::<i64>().is_err() {
+    if field.starts_with('\'')
+        || (field.starts_with(FORMULA_STARTS) && field.parse::<i64>().is_err())
+    {
         format!("'{field}")
     } else {
         field.to_string()
@@ -58,7 +60,7 @@ fn neutralize(field: &str) -> String {
 /// `neutralize` で付けた `'` を外す。取込で、書き出したときの文字列に戻すために使う。
 pub fn unneutralize(field: &str) -> &str {
     match field.strip_prefix('\'') {
-        Some(rest) if rest.starts_with(FORMULA_STARTS) => rest,
+        Some(rest) if rest.starts_with('\'') || rest.starts_with(FORMULA_STARTS) => rest,
         _ => field,
     }
 }

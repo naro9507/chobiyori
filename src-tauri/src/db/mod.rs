@@ -49,6 +49,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0009_filing.sql"),
     include_str!("migrations/0010_recurring.sql"),
     include_str!("migrations/0011_payments.sql"),
+    include_str!("migrations/0012_accounting_consistency.sql"),
 ];
 
 pub struct Database {
@@ -196,6 +197,9 @@ fn migrate(conn: &Connection) -> AppResult<()> {
 pub(crate) fn flag(value: bool) -> i64 {
     i64::from(value)
 }
+
+#[cfg(test)]
+mod regression_tests;
 
 #[cfg(test)]
 mod tests {

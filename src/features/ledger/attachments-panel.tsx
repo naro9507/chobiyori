@@ -24,7 +24,7 @@ export function AttachmentsPanel({
 	const errorMessage = useErrorMessage()
 	const list = useAttachments(transactionId)
 	const attach = useAttachFiles()
-	const remove = useDeleteAttachment()
+	const remove = useDeleteAttachment(transactionId)
 	const [shown, setShown] = useState<number | null>(null)
 	const files = list.data ?? []
 	const error = list.error ?? attach.error ?? remove.error
