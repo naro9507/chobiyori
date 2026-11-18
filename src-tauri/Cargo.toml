@@ -1,5 +1,5 @@
 [package]
-name = "dcs-accounting"
+name = "chobiyori"
 version = "0.1.0"
 description = "個人事業主向けの確定申告用会計ソフト"
 edition = "2021"
@@ -9,7 +9,7 @@ publish = false
 
 [lib]
 # Windows でバイナリ名とライブラリ名が衝突しないよう、別名にする
-name = "dcs_accounting_lib"
+name = "chobiyori_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

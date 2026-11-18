@@ -27,7 +27,7 @@ export function failureMessage(result, password) {
 }
 
 export function checkSigning(cli, env = process.env) {
-	const directory = mkdtempSync(path.join(tmpdir(), "dcs-signing-"))
+	const directory = mkdtempSync(path.join(tmpdir(), "chobiyori-signing-"))
 	try {
 		const probe = path.join(directory, "probe.txt")
 		writeFileSync(probe, "signing preflight\n")

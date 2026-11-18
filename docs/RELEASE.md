@@ -41,7 +41,7 @@
 
 秘密鍵を GitHub に登録する。
 
-1. 秘密鍵のファイル（`dcs-updater.key`）の中身をすべてコピーする。端末の表示からコピーすると、末尾に `%` などのプロンプトが混ざることがある。ファイルの内容だけを使う。
+1. 秘密鍵のファイル（`chobiyori-updater.key`）の中身をすべてコピーする。端末の表示からコピーすると、末尾に `%` などのプロンプトが混ざることがある。ファイルの内容だけを使う。
 2. GitHub のリポジトリで Settings → Secrets and variables → Actions → New repository secret を開く。
 3. 名前を `TAURI_SIGNING_PRIVATE_KEY` にし、コピーした中身を貼って保存する。
 4. 秘密鍵のファイルは、パスワード管理ソフトなど安全な場所にも保管する。
@@ -51,10 +51,10 @@
 ### 鍵を作り直す場合
 
 ```bash
-pnpm tauri signer generate -w ~/.tauri/dcs-updater.key
+pnpm tauri signer generate -w ~/.tauri/chobiyori-updater.key
 ```
 
-表示された公開鍵（`~/.tauri/dcs-updater.key.pub` の中身）を `tauri.conf.json` の `pubkey` に貼る。秘密鍵は上の手順で Secrets に登録する。パスワードを付けた場合は `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` も登録する。
+表示された公開鍵（`~/.tauri/chobiyori-updater.key.pub` の中身）を `tauri.conf.json` の `pubkey` に貼る。秘密鍵は上の手順で Secrets に登録する。パスワードを付けた場合は `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` も登録する。
 
 ## リリースの手順
 
@@ -89,7 +89,7 @@ git push --follow-tags
 GitHub CLI が使える場合は、ファイルから直接登録するとコピー時の混入を防げる。
 
 ```bash
-gh secret set TAURI_SIGNING_PRIVATE_KEY --repo naro9507/dcs-accounting-app < ~/.tauri/dcs-updater.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY --repo naro9507/chobiyori < ~/.tauri/chobiyori-updater.key
 ```
 
 `plugins.updater.pubkey` にも余分な文字がないか確認する。公開鍵は同じ秘密鍵と対になる `.pub` ファイルの内容を使う。

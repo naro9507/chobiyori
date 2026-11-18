@@ -42,7 +42,7 @@ beforeEach(() => {
 				completed = true
 				return { completed: true, fiscalYear: args.input.fiscalYear }
 			case "app_info":
-				return { name: "dcs-accounting", version: "0.1.0" }
+				return { name: "chobiyori", version: "0.1.0" }
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}

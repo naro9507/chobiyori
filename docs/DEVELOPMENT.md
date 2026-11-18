@@ -48,7 +48,7 @@ make dev     # アプリを起動
 Tauri の標準の構成（`npm create tauri-app` で作られる形）に合わせ、画面はリポジトリ直下に、Rust は `src-tauri/` に置く。
 
 ```text
-dcs-accounting-app/
+chobiyori/
 ├── src/                        # 画面（React）
 │   ├── app/                    # ルーティング、全体の Provider、メニューの定義
 │   ├── components/
@@ -208,3 +208,10 @@ shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコード
 
 
 `git push` の前に `.husky/pre-push` が、Biome・型チェック・Vitest・rustfmt・Clippy・cargo test を実行する。
+
+## 帳日和への名称変更
+
+表示名は「帳日和」、英字名・パッケージ名・リポジトリ名は `Chobiyori` / `chobiyori` とする。
+既存の帳簿・資格情報・WebView の設定を引き継ぐため、Tauri の `identifier` とキーチェーンのサービス名 `jp.dcs.accounting`、端末設定の `dcs-*` キーは互換識別子として維持する。これらを変える場合はデータ移行と Windows/macOS のアップグレード検証が必要。
+新しいバックアップは `.chobiyori-backup` で保存し、旧 `.dcsbackup` も一覧・復元画面で扱う。取込形式は `app: "chobiyori"` で出力し、旧 `app: "dcs-accounting"` の読み込みも受け付ける。旧 Excel 帳簿のファイル名は取込の例として残す。
+リポジトリを `naro9507/chobiyori` に改名してから、変更後の更新URLでリリースする。以前の署名鍵ペアを引き続き使用する。

@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 /// 自動のバックアップを残す数。
 pub const AUTO_KEEP: usize = 7;
 /// バックアップのファイルの拡張子。
-pub const EXTENSION: &str = "dcsbackup";
+pub const EXTENSION: &str = "chobiyori-backup";
+pub const LEGACY_EXTENSION: &str = "dcsbackup";
 /// 保存先の設定のキー（`settings` 表）。
 const DIR_SETTING: &str = "backup_dir";
 
@@ -140,7 +141,9 @@ pub fn list(dir: &Path) -> AppResult<Vec<BackupFile>> {
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
             let kind = BackupKind::of(&name)?;
-            if !name.ends_with(&format!(".{EXTENSION}")) {
+            if !name.ends_with(&format!(".{EXTENSION}"))
+                && !name.ends_with(&format!(".{LEGACY_EXTENSION}"))
+            {
                 return None;
             }
             let stamp = name
@@ -344,6 +347,17 @@ mod tests {
             (account(&conn, "101"), account(&conn, "610"))
         };
         transactions::create(db, 2026, &entry("2026-03-01", supplies, cash, amount)).unwrap();
+    }
+
+    #[test]
+    fn legacy_backups_remain_listed() {
+        let dir = tempfile::tempdir().unwrap();
+        let backups = dir.path().join("backups");
+        let db = books(dir.path());
+        let created = create(&db, &backups, BackupKind::Manual).unwrap();
+        let legacy = created.replace(EXTENSION, LEGACY_EXTENSION);
+        std::fs::rename(backups.join(&created), backups.join(&legacy)).unwrap();
+        assert_eq!(list(&backups).unwrap()[0].name, legacy);
     }
 
     #[test]

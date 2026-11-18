@@ -164,7 +164,15 @@ pub async fn choose_restore_file(
     app: AppHandle,
     state: State<'_, RestoreState>,
 ) -> AppResult<Option<String>> {
-    let Some(path) = files::open_path(app, ("DCS backup", &[backup::EXTENSION])).await else {
+    let Some(path) = files::open_path(
+        app,
+        (
+            "Chobiyori backup",
+            &[backup::EXTENSION, backup::LEGACY_EXTENSION],
+        ),
+    )
+    .await
+    else {
         return Ok(None);
     };
     let name = files::file_name(&path);

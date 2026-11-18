@@ -399,7 +399,7 @@ pub fn render(report: &Report, font: &PdfFont) -> AppResult<Vec<u8>> {
     document.set_metadata(
         krilla::metadata::Metadata::new()
             .title(report.title.clone())
-            .creator("DCS 会計".to_string())
+            .creator("帳日和".to_string())
             .language(match report.locale {
                 l::Locale::Ja => "ja".to_string(),
                 l::Locale::En => "en".to_string(),

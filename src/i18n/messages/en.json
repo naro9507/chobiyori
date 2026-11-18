@@ -1,6 +1,6 @@
 {
 	"app": {
-		"name": "DCS Books",
+		"name": "Chobiyori",
 		"skipToContent": "Skip to content",
 		"fiscalYear": "FY {year}",
 		"loading": "Loading",
@@ -1211,7 +1211,7 @@
 		"guideTitle": "How to set up sending",
 		"guideGmail": "For Gmail, create an \"app password\" instead of using your usual password.",
 		"step1": "Turn on 2-Step Verification for your Google account (needed to create app passwords).",
-		"step2": "Open this page in your browser and create an app password (any name you'll recognise, such as \"DCS Books\").",
+		"step2": "Open this page in your browser and create an app password (any name you'll recognise, such as \"Chobiyori\").",
 		"copyUrl": "Copy URL",
 		"copied": "Copied",
 		"step3": "Copy the 16 characters shown and paste them into \"Password\" below. Spaces are fine.",

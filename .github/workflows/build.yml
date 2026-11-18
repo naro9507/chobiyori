@@ -104,7 +104,7 @@ jobs:
           args: ${{ matrix.args }} ${{ steps.signing.outputs.args }} -- --locked
           # タグのときだけ Release を作る。自動アップデートは公開した Release の latest.json を見る
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('DCS 会計 {0}', github.ref_name) || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('帳日和 {0}', github.ref_name) || '' }}
           # CHANGELOG.md の変更点。自動アップデートの案内にもこの文が表示される
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
