@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router"
 import { type ReactNode, useEffect } from "react"
 import type { ScreenId } from "@/app/navigation"
-import { ScreenGuide } from "@/features/help/screen-guide"
+import { HelpTip } from "@/components/ui/help-tip"
 import { useTranslations } from "@/i18n/use-translations"
 
 /** 画面の見出しと説明。本文は children に置く。 */
@@ -30,19 +30,20 @@ export function Page({
 		return () => window.removeEventListener("keydown", listener)
 	}, [navigate, screen, nav])
 	const tHelp = useTranslations("help")
-	const tNav = useTranslations("nav")
+	const description = useTranslations("descriptions")
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-8 py-8">
 			<header className="flex flex-wrap items-end justify-between gap-4">
-				<div className="flex min-w-0 flex-col gap-1">
+				<div className="flex min-w-0 items-center gap-1">
 					<h1
 						id={`screen-${screen}-title`}
 						tabIndex={-1}
 						className="font-bold text-2xl leading-snug outline-none"
 					>
-						{tNav(screen)}
+						{nav(screen)}
 					</h1>
+					<HelpTip topic={nav(screen)}>{description(screen)}</HelpTip>
 				</div>
 				<div className="flex items-center gap-3">
 					{actions}
@@ -57,7 +58,6 @@ export function Page({
 					)}
 				</div>
 			</header>
-			<ScreenGuide screen={screen} />
 			{children}
 		</div>
 	)

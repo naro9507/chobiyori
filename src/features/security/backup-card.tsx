@@ -50,8 +50,8 @@ export function BackupCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("title")}</CardTitle>
-				<CardDescription>{t("description")}</CardDescription>
+				<CardTitle help={t("description")}>{t("title")}</CardTitle>
+				<CardDescription>{t("restorePasswordNote")}</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
 				{settings.error && (

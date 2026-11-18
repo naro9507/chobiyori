@@ -1,12 +1,6 @@
 import { useId } from "react"
 import { Page } from "@/components/layout/page"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
 import { DocumentSettingsCard } from "@/features/documents/document-settings-card"
@@ -47,8 +41,9 @@ export function SettingsPage() {
 			<MailSettingsCard />
 			<Card>
 				<CardHeader>
-					<CardTitle id={languageId}>{t("language")}</CardTitle>
-					<CardDescription>{t("languageDescription")}</CardDescription>
+					<CardTitle id={languageId} help={t("languageDescription")}>
+						{t("language")}
+					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<RadioCards
@@ -67,8 +62,9 @@ export function SettingsPage() {
 			</Card>
 			<Card>
 				<CardHeader>
-					<CardTitle id={themeId}>{t("theme")}</CardTitle>
-					<CardDescription>{t("themeDescription")}</CardDescription>
+					<CardTitle id={themeId} help={t("themeDescription")}>
+						{t("theme")}
+					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<RadioCards

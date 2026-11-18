@@ -2,6 +2,7 @@ import { Pencil, Trash2 } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { MasterCombobox } from "@/features/journal/master-combobox"
 import { useJournalMasters } from "@/features/journal/use-master-items"
@@ -48,14 +49,15 @@ export function RulesPanel() {
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-muted-foreground text-sm">{t("rulesHint")}</p>
-			<Button
-				variant="outline"
-				className="w-fit"
-				onClick={() => setEditing({ id: null, input: blank })}
-			>
-				{t("addRule")}
-			</Button>
+			<div className="flex items-center gap-1">
+				<Button
+					variant="outline"
+					onClick={() => setEditing({ id: null, input: blank })}
+				>
+					{t("addRule")}
+				</Button>
+				<HelpTip topic={t("rulesTitle")}>{t("rulesHint")}</HelpTip>
+			</div>
 			{editing && (
 				<RuleForm
 					key={editing.id ?? "new"}

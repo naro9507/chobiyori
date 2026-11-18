@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { HelpTip } from "@/components/ui/help-tip"
 import { LabeledCheckbox } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -20,10 +21,19 @@ export function FeatureChoices({
 	onChange: (value: FeatureSettings) => void
 }) {
 	const t = useTranslations("setupMore")
+	const titleId = useId()
 	return (
-		<fieldset disabled={disabled} className="flex flex-col gap-3">
-			<legend className="mb-3 font-bold">{t("features")}</legend>
-			<p className="text-muted-foreground text-sm">{t("featuresHint")}</p>
+		<fieldset
+			aria-labelledby={titleId}
+			disabled={disabled}
+			className="flex flex-col gap-3"
+		>
+			<legend className="mb-3 font-bold">
+				<span className="inline-flex items-center gap-1">
+					<span id={titleId}>{t("features")}</span>
+					<HelpTip topic={t("features")}>{t("featuresHint")}</HelpTip>
+				</span>
+			</legend>
 			{(Object.keys(defaultFeatures) as (keyof FeatureSettings)[]).map(
 				(key) => (
 					<LabeledCheckbox

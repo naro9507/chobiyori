@@ -5,6 +5,7 @@ import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { NativeSelect } from "@/components/ui/input"
 import { useAttachmentCounts } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
@@ -145,26 +146,28 @@ export function LedgersPage() {
 				onValueChange={(value) => setBook(value as Book)}
 				className="flex flex-col gap-4"
 			>
-				<Tabs.List
-					aria-label={t("tabsLabel")}
-					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
-				>
-					{orderedBooks
-						.filter((value) => value !== "partners" || features.receivables)
-						.map((value) => (
-							<Tabs.Trigger
-								key={value}
-								value={value}
-								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-							>
-								{t(value)}
-							</Tabs.Trigger>
-						))}
-				</Tabs.List>
+				<div className="flex items-center gap-1">
+					<Tabs.List
+						aria-label={t("tabsLabel")}
+						className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
+					>
+						{orderedBooks
+							.filter((value) => value !== "partners" || features.receivables)
+							.map((value) => (
+								<Tabs.Trigger
+									key={value}
+									value={value}
+									className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+								>
+									{t(value)}
+								</Tabs.Trigger>
+							))}
+					</Tabs.List>
+					<HelpTip topic={t(book)}>{t(`${book}Hint`)}</HelpTip>
+				</div>
 
 				<Card>
 					<CardContent className="flex flex-col gap-4">
-						<p className="text-muted-foreground text-sm">{t(`${book}Hint`)}</p>
 						<div className="flex flex-wrap items-end justify-between gap-4">
 							<div className="flex flex-wrap items-end gap-4">
 								{monthSelect(t("fromMonth"), fromMonth, (m) => {

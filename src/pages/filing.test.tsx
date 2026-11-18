@@ -374,8 +374,8 @@ describe("インボイスの登録と期限", () => {
 
 	it("設定した期間の未提出だけを通知し、設定を端末に保存する", async () => {
 		notices = [
-			{ ...deadline, daysLeft: 7 },
-			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 7 },
+			{ ...deadline, daysLeft: 5 },
+			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 5 },
 		]
 		const user = userEvent.setup()
 		renderAt("/settings")
@@ -383,8 +383,9 @@ describe("インボイスの登録と期限", () => {
 			name: "申告期限のリマインダー",
 		})
 		expect(reminder).toHaveTextContent("2026年分の確定申告")
+		expect(reminder).toHaveTextContent("申告期限まであと5日（2027-03-15）")
 		const sevenDays = screen.getByRole("checkbox", {
-			name: "7日前（残り7〜2日）",
+			name: "期限の7日前",
 		})
 		await user.click(sevenDays)
 		expect(
@@ -416,6 +417,14 @@ describe("インボイスの登録と期限", () => {
 		renderAt("/settings")
 		await screen.findByRole("region", { name: "申告期限のリマインダー" })
 		const checkbox = screen.getByRole("checkbox", { name: "デスクトップ通知" })
+		expect(checkbox).toHaveAccessibleDescription(/午前9時に通知を予約/)
+		const help = screen.getByRole("button", { name: "デスクトップ通知の説明" })
+		expect(screen.queryByText(/閉じていても届きます/)).not.toBeInTheDocument()
+		await user.hover(help)
+		expect(await screen.findByRole("tooltip")).toHaveTextContent(
+			"閉じていても届きます"
+		)
+		await user.keyboard("{Escape}")
 		const calls = () =>
 			mocks.callCommand.mock.calls.filter(
 				([name]) => name === "plugin:notification|notify"
@@ -428,7 +437,7 @@ describe("インボイスの登録と期限", () => {
 		expect(calls()[0][1]).toEqual({
 			options: {
 				title: "2026年分の確定申告",
-				body: "期限は 2027-03-15、あと 20 日です。",
+				body: "申告期限まであと20日（2027-03-15）",
 			},
 		})
 		const saved = JSON.parse(localStorage.getItem("dcs-settings") ?? "{}")
@@ -477,13 +486,12 @@ describe("インボイスの登録と期限", () => {
 			scheduled.setDate(scheduled.getDate() - days)
 			expect(reserved[index].at).toBe(scheduled.getTime())
 		}
+		expect(reserved[2].body).toBe(`申告期限は明日（${today(due)}）です。`)
 		expect(mocks.callCommand).toHaveBeenCalledWith("filing_deadlines", {
 			today: today(),
 			includeFuture: true,
 		})
-		await user.click(
-			screen.getByRole("checkbox", { name: "7日前（残り7〜2日）" })
-		)
+		await user.click(screen.getByRole("checkbox", { name: "期限の7日前" }))
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))

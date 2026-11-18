@@ -8,6 +8,20 @@ const storageKey = "dcs-filing-notification-plan"
 type Reservation = { key: string; at: number }
 type ScheduledNotice = Reservation & { id: string; title: string; body: string }
 
+export function filingReminderBody(
+	{ date, estimated }: DeadlineNotice,
+	days: number,
+	t: ReturnType<typeof useTranslations<"filing">>
+) {
+	const message =
+		days === 0
+			? t("reminderDueToday", { date })
+			: days === 1
+				? t("reminderDueTomorrow", { date })
+				: t("reminderDaysLeft", { date, days })
+	return message + (estimated ? ` ${t("deadlineEstimated")}` : "")
+}
+
 export function deadlineKey(notice: DeadlineNotice) {
 	return `${notice.kind}-${notice.fiscalYear}-${notice.date}`
 }
@@ -64,9 +78,7 @@ export function planFilingNotifications(
 					deadline.kind === "income" ? "deadlineIncome" : "deadlineConsumption",
 					{ year: deadline.fiscalYear }
 				),
-				body:
-					t("deadlineLeft", { date: deadline.date, days: offset }) +
-					(deadline.estimated ? ` ${t("deadlineEstimated")}` : ""),
+				body: filingReminderBody(deadline, offset, t),
 			})
 		}
 	}

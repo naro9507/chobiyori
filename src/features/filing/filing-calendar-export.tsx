@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
+import { HelpTip } from "@/components/ui/help-tip"
 import { useTranslations } from "@/i18n/use-translations"
 import { callCommand } from "@/lib/tauri"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -28,15 +29,18 @@ export function FilingCalendarExport() {
 
 	return (
 		<div className="space-y-2 border-t pt-4">
-			<p className="text-muted-foreground text-sm">{t("calendarHint")}</p>
-			<Button
-				type="button"
-				variant="outline"
-				disabled={calendar.isPending}
-				onClick={() => calendar.mutate()}
-			>
-				{t("calendarExport")}
-			</Button>
+			<div className="flex items-center gap-1">
+				<Button
+					type="button"
+					variant="outline"
+					disabled={calendar.isPending}
+					onClick={() => calendar.mutate()}
+				>
+					{t("calendarExport")}
+				</Button>
+				<HelpTip topic={t("calendarExport")}>{t("calendarHint")}</HelpTip>
+			</div>
+			<p className="text-muted-foreground text-sm">{t("calendarAlerts")}</p>
 			{feedback && (
 				<p role="status" className="text-sm">
 					{feedback}

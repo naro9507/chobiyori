@@ -1,13 +1,7 @@
 import { CircleCheck, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
 import { parseNotes } from "@/features/changelog/changelog"
 import { ReleaseNotes } from "@/features/changelog/release-notes"
@@ -37,8 +31,9 @@ export function UpdateSettings() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("sectionTitle")}</CardTitle>
-				<CardDescription>{t("sectionDescription")}</CardDescription>
+				<CardTitle help={t("sectionDescription")}>
+					{t("sectionTitle")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				{appInfo && (

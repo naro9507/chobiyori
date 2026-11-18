@@ -100,8 +100,7 @@ function ImportCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("importTitle")}</CardTitle>
-				<CardDescription>{t("importDescription")}</CardDescription>
+				<CardTitle help={t("importDescription")}>{t("importTitle")}</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
 				<div className="grid gap-3 sm:grid-cols-2">
@@ -439,7 +438,7 @@ function ExportCard() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
-				<Field label={t("encoding")} hint={t("encodingHint")} className="w-72">
+				<Field label={t("encoding")} help={t("encodingHint")} className="w-72">
 					<NativeSelect
 						value={encoding}
 						onChange={(e) => setEncoding(e.target.value as CsvEncoding)}
