@@ -4,7 +4,12 @@ import { defaultLocale, type Locale } from "@/i18n/i18n"
 
 export type Theme = "light" | "dark" | "system"
 
+export const filingReminderDays = [30, 7, 1] as const
+type FilingReminderDay = (typeof filingReminderDays)[number]
+
 type SettingsState = {
+	filingReminders: FilingReminderDay[]
+	setFilingReminder: (day: FilingReminderDay, enabled: boolean) => void
 	locale: Locale
 	theme: Theme
 	/** 最後に起動したときのバージョン。更新後の「変更点」の表示に使う */
@@ -24,6 +29,13 @@ export const useSettingsStore = create<SettingsState>()(
 			locale: defaultLocale,
 			theme: "system",
 			lastSeenVersion: null,
+			filingReminders: [...filingReminderDays],
+			setFilingReminder: (day, enabled) =>
+				set(({ filingReminders }) => ({
+					filingReminders: filingReminderDays.filter((option) =>
+						option === day ? enabled : filingReminders.includes(option)
+					),
+				})),
 			setLocale: (locale) => set({ locale }),
 			setTheme: (theme) => set({ theme }),
 			setLastSeenVersion: (lastSeenVersion) => set({ lastSeenVersion }),
@@ -31,7 +43,8 @@ export const useSettingsStore = create<SettingsState>()(
 		{
 			name: "dcs-settings",
 			storage: createJSONStorage(() => localStorage),
-			partialize: ({ locale, theme, lastSeenVersion }) => ({
+			partialize: ({ locale, theme, lastSeenVersion, filingReminders }) => ({
+				filingReminders,
 				locale,
 				theme,
 				lastSeenVersion,

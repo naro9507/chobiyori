@@ -2,6 +2,7 @@ import { Link, Outlet } from "@tanstack/react-router"
 import { navGroups, screenEnabled } from "@/app/navigation"
 import { WhatsNewBanner } from "@/features/changelog/whats-new-banner"
 import { CommandPalette } from "@/features/commands/command-palette"
+import { FilingReminderBanner } from "@/features/filing/filing-reminder-banner"
 import {
 	useFiscalYear,
 	useFiscalYears,
@@ -81,6 +82,7 @@ export function AppShell() {
 			<main id="main" className="min-w-0 flex-1 overflow-y-auto">
 				<WhatsNewBanner />
 				<UpdateBanner />
+				<FilingReminderBanner />
 				<Outlet />
 			</main>
 		</div>
