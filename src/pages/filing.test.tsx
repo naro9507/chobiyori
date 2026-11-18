@@ -188,9 +188,11 @@ const deadline: DeadlineNotice = {
 	total: 7,
 }
 let notices: DeadlineNotice[]
+let calendarResult: "saved" | "cancelled" | "noDeadlines"
 
 beforeEach(() => {
 	notices = [deadline]
+	calendarResult = "saved"
 	useSettingsStore.setState({
 		locale: "ja",
 		theme: "light",
@@ -254,6 +256,8 @@ beforeEach(() => {
 				}
 			case "filing_deadlines":
 				return notices
+			case "export_filing_calendar":
+				return calendarResult
 			case "sync_filing_notifications":
 				return "ready"
 			case "plugin:notification|notify":
@@ -483,5 +487,42 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
+	})
+
+	it("通知をオフにしていてもカレンダーに書き出せ、期限がなければ案内する", async () => {
+		useSettingsStore.setState({
+			filingReminders: [],
+			filingDesktopNotifications: false,
+		})
+		const user = userEvent.setup()
+		renderAt("/settings")
+		const button = await screen.findByRole("button", {
+			name: "カレンダーに書き出す",
+		})
+		await user.click(button)
+		expect(
+			await screen.findByText(
+				"保存しました。カレンダーでファイルを取り込んでください。"
+			)
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("export_filing_calendar", {
+			today: today(),
+			locale: "ja",
+		})
+
+		calendarResult = "noDeadlines"
+		await user.click(button)
+		expect(
+			await screen.findByText("書き出せる未提出の申告期限はありません。")
+		).toBeInTheDocument()
+
+		calendarResult = "cancelled"
+		await user.click(button)
+		await waitFor(() => {
+			expect(button).toBeEnabled()
+			expect(
+				screen.queryByText("書き出せる未提出の申告期限はありません。")
+			).not.toBeInTheDocument()
+		})
 	})
 })

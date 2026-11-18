@@ -5,6 +5,7 @@
 
 pub mod csv;
 pub mod document;
+pub mod filing_calendar;
 pub mod labels;
 pub mod pdf;
 pub mod report;

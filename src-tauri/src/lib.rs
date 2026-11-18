@@ -110,6 +110,7 @@ pub fn run() {
             commands::books::expense_book,
             commands::books::sales_book,
             commands::export::export_report,
+            commands::export::export_filing_calendar,
             commands::import::choose_import_file,
             commands::import::preview_import,
             commands::import::run_import,
