@@ -1,13 +1,7 @@
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
@@ -274,8 +268,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("simple")}</CardTitle>
-				<CardDescription>{t("simpleDescription")}</CardDescription>
+				<CardTitle help={t("simpleDescription")}>{t("simple")}</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form

@@ -1,5 +1,6 @@
 import type * as React from "react"
 import { cn } from "@/lib/utils"
+import { HelpTip } from "./help-tip"
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
 	return (
@@ -24,13 +25,26 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 	)
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"h2">) {
-	return (
+type CardTitleProps = React.ComponentProps<"h2"> &
+	({ children: string; help: string } | { help?: undefined })
+
+function CardTitle({ className, children, help, ...props }: CardTitleProps) {
+	const title = (
 		<h2
 			data-slot="card-title"
 			className={cn("font-bold text-base leading-snug", className)}
 			{...props}
-		/>
+		>
+			{children}
+		</h2>
+	)
+	if (help === undefined) return title
+
+	return (
+		<div className="flex min-w-0 items-center gap-1">
+			{title}
+			<HelpTip topic={children}>{help}</HelpTip>
+		</div>
 	)
 }
 

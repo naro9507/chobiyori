@@ -2,6 +2,7 @@ import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Checkbox, Input, LabeledCheckbox } from "@/components/ui/input"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -104,28 +105,31 @@ export function ChecklistPanel({ fiscalYear }: { fiscalYear: number | null }) {
 			</p>
 			<ul className="flex flex-col divide-y rounded-lg border">
 				{query.data.map((item) => (
-					<li key={item.item} className="flex items-start gap-3 px-4 py-3">
+					<li key={item.item} className="flex items-center gap-3 px-4 py-2">
 						<Checkbox
 							id={`check-${item.item}`}
-							className="mt-0.5"
 							checked={item.done}
 							disabled={item.auto || setCheck.isPending}
 							onChange={(e) =>
 								setCheck.mutate({ item: item.item, done: e.target.checked })
 							}
 						/>
-						<label
-							htmlFor={`check-${item.item}`}
-							className="flex flex-col gap-0.5"
-						>
-							<span className="font-medium text-sm">
+						<div className="flex flex-wrap items-center gap-x-1">
+							<label
+								htmlFor={`check-${item.item}`}
+								className="font-medium text-sm"
+							>
 								{t(`check_${item.item}`)}
-							</span>
-							<span className="text-muted-foreground text-xs">
+							</label>
+							<HelpTip topic={t(`check_${item.item}`)}>
 								{t(`checkHint_${item.item}`)}
-								{item.auto && ` ${t("checkAuto")}`}
-							</span>
-						</label>
+							</HelpTip>
+							{item.auto && (
+								<span className="text-muted-foreground text-xs">
+									{t("checkAuto")}
+								</span>
+							)}
+						</div>
 					</li>
 				))}
 			</ul>

@@ -1,14 +1,9 @@
 import { Loader2, Plus, X } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { TermHelp } from "@/features/help/term-help"
 import { type TaxCategory, taxCategories } from "@/features/master/master-api"
@@ -167,10 +162,11 @@ export function CompoundEntry({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>
-					{title} <TermHelp term="journal" />
-				</CardTitle>
-				<CardDescription>{t("compoundDescription")}</CardDescription>
+				<div className="flex items-center gap-1">
+					<CardTitle>{title}</CardTitle>
+					<HelpTip topic={title}>{t("compoundDescription")}</HelpTip>
+					<TermHelp term="journal" />
+				</div>
 			</CardHeader>
 			<CardContent>
 				<form

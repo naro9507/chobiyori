@@ -494,7 +494,7 @@ function PartnersSection() {
 					</Field>
 					<Field
 						label={t("billingName")}
-						hint={t("billingNameHint")}
+						help={t("billingNameHint")}
 						error={errorFor("billingName")}
 					>
 						<Input

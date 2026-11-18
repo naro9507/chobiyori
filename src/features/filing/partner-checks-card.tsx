@@ -1,10 +1,4 @@
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { AccountantNote } from "./common"
@@ -23,8 +17,9 @@ export function PartnerChecksCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("partnerChecksTitle")}</CardTitle>
-				<CardDescription>{t("partnerChecksDescription")}</CardDescription>
+				<CardTitle help={t("partnerChecksDescription")}>
+					{t("partnerChecksTitle")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				{rows.length === 0 ? (

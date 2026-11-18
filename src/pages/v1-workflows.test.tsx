@@ -8,7 +8,6 @@ import type { Account } from "@/features/master/master-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { defaultFeatures } from "@/features/setup/setup"
 import { useEntryIntent } from "@/stores/entry-intent-store"
-import { useHelpPreferences } from "@/stores/help-preferences-store"
 import { useSettingsStore } from "@/stores/settings-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
@@ -57,7 +56,6 @@ function renderApp(path = "/help") {
 	return router
 }
 beforeEach(() => {
-	useHelpPreferences.setState({ dismissedScreens: {} })
 	useSettingsStore.setState({ locale: "ja" })
 	useYearStore.setState({ selected: null })
 	useEntryIntent.setState({
@@ -283,36 +281,23 @@ it("登録した摘要で科目を確認し、日付・金額を入力して記�
 	expect(within(form).getByLabelText("金額")).toHaveValue("")
 })
 
-it("閉じた初回案内は画面の行き来とストレージからの復元後も出さない", async () => {
+it("画面の説明は見出し横のヘルプから必要なときに読める", async () => {
 	const user = userEvent.setup()
 	renderApp()
-	const guide = await screen.findByRole("complementary", {
-		name: "ヘルプの使い方",
-	})
-	await user.click(
-		within(guide).getByRole("button", { name: "ヘルプの案内を閉じる" })
-	)
-	expect(
-		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
-	).not.toBeInTheDocument()
+	const guide = "会計がはじめての方に向けて、使い方とことばの意味をまとめます。"
+	const help = await screen.findByRole("button", { name: "ヘルプの説明" })
+	expect(screen.queryByText(guide)).not.toBeInTheDocument()
+	await user.hover(help)
+	expect(await screen.findByRole("tooltip")).toHaveTextContent(guide)
+	await user.keyboard("{Escape}")
+	expect(screen.queryByRole("tooltip")).not.toBeInTheDocument()
+
 	const nav = screen.getByRole("navigation", { name: "メインメニュー" })
 	await user.click(within(nav).getByRole("link", { name: "帳簿" }))
-	expect(
-		await screen.findByRole("complementary", { name: "帳簿の使い方" })
-	).toBeInTheDocument()
-	await user.click(within(nav).getByRole("link", { name: "ヘルプ" }))
-	expect(
-		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
-	).not.toBeInTheDocument()
-	const stored = localStorage.getItem("dcs-help-preferences")
-	expect(stored).toContain('"help":true')
-	// 再起動時のように、メモリの状態を空にして保存済みの値から読み直す。
-	useHelpPreferences.setState({ dismissedScreens: {} })
-	localStorage.setItem("dcs-help-preferences", stored ?? "")
-	await useHelpPreferences.persist.rehydrate()
-	expect(
-		screen.queryByRole("complementary", { name: "ヘルプの使い方" })
-	).not.toBeInTheDocument()
+	const ledgerHelp = await screen.findByRole("button", { name: "帳簿の説明" })
+	expect(screen.queryByRole("tooltip")).not.toBeInTheDocument()
+	await user.pointer({ keys: "[TouchA]", target: ledgerHelp })
+	expect(await screen.findByRole("tooltip")).toHaveTextContent("CSV や PDF")
 })
 
 it("学校の入力例は学校の科目を引き継ぎ、使わない定期売上の例は表示しない", async () => {
@@ -360,15 +345,10 @@ it("無効な科目を使う入力例は読めるが、入力には渡さない"
 	expect(within(card).getByText(/科目・口座を使えません/)).toBeInTheDocument()
 })
 
-it("案内を閉じても F1 でその画面の説明を開け、検索欄の編集で全体検索に戻れる", async () => {
+it("F1 でその画面の説明を開け、検索欄の編集で全体検索に戻れる", async () => {
 	const user = userEvent.setup()
 	renderApp("/transactions")
-	await user.click(
-		await screen.findByRole("button", { name: "取引入力の案内を閉じる" })
-	)
-	expect(
-		screen.getByRole("heading", { level: 1, name: "取引入力" })
-	).toHaveFocus()
+	await screen.findByRole("heading", { level: 1, name: "取引入力" })
 	await user.keyboard("{F1}")
 	await screen.findByRole("heading", { level: 1, name: "ヘルプ" })
 	expect(screen.getByRole("heading", { name: "取引入力" })).toBeInTheDocument()

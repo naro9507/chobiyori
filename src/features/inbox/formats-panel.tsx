@@ -2,6 +2,7 @@ import { FileDown, FileUp, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Input, NativeSelect } from "@/components/ui/input"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
@@ -64,9 +65,11 @@ export function FormatsPanel() {
 
 	return (
 		<div className="flex flex-col gap-5">
-			<p className="text-muted-foreground text-sm">{t("formatsHint")}</p>
 			<section aria-label={t("myFormats")} className="flex flex-col gap-1">
-				<p className="font-bold text-sm">{t("myFormats")}</p>
+				<div className="flex items-center gap-1">
+					<h3 className="font-bold text-sm">{t("myFormats")}</h3>
+					<HelpTip topic={t("myFormats")}>{t("formatsHint")}</HelpTip>
+				</div>
 				{mine.length === 0 ? (
 					<p className="text-muted-foreground text-sm">{t("noFormats")}</p>
 				) : (

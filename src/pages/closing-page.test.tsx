@@ -235,9 +235,13 @@ describe("決算", () => {
 	it("チェックリストは、帳簿から分かる項目を手で変えられず、ほかの項目に印を付けられる", async () => {
 		const user = userEvent.setup()
 		renderPage()
-		const auto = await screen.findByLabelText(/期首残高を確定する/)
+		const auto = await screen.findByRole("checkbox", {
+			name: "期首残高を確定する",
+		})
 		expect(auto).toBeDisabled()
-		await user.click(screen.getByLabelText(/現金と預金の残高を確かめる/))
+		await user.click(
+			screen.getByRole("checkbox", { name: "現金と預金の残高を確かめる" })
+		)
 		expect(mocks.callCommand).toHaveBeenCalledWith("set_closing_check", {
 			fiscalYear: 2026,
 			item: "cashCount",
