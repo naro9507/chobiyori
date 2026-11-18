@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
+import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -47,6 +48,17 @@ beforeEach(() => {
 					}
 					book = { state: "encrypted", unlocked: true }
 					return null
+				case "reset_books_password":
+					if (args?.recoveryCode !== "saved code") {
+						throw { code: "invalidRecoveryCode", field: "recoveryCode" }
+					}
+					book = { state: "encrypted", unlocked: true }
+					return null
+				case "issue_recovery_code":
+					if (args?.current !== "correct horse") {
+						throw { code: "wrongPassword", field: "currentPassword" }
+					}
+					return "saved code"
 				case "create_books":
 					book = { state: "encrypted", unlocked: true }
 					return null
@@ -99,7 +111,7 @@ describe("起動時のパスワード", () => {
 		book = { state: "notCreated", unlocked: false }
 		renderApp()
 		expect(
-			await screen.findByText(/忘れると帳簿もバックアップも開けなくなります/)
+			await screen.findByText(/設定で復旧コードを発行/)
 		).toBeInTheDocument()
 		await user.type(screen.getByLabelText("パスワード"), "first password")
 		await user.type(
@@ -128,6 +140,68 @@ describe("起動時のパスワード", () => {
 		expect(mocks.callCommand).toHaveBeenCalledWith("create_books", {
 			password: "first password",
 		})
+	})
+
+	it("保存した復旧コードでパスワードを再設定する", async () => {
+		const user = userEvent.setup()
+		renderApp()
+		await user.click(
+			await screen.findByRole("button", { name: "パスワードを忘れたとき" })
+		)
+		const code = screen.getByLabelText("復旧コード")
+		await user.type(code, "wrong code")
+		await user.type(screen.getByLabelText("新しいパスワード"), "new password")
+		await user.type(screen.getByLabelText("もう一度入れてください"), "mismatch")
+		const reset = screen.getByRole("button", {
+			name: "パスワードを再設定して開く",
+		})
+		await user.click(reset)
+		expect(screen.getByText(/パスワードが違います/)).toBeInTheDocument()
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"reset_books_password",
+			expect.anything()
+		)
+
+		const confirm = screen.getByLabelText("もう一度入れてください")
+		await user.clear(confirm)
+		await user.type(confirm, "new password")
+		await user.click(reset)
+		expect(
+			await screen.findByText(/この復旧コードは使えません/)
+		).toBeInTheDocument()
+
+		await user.clear(code)
+		await user.type(code, "saved code")
+		await user.click(reset)
+		expect(mocks.callCommand).toHaveBeenCalledWith("reset_books_password", {
+			recoveryCode: "saved code",
+			new: "new password",
+		})
+		expect(
+			await screen.findByRole("heading", { level: 1, name: "ホーム" })
+		).toBeInTheDocument()
+	})
+
+	it("いまのパスワードを確認して復旧コードを一度だけ表示する", async () => {
+		const user = userEvent.setup()
+		render(
+			<AppProviders>
+				<RecoveryCard />
+			</AppProviders>
+		)
+		const current = screen.getByLabelText("いまのパスワード")
+		const issue = screen.getByRole("button", { name: "復旧コードを発行する" })
+		await user.type(current, "wrong password")
+		await user.click(issue)
+		expect(await screen.findByText(/パスワードが違います/)).toBeInTheDocument()
+
+		await user.clear(current)
+		await user.type(current, "correct horse")
+		await user.click(issue)
+		expect(await screen.findByLabelText("復旧コード")).toHaveValue("saved code")
+		await user.click(screen.getByRole("button", { name: "復旧コードを閉じる" }))
+		expect(screen.queryByLabelText("復旧コード")).toBeNull()
+		expect(screen.getByLabelText("いまのパスワード")).toHaveValue("")
 	})
 })
 
