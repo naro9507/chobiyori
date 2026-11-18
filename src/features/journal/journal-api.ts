@@ -8,7 +8,9 @@ export type Side = "debit" | "credit"
 
 export const simpleKinds = [
 	"income",
+	"unpaid_income",
 	"expense",
+	"personal_expense",
 	"transfer",
 	"owner_draw",
 	"owner_contribution",

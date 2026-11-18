@@ -103,6 +103,7 @@ export type IncomeGuide = {
 	incomeBeforeDeduction: number
 	deduction: number
 	deductionOnPaper: number
+	incomeOnPaper: number
 	income: number
 	issueCount: number
 }

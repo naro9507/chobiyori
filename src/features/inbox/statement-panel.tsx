@@ -69,8 +69,14 @@ export function StatementPanel() {
 	const open = useOpenStatement()
 	const importing = useImportStatement()
 	const [opened, setOpened] = useState<OpenedStatement | null>(null)
+	const [revision, setRevision] = useState(0)
 	const [format, setFormat] = useState<ImportFormat | null>(null)
 	const [draft, setDraft] = useState<FormatDraft | null>(null)
+	const matchedPreview = useStatementPreview(
+		opened,
+		draft ? null : (format?.definition ?? null),
+		revision
+	)
 
 	const choose = () => {
 		importing.reset()
@@ -78,6 +84,7 @@ export function StatementPanel() {
 			onSuccess: (result) => {
 				if (!result) return
 				setOpened(result)
+				setRevision((value) => value + 1)
 				const matched = result.matched
 				if (matched?.id != null) {
 					setFormat(matched)
@@ -102,7 +109,7 @@ export function StatementPanel() {
 				<Button
 					variant="outline"
 					className="w-fit"
-					disabled={open.isPending}
+					disabled={open.isPending || importing.isPending}
 					onClick={choose}
 				>
 					<FileUp aria-hidden="true" />
@@ -142,9 +149,19 @@ export function StatementPanel() {
 								/>
 								{t("formatMatched", { name: format.name })}
 							</p>
+							{!importing.data && matchedPreview.data && (
+								<IgnoredRows
+									count={matchedPreview.data.ignoredCount}
+									notes={matchedPreview.data.ignored}
+								/>
+							)}
 							<div className="flex flex-wrap gap-2">
 								<Button
-									disabled={importing.isPending}
+									disabled={
+										open.isPending ||
+										importing.isPending ||
+										matchedPreview.isFetching
+									}
 									onClick={() => runImport(format)}
 								>
 									{importing.isPending && (
@@ -165,6 +182,7 @@ export function StatementPanel() {
 					{draft && (
 						<FormatEditor
 							opened={opened}
+							revision={revision}
 							draft={draft}
 							onChange={setDraft}
 							onSaved={(saved) => {
@@ -202,13 +220,16 @@ function ImportResultView({
 	const t = useTranslations("inbox")
 	if (result.kind === "imported") {
 		return (
-			<p role="status" className="flex items-center gap-2 text-sm">
-				<CircleCheck aria-hidden="true" className="size-4 text-success" />
-				{t("importedToInbox", {
-					added: result.added,
-					duplicates: result.duplicates,
-				})}
-			</p>
+			<div role="status" className="space-y-2 text-sm">
+				<p className="flex items-center gap-2">
+					<CircleCheck aria-hidden="true" className="size-4 text-success" />
+					{t("importedToInbox", {
+						added: result.added,
+						duplicates: result.duplicates,
+					})}
+				</p>
+				<IgnoredRows count={result.ignoredCount} notes={result.ignored} />
+			</div>
 		)
 	}
 	return (
@@ -241,6 +262,20 @@ function ImportResultView({
 	)
 }
 
+function IgnoredRows({ count, notes }: { count: number; notes: RowNote[] }) {
+	const t = useTranslations("inbox")
+	if (!count) return null
+	return (
+		<div className="space-y-1 text-sm text-warning">
+			<p>{t("ignoredRowsTitle", { count })}</p>
+			<NoteList notes={notes} />
+			{count > notes.length && (
+				<p>{t("otherIgnoredRows", { count: count - notes.length })}</p>
+			)}
+		</div>
+	)
+}
+
 function NoteList({ notes }: { notes: RowNote[] }) {
 	const t = useTranslations("inbox")
 	return (
@@ -257,11 +292,13 @@ function NoteList({ notes }: { notes: RowNote[] }) {
 /** 形式エディタ。実際のファイルを試し読みしながら、読み方と取込先を決める。 */
 function FormatEditor({
 	opened,
+	revision,
 	draft,
 	onChange,
 	onSaved,
 }: {
 	opened: OpenedStatement
+	revision: number
 	draft: FormatDraft
 	onChange: (draft: FormatDraft) => void
 	onSaved: (format: ImportFormat) => void
@@ -270,7 +307,7 @@ function FormatEditor({
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
 	const save = useSaveImportFormat()
-	const preview = useStatementPreview(opened, draft.definition)
+	const preview = useStatementPreview(opened, draft.definition, revision)
 	const def = draft.definition
 	const setDef = (patch: Partial<FormatDefinition>) =>
 		onChange({ ...draft, definition: { ...def, ...patch } })
@@ -466,13 +503,15 @@ function FormatEditor({
 							})}
 						</p>
 					)}
+					<IgnoredRows count={p.ignoredCount} notes={p.ignored} />
 					{p.errorCount > 0 ? (
 						<div role="alert" className="flex flex-col gap-1 text-destructive">
 							<p>{t("errorsTitle", { count: p.errorCount })}</p>
 							<NoteList notes={p.errors} />
 						</div>
 					) : (
-						p.missingRoles.length === 0 && (
+						p.missingRoles.length === 0 &&
+						p.ignoredCount === 0 && (
 							<Badge variant="success">
 								<CircleCheck aria-hidden="true" />
 								{t("allRowsRead")}

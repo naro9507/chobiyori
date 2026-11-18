@@ -46,8 +46,12 @@ string_enum! {
     pub enum SimpleKind {
         /// 収入: 口座 / 収益など
         Income => "income",
+        /// 未入金売上: 売掛金 / 売上
+        UnpaidIncome => "unpaid_income",
         /// 支出: 経費など / 口座
         Expense => "expense",
+        /// 私用のお金で立て替えた経費: 経費など / 事業主借
+        PersonalExpense => "personal_expense",
         /// 口座間の振替: 入れた口座 / 出した口座
         Transfer => "transfer",
         /// 事業のお金を私用に使った（引き出した）: 事業主貸 / 口座
@@ -156,8 +160,9 @@ pub fn simple_to_transaction(
     };
     let payment = input.payment_account_id;
     let (debit, credit) = match input.kind {
-        SimpleKind::Income => (payment, account()?),
+        SimpleKind::Income | SimpleKind::UnpaidIncome => (payment, account()?),
         SimpleKind::Expense => (account()?, payment),
+        SimpleKind::PersonalExpense => (account()?, owner.contributions),
         SimpleKind::Transfer => (account()?, payment),
         SimpleKind::OwnerDraw => (owner.drawings, payment),
         SimpleKind::OwnerContribution => (payment, owner.contributions),
@@ -183,7 +188,10 @@ pub fn simple_to_transaction(
 /// かんたん入力で、借方・貸方の科目がどの入力欄から来たか。
 fn simple_field(kind: SimpleKind, side: Side) -> &'static str {
     match (kind, side) {
-        (SimpleKind::Income | SimpleKind::OwnerContribution, Side::Debit)
+        (
+            SimpleKind::Income | SimpleKind::UnpaidIncome | SimpleKind::OwnerContribution,
+            Side::Debit,
+        )
         | (SimpleKind::Expense | SimpleKind::Transfer | SimpleKind::OwnerDraw, Side::Credit) => {
             "paymentAccountId"
         }

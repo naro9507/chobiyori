@@ -260,6 +260,7 @@ describe("帳簿", () => {
 			"401 売上高",
 			"8,000",
 			"月謝",
+			"修正する",
 			// 証憑の数
 			"2",
 		])
@@ -267,7 +268,7 @@ describe("帳簿", () => {
 			within(rows[3])
 				.getAllByRole("cell")
 				.map((c) => c.textContent)
-		).toEqual(["", "", "", "206 預り金", "5,000", "", ""])
+		).toEqual(["", "", "", "206 預り金", "5,000", "", "", ""])
 		expect(rows[4]).toHaveTextContent("108,000")
 		// サイドメニューで選んだ年度で読む
 		expect(mocks.callCommand).toHaveBeenCalledWith("journal_book", {

@@ -92,8 +92,9 @@ export function FilingNotificationScheduler() {
 	const selected = useSettingsStore((state) => state.filingReminders)
 	const enabled = useSettingsStore((state) => state.filingDesktopNotifications)
 	const setStatus = useSettingsStore((state) => state.setFilingScheduleStatus)
+	const retry = useSettingsStore((state) => state.filingScheduleRetry)
 	const t = useTranslations("filing")
-	const { data, isError } = useFilingDeadlines(
+	const { data, isError, refetch } = useFilingDeadlines(
 		enabled && selected.length > 0,
 		true
 	)
@@ -103,17 +104,29 @@ export function FilingNotificationScheduler() {
 			: data && JSON.stringify(planFilingNotifications(data, selected, t))
 
 	useEffect(() => {
-		if (!isTauri()) return
-		if (plan === undefined) {
-			if (isError) setStatus("failed")
+		if (retry > 0 && enabled && selected.length > 0) void refetch()
+	}, [retry, enabled, selected, refetch])
+
+	useEffect(() => {
+		if (!isTauri()) {
+			setStatus({ kind: "unavailable" })
 			return
 		}
+		if (plan === undefined) {
+			setStatus({ kind: isError ? "failed" : "scheduling" })
+			return
+		}
+		setStatus({ kind: "scheduling" })
 		let superseded = false
 		queue = queue.then(async () => {
-			if (superseded) return
+			if (
+				superseded ||
+				useSettingsStore.getState().filingScheduleRetry !== retry
+			)
+				return
 			const entries: ScheduledNotice[] = JSON.parse(plan)
 			try {
-				const result = await callCommand<"ready" | "unavailable">(
+				const result = await callCommand<"ready" | "denied" | "unavailable">(
 					"sync_filing_notifications",
 					{
 						notifications: entries.map(({ id, at, title, body }) => ({
@@ -131,23 +144,35 @@ export function FilingNotificationScheduler() {
 							entry.at <= now.getTime() &&
 							today(new Date(entry.at)) === today(now)
 					)
-					localStorage.setItem(
-						storageKey,
-						JSON.stringify([
-							...delivered,
-							...entries.map(({ key, at }) => ({ key, at })),
-						])
-					)
+					const pending = entries.filter(({ at }) => at > now.getTime())
+					try {
+						localStorage.setItem(
+							storageKey,
+							JSON.stringify([
+								...delivered,
+								...pending.map(({ key, at }) => ({ key, at })),
+							])
+						)
+					} catch {
+						// OS への予約は完了している。
+					}
+					if (!superseded)
+						setStatus({
+							kind: "ready",
+							count: pending.length,
+							nextAt: pending[0]?.at,
+						})
+				} else if (!superseded) {
+					setStatus({ kind: result })
 				}
-				if (!superseded) setStatus(result)
 			} catch {
-				if (!superseded) setStatus("failed")
+				if (!superseded) setStatus({ kind: "failed" })
 			}
 		})
 		return () => {
 			superseded = true
 		}
-	}, [plan, isError, setStatus])
+	}, [plan, isError, retry, setStatus])
 
 	return null
 }

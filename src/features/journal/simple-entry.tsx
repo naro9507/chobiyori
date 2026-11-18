@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -16,10 +17,18 @@ import { TermHelp } from "@/features/help/term-help"
 import { type AccountCategory, displayName } from "@/features/master/master-api"
 import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
-import { amountForCommand, formatAmount } from "@/lib/amount"
+import { amountForCommand, formatAmount, parseAmount } from "@/lib/amount"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useEntryIntent } from "@/stores/entry-intent-store"
 import { useSettingsStore } from "@/stores/settings-store"
+import {
+	type SimpleEntryFormState as Form,
+	type KindChoice,
+	kindChoices,
+	rememberSimpleEntry,
+	setSimpleEntrySaving,
+	useSimpleEntryDrafts,
+} from "@/stores/simple-entry-draft-store"
 import {
 	type SimpleKind,
 	type Transaction,
@@ -28,31 +37,13 @@ import {
 import { useJournalErrorMessage } from "./journal-errors"
 import { useJournalMasters } from "./use-master-items"
 
-/** 画面で選ぶ種類。事業主の出し入れは、向きを別に選ぶ。 */
-const kindChoices = ["income", "expense", "transfer", "owner"] as const
-type KindChoice = (typeof kindChoices)[number]
-
 /** 内容の科目の候補を、種類に合う区分から先に並べる。 */
 const categoryOrder: Record<"income" | "expense", AccountCategory[]> = {
 	income: ["revenue", "liability", "equity", "asset", "cogs", "expense"],
 	expense: ["expense", "cogs", "asset", "liability", "equity", "revenue"],
 }
 
-type Form = {
-	choice: KindChoice
-	ownerKind: "owner_draw" | "owner_contribution"
-	date: string
-	amount: string
-	accountId: string
-	paymentAccountId: string
-	partnerId: string
-	memo: string
-	/** 家事按分する。経費の科目に按分ルールがあるときだけ選べる */
-	allocate: boolean
-	allocationPercent: string
-	/** 収入を請求書か定期売上の月に結び付ける（`targetKey` の文字列。空なら結び付けない） */
-	depositKey: string
-}
+const personalPayment = "personal"
 
 function today() {
 	const now = new Date()
@@ -88,14 +79,14 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 
 	const features = useFeatures()
 	const [draft] = useState(() => useEntryIntent.getState().draft)
-	useEffect(() => {
-		useEntryIntent.setState({ draft: null })
-	}, [])
+	const draftKey = String(fiscalYear)
+	const [validation, setValidation] = useState(false)
 	const initialDate =
 		fiscalYear !== null && !today().startsWith(String(fiscalYear))
 			? `${fiscalYear}-01-01`
 			: today()
-	const [form, setFormState] = useState<Form>({
+	const [initialForm] = useState<Form>(() => ({
+		unpaid: false,
 		choice: draft?.kind ?? "expense",
 		ownerKind: "owner_draw",
 		date: initialDate,
@@ -115,15 +106,33 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		allocate: false,
 		allocationPercent: "",
 		depositKey: "",
-	})
+	}))
+	const storedForm = useSimpleEntryDrafts((s) => s.forms[draftKey])
+	const saving = useSimpleEntryDrafts((s) => s.saving.has(draftKey))
+	const intent = useEntryIntent((s) => s.draft)
+	const form =
+		draft && intent === draft ? initialForm : (storedForm ?? initialForm)
+	useEffect(() => {
+		if (draft && useEntryIntent.getState().draft === draft) {
+			rememberSimpleEntry(draftKey, initialForm)
+			useEntryIntent.setState({ draft: null })
+		}
+	}, [draft, draftKey, initialForm])
 	const deposit = useRecordDeposit()
 	const targets = useOpenTargets(fiscalYear)
-	const linked = form.choice === "income" && form.depositKey !== ""
+	const unpaid = features.receivables && form.choice === "income" && form.unpaid
+	const personal =
+		form.choice === "expense" && form.paymentAccountId === personalPayment
+	const linked =
+		features.receivables &&
+		form.choice === "income" &&
+		!unpaid &&
+		form.depositKey !== ""
 	const setForm = (patch: Partial<Form>) => {
 		create.reset()
 		deposit.reset()
 		setSaved(null)
-		setFormState({ ...form, ...patch })
+		rememberSimpleEntry(draftKey, { ...form, ...patch })
 	}
 
 	const activeAccounts = masters.accounts.filter((a) => a.isActive)
@@ -148,12 +157,49 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		})
 	}
 
-	const kind: SimpleKind =
-		form.choice === "owner" ? form.ownerKind : form.choice
+	let kind: SimpleKind = form.choice === "owner" ? form.ownerKind : form.choice
+	if (unpaid) kind = "unpaid_income"
+	if (personal) kind = "personal_expense"
+	const parsedAmount = parseAmount(form.amount)
+	const invalid = {
+		date: !form.date
+			? t("dateRequired")
+			: fiscalYear !== null && !form.date.startsWith(`${fiscalYear}-`)
+				? t("dateOutOfYear", { year: fiscalYear })
+				: undefined,
+		amount:
+			parsedAmount === null
+				? t("amountRequired")
+				: !Number.isSafeInteger(parsedAmount) || parsedAmount < 1
+					? t("amountInvalid")
+					: undefined,
+		accountId:
+			form.choice !== "owner" && !linked && !form.accountId
+				? t("contentRequired")
+				: undefined,
+		paymentAccountId:
+			!unpaid && !form.paymentAccountId ? t("paymentRequired") : undefined,
+	}
 	const error = create.error ?? deposit.error
 	const errorFor = (field: string) => {
 		const e = fieldError(error, field)
-		return e ? errorMessage(e) : undefined
+		return (
+			(validation && invalid[field as keyof typeof invalid]) ||
+			(e ? errorMessage(e) : undefined)
+		)
+	}
+
+	const complete = (
+		submitted: Form,
+		transaction: Transaction,
+		patch: Partial<Form>
+	) => {
+		const next = { ...submitted, amount: "", memo: "", ...patch }
+		// 別画面に移動しても、保存済みの入力は再表示しない。
+		if (useSimpleEntryDrafts.getState().forms[draftKey] === submitted) {
+			rememberSimpleEntry(draftKey, next)
+		}
+		setSaved(transaction)
 	}
 
 	const onDepositChange = (depositKey: string) => {
@@ -168,51 +214,54 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		})
 	}
 
-	const onSubmit = (event: FormEvent) => {
+	const onSubmit = async (event: FormEvent) => {
 		event.preventDefault()
+		setValidation(true)
+		if (
+			Object.values(invalid).some(Boolean) ||
+			useSimpleEntryDrafts.getState().saving.has(draftKey)
+		)
+			return
+		setValidation(false)
 		const target = linked ? parseTargetKey(form.depositKey) : null
-		if (target) {
-			deposit.mutate(
-				{
+		const paymentAccountId =
+			personal || unpaid ? 0 : Number(form.paymentAccountId)
+		const amount = amountForCommand(form.amount)
+		setSimpleEntrySaving(draftKey, true)
+		try {
+			if (target) {
+				const transaction = await deposit.mutateAsync({
 					target,
 					date: form.date,
-					amount: amountForCommand(form.amount),
-					accountId: Number(form.paymentAccountId || 0),
+					amount,
+					accountId: paymentAccountId,
 					memo: form.memo,
-				},
-				{
-					onSuccess: (transaction) => {
-						setSaved(transaction)
-						setFormState({ ...form, amount: "", memo: "", depositKey: "" })
-					},
-				}
-			)
-			return
-		}
-		const usesAccount = form.choice !== "owner"
-		create.mutate(
-			{
+				})
+				complete(form, transaction, { depositKey: "" })
+				return
+			}
+			const transaction = await create.mutateAsync({
 				kind,
 				date: form.date,
-				amount: amountForCommand(form.amount),
+				amount,
 				accountId:
-					usesAccount && form.accountId ? Number(form.accountId) : null,
-				paymentAccountId: Number(form.paymentAccountId || 0),
+					form.choice !== "owner" && form.accountId
+						? Number(form.accountId)
+						: null,
+				paymentAccountId,
 				partnerId: form.partnerId ? Number(form.partnerId) : null,
 				memo: form.memo,
 				allocationPercent:
 					rulePercent !== null && form.allocate
 						? amountForCommand(form.allocationPercent)
 						: null,
-			},
-			{
-				onSuccess: (transaction) => {
-					setSaved(transaction)
-					// 日付・種類・口座は続けて入力しやすいように残す
-					setFormState({ ...form, amount: "", memo: "", partnerId: "" })
-				},
-			}
-		)
+			})
+			complete(form, transaction, { partnerId: "" })
+		} catch {
+			// 入力欄に対応するエラーは mutation から表示する。
+		} finally {
+			setSimpleEntrySaving(draftKey, false)
+		}
 	}
 
 	const labels: Record<KindChoice, { account: string; payment: string }> = {
@@ -231,7 +280,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 			))
 		}
 		const order = categoryOrder[form.choice === "income" ? "income" : "expense"]
-		return order.map((category) => {
+		return (unpaid ? ["revenue" as const] : order).map((category) => {
 			const inCategory = contentAccounts.filter((a) => a.category === category)
 			if (inCategory.length === 0) return null
 			return (
@@ -277,211 +326,269 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					aria-label={t("simple")}
 					className="flex flex-col gap-5"
 				>
-					<fieldset className="flex flex-col gap-2">
-						<legend className="mb-1.5 font-medium text-sm">{t("kind")}</legend>
-						<RadioCards
-							value={form.choice}
-							onValueChange={(value) =>
-								setForm({
-									choice: value as KindChoice,
-									accountId: "",
-									depositKey: "",
-								})
-							}
-							className="sm:grid-cols-4"
-						>
-							{kindChoices.map((choice) => (
-								<RadioCardsItem key={choice} value={choice}>
-									{t(`kind_${choice}`)}
-								</RadioCardsItem>
-							))}
-						</RadioCards>
-					</fieldset>
-
-					{paymentAccounts.length === 0 && masters.accounts.length > 0 && (
-						<p className="text-muted-foreground text-sm">
-							{t("noPaymentAccounts")}
-						</p>
-					)}
-
-					{features.receivables &&
-						form.choice === "income" &&
-						((targets.data?.invoices.length ?? 0) > 0 ||
-							(targets.data?.planMonths.length ?? 0) > 0) && (
-							<Field
-								label={t("depositTarget")}
-								hint={t("depositTargetHint")}
-								error={errorFor("targetMonth") ?? errorFor("status")}
+					<fieldset disabled={saving} className="flex flex-col gap-5">
+						<fieldset className="flex flex-col gap-2">
+							<legend className="mb-1.5 font-medium text-sm">
+								{t("kind")}
+							</legend>
+							<RadioCards
+								value={form.choice}
+								onValueChange={(value) =>
+									setForm({
+										choice: value as KindChoice,
+										accountId: "",
+										unpaid: false,
+										paymentAccountId: personal ? "" : form.paymentAccountId,
+										depositKey: "",
+									})
+								}
+								className="sm:grid-cols-4"
 							>
-								<DepositTargetSelect
-									targets={targets.data}
-									value={form.depositKey}
-									onChange={onDepositChange}
-								/>
-							</Field>
-						)}
+								{kindChoices.map((choice) => (
+									<RadioCardsItem key={choice} value={choice}>
+										{t(`kind_${choice}`)}
+									</RadioCardsItem>
+								))}
+							</RadioCards>
+						</fieldset>
 
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{form.choice === "owner" && (
-							<Field
-								term={form.ownerKind === "owner_draw" ? "draw" : "contribution"}
-								label={t("ownerDirection")}
-								className="lg:col-span-3"
-							>
-								<NativeSelect
-									value={form.ownerKind}
+						{features.receivables && form.choice === "income" && (
+							<div className="space-y-2">
+								<LabeledCheckbox
+									label={t("unpaidIncome")}
+									checked={unpaid}
 									onChange={(e) =>
 										setForm({
-											ownerKind: e.target.value as Form["ownerKind"],
+											unpaid: e.target.checked,
+											accountId: "",
+											depositKey: "",
 										})
 									}
-								>
-									<option value="owner_draw">{t("owner_draw")}</option>
-									<option value="owner_contribution">
-										{t("owner_contribution")}
-									</option>
-								</NativeSelect>
-							</Field>
+								/>
+								{unpaid && (
+									<p className="text-muted-foreground text-sm">
+										{t("unpaidIncomeHint")}{" "}
+										<Link
+											to="/documents"
+											onClick={() => useEntryIntent.getState().newInvoice()}
+											className="text-primary underline underline-offset-4"
+										>
+											{t("newInvoiceInstead")}
+										</Link>
+									</p>
+								)}
+							</div>
 						)}
-						<Field label={t("date")} error={errorFor("date")}>
-							<Input
-								type="date"
-								value={form.date}
-								min={fiscalYear ? `${fiscalYear}-01-01` : undefined}
-								max={fiscalYear ? `${fiscalYear}-12-31` : undefined}
-								onChange={(e) => setForm({ date: e.target.value })}
-								className="num"
-							/>
-						</Field>
-						<Field
-							label={t("amount")}
-							hint={t("amountHint")}
-							error={errorFor("amount")}
-						>
-							<Input
-								inputMode="numeric"
-								value={form.amount}
-								onChange={(e) => setForm({ amount: e.target.value })}
-								className="num text-right"
-							/>
-						</Field>
-						{form.choice !== "owner" && !linked && (
-							<Field
-								term="account"
-								label={labels[form.choice].account}
-								error={errorFor("accountId")}
-							>
-								<NativeSelect
-									value={form.accountId}
-									onChange={(e) => onAccountChange(e.target.value)}
-								>
-									<option value="">{t("choose")}</option>
-									{accountOptions()}
-								</NativeSelect>
-							</Field>
-						)}
-						<Field
-							label={labels[form.choice].payment}
-							error={errorFor("paymentAccountId") ?? errorFor("accountId")}
-						>
-							<NativeSelect
-								value={form.paymentAccountId}
-								onChange={(e) => setForm({ paymentAccountId: e.target.value })}
-							>
-								<option value="">{t("choose")}</option>
-								{paymentAccounts.map((a) => (
-									<option key={a.id} value={a.id}>
-										{a.code} {displayName(a, locale)}
-									</option>
-								))}
-							</NativeSelect>
-						</Field>
-						{!linked && (
-							<Field
-								label={t("partner")}
-								hint={t("optional")}
-								error={errorFor("partnerId")}
-							>
-								<NativeSelect
-									value={form.partnerId}
-									onChange={(e) => setForm({ partnerId: e.target.value })}
-								>
-									<option value="">{t("none")}</option>
-									{activePartners.map((p) => (
-										<option key={p.id} value={p.id}>
-											{p.code} {p.label}
-										</option>
-									))}
-								</NativeSelect>
-							</Field>
-						)}
-						<Field
-							label={t("memo")}
-							hint={t("memoHint")}
-							error={errorFor("memo")}
-						>
-							<Input
-								value={form.memo}
-								onChange={(e) => setForm({ memo: e.target.value })}
-							/>
-						</Field>
-					</div>
+						{paymentAccounts.length === 0 &&
+							masters.accounts.length > 0 &&
+							!unpaid &&
+							!personal && (
+								<p className="text-muted-foreground text-sm">
+									{t("noPaymentAccounts")}
+								</p>
+							)}
 
-					{rulePercent !== null && (
-						<fieldset className="flex flex-col gap-3 rounded-lg border p-4">
-							<legend className="px-1 font-medium text-sm">
-								{t("allocationTitle")} <TermHelp term="allocation" />
-							</legend>
-							<LabeledCheckbox
-								className=""
-								label={t("allocate")}
-								checked={form.allocate}
-								onChange={(e) => setForm({ allocate: e.target.checked })}
-							/>
-							{form.allocate && (
+						{features.receivables &&
+							form.choice === "income" &&
+							!unpaid &&
+							((targets.data?.invoices.length ?? 0) > 0 ||
+								(targets.data?.planMonths.length ?? 0) > 0) && (
 								<Field
-									term="allocation"
-									label={t("businessPercent")}
-									hint={t("businessPercentHint")}
-									error={errorFor("allocationPercent")}
-									className="w-56"
+									label={t("depositTarget")}
+									hint={t("depositTargetHint")}
+									error={errorFor("targetMonth") ?? errorFor("status")}
 								>
-									<Input
-										inputMode="numeric"
-										value={form.allocationPercent}
-										onChange={(e) =>
-											setForm({ allocationPercent: e.target.value })
-										}
-										className="num text-right"
+									<DepositTargetSelect
+										targets={targets.data}
+										value={form.depositKey}
+										onChange={onDepositChange}
 									/>
 								</Field>
 							)}
-						</fieldset>
-					)}
 
-					{error && !(isAppError(error) && error.field) ? (
-						<p role="alert" className="text-destructive text-sm">
-							{errorMessage(error)}
-						</p>
-					) : null}
+						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							{form.choice === "owner" && (
+								<Field
+									term={
+										form.ownerKind === "owner_draw" ? "draw" : "contribution"
+									}
+									label={t("ownerDirection")}
+									className="lg:col-span-3"
+								>
+									<NativeSelect
+										value={form.ownerKind}
+										onChange={(e) =>
+											setForm({
+												ownerKind: e.target.value as Form["ownerKind"],
+											})
+										}
+									>
+										<option value="owner_draw">{t("owner_draw")}</option>
+										<option value="owner_contribution">
+											{t("owner_contribution")}
+										</option>
+									</NativeSelect>
+								</Field>
+							)}
+							<Field label={t("date")} error={errorFor("date")}>
+								<Input
+									type="date"
+									value={form.date}
+									min={fiscalYear ? `${fiscalYear}-01-01` : undefined}
+									max={fiscalYear ? `${fiscalYear}-12-31` : undefined}
+									onChange={(e) => setForm({ date: e.target.value })}
+									className="num"
+								/>
+							</Field>
+							<Field
+								label={t("amount")}
+								hint={t("amountHint")}
+								error={errorFor("amount")}
+							>
+								<Input
+									inputMode="numeric"
+									value={form.amount}
+									onChange={(e) => setForm({ amount: e.target.value })}
+									className="num text-right"
+								/>
+							</Field>
+							{form.choice !== "owner" && !linked && (
+								<Field
+									term="account"
+									label={
+										unpaid ? t("unpaidAccount") : labels[form.choice].account
+									}
+									error={errorFor("accountId")}
+								>
+									<NativeSelect
+										value={form.accountId}
+										onChange={(e) => onAccountChange(e.target.value)}
+									>
+										<option value="">{t("choose")}</option>
+										{accountOptions()}
+									</NativeSelect>
+								</Field>
+							)}
+							{!unpaid && (
+								<Field
+									label={labels[form.choice].payment}
+									hint={personal ? t("personalPaymentHint") : undefined}
+									error={errorFor("paymentAccountId")}
+								>
+									<NativeSelect
+										value={form.paymentAccountId}
+										onChange={(e) =>
+											setForm({ paymentAccountId: e.target.value })
+										}
+									>
+										<option value="">{t("choose")}</option>
+										{form.choice === "expense" && (
+											<option value={personalPayment}>
+												{t("personalPayment")}
+											</option>
+										)}
+										{paymentAccounts.map((a) => (
+											<option key={a.id} value={a.id}>
+												{a.code} {displayName(a, locale)}
+											</option>
+										))}
+									</NativeSelect>
+								</Field>
+							)}
+							{!linked && (
+								<Field
+									label={t("partner")}
+									hint={t("optional")}
+									error={errorFor("partnerId")}
+								>
+									<NativeSelect
+										value={form.partnerId}
+										onChange={(e) => setForm({ partnerId: e.target.value })}
+									>
+										<option value="">{t("none")}</option>
+										{activePartners.map((p) => (
+											<option key={p.id} value={p.id}>
+												{p.code} {p.label}
+											</option>
+										))}
+									</NativeSelect>
+								</Field>
+							)}
+							<Field
+								label={t("memo")}
+								hint={t("memoHint")}
+								error={errorFor("memo")}
+							>
+								<Input
+									value={form.memo}
+									onChange={(e) => setForm({ memo: e.target.value })}
+								/>
+							</Field>
+						</div>
+
+						{rulePercent !== null && (
+							<fieldset className="flex flex-col gap-3 rounded-lg border p-4">
+								<legend className="px-1 font-medium text-sm">
+									{t("allocationTitle")} <TermHelp term="allocation" />
+								</legend>
+								<LabeledCheckbox
+									className=""
+									label={t("allocate")}
+									checked={form.allocate}
+									onChange={(e) => setForm({ allocate: e.target.checked })}
+								/>
+								{form.allocate && (
+									<Field
+										term="allocation"
+										label={t("businessPercent")}
+										hint={t("businessPercentHint")}
+										error={errorFor("allocationPercent")}
+										className="w-56"
+									>
+										<Input
+											inputMode="numeric"
+											value={form.allocationPercent}
+											onChange={(e) =>
+												setForm({ allocationPercent: e.target.value })
+											}
+											className="num text-right"
+										/>
+									</Field>
+								)}
+							</fieldset>
+						)}
+
+						{error &&
+						(!(isAppError(error) && error.field) || error.field === "kind") ? (
+							<p role="alert" className="text-destructive text-sm">
+								{errorMessage(error)}
+							</p>
+						) : null}
+					</fieldset>
 					{saved && (
 						<p
 							role="status"
-							className="flex items-center gap-2 text-sm text-success"
+							className="flex flex-wrap items-center gap-2 text-sm text-success"
 						>
 							<CircleCheck aria-hidden="true" className="size-4 shrink-0" />
 							{savedSummary(saved)}
+							<Link
+								to="/transactions"
+								search={{
+									editTransaction: saved.id,
+									editMonth: Number(saved.date.slice(5, 7)),
+									editYear: saved.fiscalYear,
+								}}
+								className="text-primary underline underline-offset-4"
+							>
+								{t("reviewSaved")}
+							</Link>
 						</p>
 					)}
 
 					<div>
-						<Button
-							type="submit"
-							disabled={
-								create.isPending || deposit.isPending || fiscalYear === null
-							}
-						>
-							{(create.isPending || deposit.isPending) && (
+						<Button type="submit" disabled={saving || fiscalYear === null}>
+							{saving && (
 								<Loader2 aria-hidden="true" className="animate-spin" />
 							)}
 							{t("record")}

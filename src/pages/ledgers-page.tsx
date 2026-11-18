@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { Loader2, Paperclip } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { type ReactNode, useState } from "react"
@@ -334,6 +335,7 @@ function journalRows(
 
 function JournalView({ period }: { period: Period }) {
 	const t = useTranslations("ledgers")
+	const journal = useTranslations("journal")
 	const masters = useJournalMasters()
 	const query = useJournalBook(period)
 	const counts = useAttachmentCounts(period.fiscalYear).data
@@ -372,6 +374,25 @@ function JournalView({ period }: { period: Period }) {
 			numeric: true,
 		},
 		{ id: "memo", header: t("memo"), cell: (r) => r.memo },
+		{
+			id: "edit",
+			header: journal("actions"),
+			cell: (r) =>
+				r.date ? (
+					<Link
+						to="/transactions"
+						search={{
+							editTransaction: r.transactionId,
+							editMonth: Number(r.date.slice(5, 7)),
+							editYear: period.fiscalYear ?? undefined,
+						}}
+						aria-label={journal("editRow", { date: r.date })}
+						className="whitespace-nowrap text-primary underline underline-offset-4"
+					>
+						{journal("edit")}
+					</Link>
+				) : null,
+		},
 		{
 			id: "attachments",
 			header: t("attachments"),
@@ -424,6 +445,7 @@ function JournalView({ period }: { period: Period }) {
 								<td className="num px-3 py-2.5 text-right">
 									{formatAmount(book.totalCredit)}
 								</td>
+								<td />
 								<td />
 								<td />
 							</tr>

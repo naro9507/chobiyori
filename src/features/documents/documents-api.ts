@@ -71,6 +71,7 @@ export type DocumentRecord = {
 	lines: DocumentLine[]
 	totals: Totals
 	paid: number
+	lastPaymentAccountId: number | null
 	sourceDocumentId: number | null
 	transactionId: number | null
 	pdfAttachmentId: number | null
