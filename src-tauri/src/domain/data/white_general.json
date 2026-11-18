@@ -1,5 +1,5 @@
 {
-  "_note": "白色申告の収支内訳書（一般用）の金額一覧。事業専従者控除の要件・金額は利用者が確認して入力する。",
+  "_note": "国税庁・収支内訳書（一般用）令和5年分以降用と令和7年分の手引きに照合。根拠と検証範囲は docs/TAX_VALIDATION.md。",
   "form": "white_general",
   "from_year": 2020,
   "deduction": {},
@@ -170,7 +170,7 @@
     },
     {
       "key": "taxes_dues",
-      "no": "ア",
+      "no": "イ",
       "ja": "租税公課",
       "en": "Taxes and dues",
       "sum": [
@@ -180,7 +180,7 @@
     },
     {
       "key": "freight",
-      "no": "イ",
+      "no": "ロ",
       "ja": "荷造運賃",
       "en": "Packing and freight",
       "sum": [
@@ -190,7 +190,7 @@
     },
     {
       "key": "utilities",
-      "no": "ウ",
+      "no": "ハ",
       "ja": "水道光熱費",
       "en": "Utilities",
       "sum": [
@@ -200,7 +200,7 @@
     },
     {
       "key": "travel",
-      "no": "エ",
+      "no": "ニ",
       "ja": "旅費交通費",
       "en": "Travel and transportation",
       "sum": [
@@ -210,7 +210,7 @@
     },
     {
       "key": "communication",
-      "no": "オ",
+      "no": "ホ",
       "ja": "通信費",
       "en": "Communication",
       "sum": [
@@ -220,7 +220,7 @@
     },
     {
       "key": "advertising",
-      "no": "カ",
+      "no": "ヘ",
       "ja": "広告宣伝費",
       "en": "Advertising",
       "sum": [
@@ -230,7 +230,7 @@
     },
     {
       "key": "entertainment",
-      "no": "キ",
+      "no": "ト",
       "ja": "接待交際費",
       "en": "Entertainment",
       "sum": [
@@ -240,7 +240,7 @@
     },
     {
       "key": "insurance",
-      "no": "ク",
+      "no": "チ",
       "ja": "損害保険料",
       "en": "Insurance",
       "sum": [
@@ -250,7 +250,7 @@
     },
     {
       "key": "repairs",
-      "no": "ケ",
+      "no": "リ",
       "ja": "修繕費",
       "en": "Repairs",
       "sum": [
@@ -260,7 +260,7 @@
     },
     {
       "key": "supplies",
-      "no": "コ",
+      "no": "ヌ",
       "ja": "消耗品費",
       "en": "Supplies",
       "sum": [
@@ -270,7 +270,7 @@
     },
     {
       "key": "welfare",
-      "no": "サ",
+      "no": "ル",
       "ja": "福利厚生費",
       "en": "Employee benefits",
       "sum": [
@@ -280,7 +280,7 @@
     },
     {
       "key": "blank1",
-      "no": "シ",
+      "no": "ヲ",
       "ja": "",
       "en": "",
       "blank": true,
@@ -288,7 +288,7 @@
     },
     {
       "key": "blank2",
-      "no": "ス",
+      "no": "ワ",
       "ja": "",
       "en": "",
       "blank": true,
@@ -296,7 +296,7 @@
     },
     {
       "key": "blank3",
-      "no": "セ",
+      "no": "カ",
       "ja": "",
       "en": "",
       "blank": true,
@@ -304,7 +304,7 @@
     },
     {
       "key": "blank4",
-      "no": "ソ",
+      "no": "ヨ",
       "ja": "",
       "en": "",
       "blank": true,
@@ -320,7 +320,7 @@
     },
     {
       "key": "misc_expenses",
-      "no": "チ",
+      "no": "レ",
       "ja": "雑費",
       "en": "Miscellaneous expenses",
       "sum": [
@@ -330,16 +330,42 @@
       "overflow": true
     },
     {
-      "key": "expenses",
+      "key": "other_expenses",
       "no": "⑰",
+      "ja": "その他の経費の小計",
+      "en": "Other expenses subtotal",
+      "formula": [
+        "+taxes_dues",
+        "+freight",
+        "+utilities",
+        "+travel",
+        "+communication",
+        "+advertising",
+        "+entertainment",
+        "+insurance",
+        "+repairs",
+        "+supplies",
+        "+welfare",
+        "+blank1",
+        "+blank2",
+        "+blank3",
+        "+blank4",
+        "+blank5",
+        "+misc_expenses"
+      ],
+      "total": true
+    },
+    {
+      "key": "expenses",
+      "no": "⑱",
       "ja": "経費の計",
       "en": "Total expenses",
       "sum_of_expenses": true,
       "total": true
     },
     {
-      "key": "net",
-      "no": "⑱",
+      "key": "income_before_deduction",
+      "no": "⑲",
       "ja": "専従者控除前の所得金額",
       "en": "Income before family worker deduction",
       "formula": [
@@ -349,25 +375,15 @@
       "total": true
     },
     {
-      "key": "income_before_deduction",
-      "no": "",
-      "ja": "専従者控除前の所得金額",
-      "en": "Income before family worker deduction",
-      "formula": [
-        "+net"
-      ],
-      "total": true
-    },
-    {
       "key": "family_deduction",
-      "no": "⑲",
+      "no": "⑳",
       "ja": "事業専従者控除額（確認して入力）",
       "en": "Family worker deduction (entered after confirmation)",
       "total": false
     },
     {
       "key": "income",
-      "no": "⑳",
+      "no": "㉑",
       "ja": "所得金額",
       "en": "Business income",
       "formula": [

@@ -314,7 +314,7 @@ describe("決算", () => {
 		).toHaveTextContent("650,000")
 		expect(screen.getByText(/雑費に足しました/)).toHaveTextContent("2 つ")
 		expect(
-			screen.getByText(/最新の様式と税理士・税務署で確かめてください/)
+			screen.getByText(/国税庁の様式・手引きと、手元の記録を照合してください/)
 		).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "PDF で保存" })).toBeEnabled()
 	})

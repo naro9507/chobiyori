@@ -2,7 +2,7 @@
 //!
 //! 決算書の行の並びと、どの科目をどの行に足すかは、年度ごとのデータ
 //! （`data/blue_general.json`）で持つ。ここは、そのデータに従って足し引きするだけにする。
-//! 様式の番号や控除額などの正しさは、最新の様式と税理士に確認すること。
+//! 国税庁の様式・公開資料との照合記録は `docs/TAX_VALIDATION.md`。
 
 use super::master::{AccountCategory, FilingType};
 use serde::{Deserialize, Serialize};
@@ -190,8 +190,10 @@ pub enum StatementIssueCode {
     ExpensesMerged,
     /// 期首に事業主貸・事業主借の残高がある（年度の初めは 0 にする）
     OwnerOpening,
-    /// 白色申告の年度。白色は収支内訳書を使う（まだ出せない）
+    /// 白色で専従者給与を経費から除外した
     WhiteFiling,
+    /// 保存後の取引変更などで専従者控除が控除前所得を超えた
+    WhiteDeductionExceedsIncome,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -639,6 +641,103 @@ mod tests {
 #[cfg(test)]
 mod white_tests {
     use super::*;
+    // 独自の数値例。欄と計算式の根拠: 国税庁・収支内訳書（一般用）
+    // 令和5年分以降用、令和7年分手引き（docs/TAX_VALIDATION.md）。
+    #[test]
+    fn nta_white_form_subtotals_and_field_numbers() {
+        use AccountCategory::*;
+        let rows = [
+            (Revenue, "pl.sales", 1_000_000),
+            (Cogs, "pl.opening_inventory", 100_000),
+            (Cogs, "pl.purchases", 300_000),
+            (Cogs, "pl.closing_inventory", -80_000),
+            (Expense, "pl.wages", 100_000),
+            (Expense, "pl.rent", 50_000),
+            (Expense, "pl.utilities", 36_000),
+            (Expense, "pl.misc_expenses", 4_000),
+            // 白色では専従者給与を必要経費にせず、別に専従者控除を使う。
+            (Expense, "pl.family_employee_salaries", 200_000),
+        ];
+        let figures: Vec<_> = rows
+            .iter()
+            .enumerate()
+            .map(|(i, (category, line, value))| AccountFigure {
+                account_id: i as i64,
+                category: *category,
+                statement_line: Some((*line).into()),
+                name_ja: (*line).into(),
+                name_en: String::new(),
+                opening: 0,
+                closing: *value,
+            })
+            .collect();
+        let s = statement(2026, FilingType::White, &figures, 290_000);
+        for (key, no, expected) in [
+            ("cogs", "⑨", 320_000),
+            ("gross_profit", "⑩", 680_000),
+            ("utilities", "ハ", 36_000),
+            ("misc_expenses", "レ", 4_000),
+            ("other_expenses", "⑰", 40_000),
+            ("expenses", "⑱", 190_000),
+            ("income_before_deduction", "⑲", 490_000),
+            ("family_deduction", "⑳", 0),
+            ("income", "㉑", 490_000),
+        ] {
+            let line = s.pl.iter().find(|l| l.key == key).unwrap();
+            assert_eq!((line.no.as_str(), line.amount), (no, expected), "{key}");
+        }
+        assert!(!s
+            .issues
+            .iter()
+            .any(|i| i.code == StatementIssueCode::IncomeMismatch));
+        assert!(s
+            .issues
+            .iter()
+            .any(|i| i.code == StatementIssueCode::WhiteFiling));
+    }
+
+    #[test]
+    fn manual_startup_amortization_keeps_the_unamortized_asset() {
+        use AccountCategory::*;
+        // 任意償却の記帳例: 開業費120,000のうち30,000だけ償却。
+        // 対象費用の適否や償却額の選択を自動判定するテストではない。
+        let figures: Vec<_> = [
+            (Asset, None, 120_000, 90_000),
+            (Asset, Some("bs.cash"), 100_000, 100_000),
+            (Liability, Some("bs.loans_payable"), 50_000, 50_000),
+            (Equity, Some("bs.capital"), 170_000, 170_000),
+            (Expense, Some("pl.depreciation"), 0, 30_000),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (category, line, opening, closing))| AccountFigure {
+            account_id: i as i64,
+            category,
+            statement_line: line.map(str::to_string),
+            name_ja: "Startup example".into(),
+            name_en: String::new(),
+            opening,
+            closing,
+        })
+        .collect();
+        let s = statement(2026, FilingType::White, &figures, -30_000);
+        assert!(s.issues.is_empty());
+        assert_eq!(s.income_before_deduction, -30_000);
+        let amortization = s.pl.iter().find(|l| l.key == "depreciation").unwrap();
+        assert_eq!(
+            (amortization.no.as_str(), amortization.amount),
+            ("⑬", 30_000)
+        );
+        assert_eq!(
+            s.bs.iter()
+                .find(|l| l.key == "other_assets")
+                .unwrap()
+                .closing,
+            90_000
+        );
+        assert_eq!(next_capital(170_000, -30_000, 0, 0), 140_000);
+    }
+
     #[test]
     fn white_statement_uses_white_lines_without_a_blue_deduction() {
         let figures = vec![
@@ -674,7 +773,7 @@ mod white_tests {
         assert!(s
             .pl
             .iter()
-            .any(|l| l.key == "family_deduction" && l.no == "⑲"));
+            .any(|l| l.key == "family_deduction" && l.no == "⑳"));
         assert!(!s.pl.iter().any(|l| l.key == "deduction"));
     }
 }
