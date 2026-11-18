@@ -28,6 +28,7 @@ export function ConsumptionPanel({
 	fiscalYear: number | null
 }) {
 	const t = useTranslations("filing")
+	const tSetup = useTranslations("setup")
 	const query = useConsumptionTax(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
 	const report = query.data
@@ -43,7 +44,14 @@ export function ConsumptionPanel({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<p className="text-muted-foreground text-sm">{t("consumptionIntro")}</p>
+			<div className="flex flex-col gap-1">
+				{report.taxStatus !== "exempt" && (
+					<p className="font-medium text-sm">
+						{t("savedMethod", { method: tSetup(`tax_${report.taxStatus}`) })}
+					</p>
+				)}
+				<p className="text-muted-foreground text-sm">{t("consumptionIntro")}</p>
+			</div>
 			<AccountantNote />
 			{report.taxableFrom.endsWith("-01-01") ? null : (
 				<p className="rounded-md border px-3 py-2 text-sm">

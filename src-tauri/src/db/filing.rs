@@ -3,7 +3,7 @@
 //! 計算は `domain::filing` で行い、ここでは帳簿から材料を読み、記録を書く。
 //! アプリから国税庁などへは何も送らない（登録番号は利用者が公表サイトで確かめる）。
 
-use super::{audit, closing, setup, Database};
+use super::{audit, closing, setup, transactions, Database};
 use crate::domain::filing::{self, ConsumptionTax, DeadlineKind, Rate, SalesAmount};
 use crate::domain::journal;
 use crate::domain::master::{self, FilingType, TaxCategory, TaxStatus};
@@ -61,7 +61,8 @@ pub fn registration(conn: &Connection) -> AppResult<InvoiceRegistration> {
 pub struct RegistrationInput {
     pub registration_no: String,
     pub registered_on: String,
-    /// 登録日からの消費税の計算のしかた（免税は選べない）
+    pub fiscal_year: i64,
+    /// 設定を開いている年度の消費税の計算のしかた（免税は選べない）
     pub tax_status: TaxStatus,
     #[serde(default)]
     pub simplified_category: Option<i64>,
@@ -76,15 +77,16 @@ fn valid_category(category: Option<i64>) -> AppResult<Option<i64>> {
     }
 }
 
-/// 登録番号と登録日を保存する。登録日の年からの、まだ免税の年度（締めていないもの）を
-/// 選んだ計算のしかたの課税事業者にする。登録日の前の取引は免税のまま扱う。
+/// 登録番号と登録日を保存し、開いている年度の計算方法を更新する。
+/// 登録日を入力・変更したときは、登録年以降の未締めの免税年度も課税にする。
 pub fn save_registration(
     db: &Database,
     input: &RegistrationInput,
 ) -> AppResult<InvoiceRegistration> {
     let no = master::invoice_registration_no(Some(&input.registration_no))?
         .ok_or(AppError::field(ErrorCode::Required, "registrationNo"))?;
-    let (year, _, _) = journal::parse_date(input.registered_on.trim())
+    let date = input.registered_on.trim();
+    let (registration_year, _, _) = journal::parse_date(date)
         .ok_or(AppError::field(ErrorCode::InvalidFormat, "registeredOn"))?;
     if input.tax_status == TaxStatus::Exempt {
         return Err(AppError::field(ErrorCode::OutOfRange, "taxStatus"));
@@ -94,28 +96,37 @@ pub fn save_registration(
         return Err(AppError::field(ErrorCode::Required, "simplifiedCategory"));
     }
     db.transaction(|tx| {
+        transactions::ensure_year_open(tx, input.fiscal_year)?;
+        let previous_date = registered_on(tx)?;
         let changed = tx.execute(
             "UPDATE business_profile
              SET invoice_registration_no = ?1, invoice_registered_on = ?2,
                  simplified_tax_category = coalesce(?3, simplified_tax_category),
                  updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = 1",
-            params![no, input.registered_on.trim(), category],
+            params![no, date, category],
         )?;
         if changed == 0 {
             return Err(AppError::new(ErrorCode::NotSetUp));
         }
         tx.execute(
             "UPDATE fiscal_years SET tax_status = ?1
-             WHERE year >= ?2 AND tax_status = 'exempt' AND status = 'open'",
-            params![input.tax_status, year],
+             WHERE year = ?2 AND (year >= ?3 OR tax_status <> 'exempt')",
+            params![input.tax_status, input.fiscal_year, registration_year],
         )?;
+        if previous_date.as_deref() != Some(date) {
+            tx.execute(
+                "UPDATE fiscal_years SET tax_status = ?1
+                 WHERE year >= ?2 AND tax_status = 'exempt' AND status = 'open'",
+                params![input.tax_status, registration_year],
+            )?;
+        }
         audit::event(
             tx,
             "invoice_registration",
             "save",
-            Some(year),
-            Some(serde_json::json!({ "registeredOn": input.registered_on.trim(), "taxStatus": input.tax_status })),
+            Some(input.fiscal_year),
+            Some(serde_json::json!({ "registeredOn": date, "taxStatus": input.tax_status })),
         )?;
         registration(tx)
     })
@@ -814,6 +825,7 @@ mod tests {
             &RegistrationInput {
                 registration_no: "T7000012050002".into(),
                 registered_on: date.into(),
+                fiscal_year: 2026,
                 tax_status: status,
                 simplified_category: category,
             },
@@ -853,6 +865,43 @@ mod tests {
         assert!(!report.needs_category);
         // 2 割特例: 15,600 − 12,480 = 3,120 → 3,100、地方 874 → 800
         assert_eq!(report.tax.special20.as_ref().unwrap().total, 3_900);
+    }
+
+    #[test]
+    fn registration_method_can_be_corrected_for_an_already_taxable_year() {
+        let db = set_up_db();
+        db.conn()
+            .execute(
+                "INSERT INTO fiscal_years (year, filing_type, tax_status)
+                 VALUES (2027, 'blue65', 'exempt')",
+                [],
+            )
+            .unwrap();
+        register(&db, "2026-10-01", TaxStatus::Special20, None).unwrap();
+        register(&db, "2026-10-01", TaxStatus::Simplified, Some(5)).unwrap();
+
+        {
+            let conn = db.conn();
+            let report = consumption(&conn, 2026).unwrap();
+            assert_eq!(report.tax_status, TaxStatus::Simplified);
+            assert_eq!(report.taxable_from.as_deref(), Some("2026-10-01"));
+            assert_eq!(year_status(&conn, 2027).unwrap(), TaxStatus::Special20);
+            conn.execute(
+                "UPDATE fiscal_years SET status = 'closed' WHERE year = 2026",
+                [],
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            register(&db, "2026-11-01", TaxStatus::Standard, None).unwrap_err(),
+            AppError::new(ErrorCode::YearClosed)
+        );
+        let conn = db.conn();
+        assert_eq!(year_status(&conn, 2026).unwrap(), TaxStatus::Simplified);
+        assert_eq!(
+            registered_on(&conn).unwrap().as_deref(),
+            Some("2026-10-01")
+        );
     }
 
     #[test]

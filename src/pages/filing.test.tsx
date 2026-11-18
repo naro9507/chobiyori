@@ -8,6 +8,8 @@ import type {
 	ConsumptionReport,
 	DeadlineNotice,
 	IncomeGuide,
+	InvoiceRegistration,
+	RegistrationInput,
 } from "@/features/filing/filing-api"
 import { today } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -170,7 +172,7 @@ function renderAt(path: string) {
 	const router = createAppRouter(
 		createMemoryHistory({ initialEntries: [path] })
 	)
-	render(
+	return render(
 		<AppProviders>
 			<RouterProvider router={router} />
 		</AppProviders>
@@ -189,10 +191,19 @@ const deadline: DeadlineNotice = {
 }
 let notices: DeadlineNotice[]
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
+let registration: InvoiceRegistration
+let taxStatus: ConsumptionReport["taxStatus"]
 
 beforeEach(() => {
 	notices = [deadline]
 	calendarResult = "saved"
+	registration = {
+		registrationNo: null,
+		registeredOn: null,
+		simplifiedCategory: 5,
+		checkDigitOk: null,
+	}
+	taxStatus = "special20"
 	useSettingsStore.setState({
 		locale: "ja",
 		theme: "light",
@@ -201,7 +212,7 @@ beforeEach(() => {
 	})
 	useYearStore.setState({ selected: null })
 	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	mocks.callCommand.mockImplementation(async (command: string, args) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -210,9 +221,16 @@ beforeEach(() => {
 					{
 						year: 2026,
 						filingType: "blue65",
-						taxStatus: "special20",
+						taxStatus,
 						closed: false,
 						taxableFrom: "2026-10-01",
+					},
+					{
+						year: 2025,
+						filingType: "blue65",
+						taxStatus: "standard",
+						closed: false,
+						taxableFrom: "2025-01-01",
 					},
 				]
 			case "list_accounts":
@@ -221,7 +239,7 @@ beforeEach(() => {
 			case "income_tax_guide":
 				return guide
 			case "consumption_tax_report":
-				return consumption
+				return { ...consumption, taxStatus }
 			case "filing_checklist":
 				return [
 					{ key: "submitted", group: "income", doneAt: null },
@@ -233,12 +251,7 @@ beforeEach(() => {
 					{ key: "consumption_corner", group: "consumption", doneAt: null },
 				]
 			case "invoice_registration":
-				return {
-					registrationNo: null,
-					registeredOn: null,
-					simplifiedCategory: 5,
-					checkDigitOk: null,
-				}
+				return registration
 			case "get_business_profile":
 				return {
 					tradeName: "テスト教室",
@@ -247,13 +260,17 @@ beforeEach(() => {
 					industry: "",
 					invoiceRegistrationNo: null,
 				}
-			case "save_invoice_registration":
-				return {
-					registrationNo: "T7000012050002",
-					registeredOn: "2026-10-01",
-					simplifiedCategory: 5,
+			case "save_invoice_registration": {
+				const input: RegistrationInput = args.input
+				taxStatus = input.taxStatus
+				registration = {
+					registrationNo: input.registrationNo,
+					registeredOn: input.registeredOn,
+					simplifiedCategory: input.simplifiedCategory,
 					checkDigitOk: true,
 				}
+				return registration
+			}
 			case "filing_deadlines":
 				return notices
 			case "export_filing_calendar":
@@ -304,8 +321,14 @@ describe("確定申告の補助", () => {
 
 	it("消費税は 2 割特例・簡易課税・本則課税の目安を並べ、年の途中の登録を知らせる", async () => {
 		const user = userEvent.setup()
+		taxStatus = "standard"
 		renderAt("/closing")
 		await user.click(await screen.findByRole("tab", { name: "消費税" }))
+		expect(
+			await screen.findByText(
+				"この年度の設定は「課税事業者（本則課税）」です。"
+			)
+		).toBeVisible()
 		expect(
 			await screen.findByText("2026-10-01 からの取引だけで計算しています。", {
 				exact: false,
@@ -330,9 +353,10 @@ describe("確定申告の補助", () => {
 })
 
 describe("インボイスの登録と期限", () => {
-	it("申請書に書く内容を出し、登録番号と登録日を保存する", async () => {
+	it("登録番号と登録日を保存し、年度の申告方法を変更できる", async () => {
 		const user = userEvent.setup()
-		renderAt("/settings")
+		taxStatus = "exempt"
+		const { unmount } = renderAt("/settings")
 		const table = await screen.findByRole("table", {
 			name: "登録申請書に書く内容",
 		})
@@ -346,6 +370,11 @@ describe("インボイスの登録と期限", () => {
 			within(card as HTMLElement).getByLabelText("登録日"),
 			"2026-10-01"
 		)
+		const newMethod = within(card as HTMLElement).getByLabelText(
+			"消費税の計算のしかた"
+		)
+		expect(newMethod).toHaveValue("")
+		await user.selectOptions(newMethod, "standard")
 		await user.click(
 			within(card as HTMLElement).getByRole("button", { name: "保存する" })
 		)
@@ -355,10 +384,36 @@ describe("インボイスの登録と期限", () => {
 				input: {
 					registrationNo: "T7000012050002",
 					registeredOn: "2026-10-01",
-					taxStatus: "special20",
+					fiscalYear: 2026,
+					taxStatus: "standard",
 					simplifiedCategory: 5,
 				},
 			}
+		)
+		await within(card as HTMLElement).findByText("設定を保存しました。")
+		expect(newMethod).toHaveValue("standard")
+		unmount()
+		renderAt("/settings")
+		const method = await screen.findByDisplayValue("本則課税")
+		expect(method).toHaveAccessibleName("消費税の計算のしかた")
+		const savedCard = within(method.closest("[data-slot=card]") as HTMLElement)
+		await user.selectOptions(method, "simplified")
+		await user.click(savedCard.getByRole("button", { name: "保存する" }))
+		expect(await savedCard.findByText("設定を保存しました。")).toBeVisible()
+		expect(method).toHaveValue("simplified")
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"save_invoice_registration",
+			expect.objectContaining({
+				input: expect.objectContaining({ taxStatus: "simplified" }),
+			})
+		)
+		await user.selectOptions(screen.getByLabelText("見る年度"), "2025")
+		expect(await screen.findByDisplayValue("本則課税")).toHaveAccessibleName(
+			"消費税の計算のしかた"
+		)
+		await user.selectOptions(screen.getByLabelText("見る年度"), "2026")
+		expect(await screen.findByDisplayValue("簡易課税")).toHaveAccessibleName(
+			"消費税の計算のしかた"
 		)
 	})
 

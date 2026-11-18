@@ -43,6 +43,8 @@ beforeEach(() => {
 				return { completed: true, fiscalYear: args.input.fiscalYear }
 			case "app_info":
 				return { name: "chobiyori", version: "0.1.0" }
+			case "open_invoice_site":
+				return null
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}
@@ -77,11 +79,18 @@ describe("初期設定ウィザード", () => {
 
 		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
 		await user.type(screen.getByLabelText("屋号"), "テスト教室")
+		await user.click(
+			screen.getByRole("button", { name: "国税庁の公表サイトで番号を確認" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_invoice_site")
+		expect(screen.getByLabelText("インボイスの登録番号")).toHaveValue("")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
+		await user.click(screen.getByText("自分の消費税区分を確認する方法"))
+		expect(screen.getByText(/消費税簡易課税制度選択届出書/)).toBeVisible()
 		await user.click(screen.getByRole("radio", { name: "白色申告" }))
 		await user.click(
-			screen.getByRole("radio", { name: "課税事業者（2 割特例）" })
+			screen.getByRole("radio", { name: "課税事業者（本則課税）" })
 		)
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
@@ -106,7 +115,7 @@ describe("初期設定ウィザード", () => {
 				},
 				fiscalYear: 2025,
 				filingType: "white",
-				taxStatus: "special20",
+				taxStatus: "standard",
 				template: "general",
 				accounts: [{ name: "現金", kind: "cash", balance: 0 }],
 				openingBalances: [],
