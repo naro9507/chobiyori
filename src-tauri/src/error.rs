@@ -73,6 +73,10 @@ pub enum ErrorCode {
     MonthLocked,
     /// パスワードが違う
     WrongPassword,
+    /// 復旧コードが現在の帳簿に使えない
+    InvalidRecoveryCode,
+    /// 再設定するパスワードがいまのものと同じ
+    SamePassword,
     /// パスワードが短すぎる
     WeakPassword,
     /// 帳簿がまだ開いていない（パスワードを入れる前）

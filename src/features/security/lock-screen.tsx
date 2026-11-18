@@ -18,10 +18,7 @@ import { type BookStatus, useOpenBooks } from "./security-api"
 /** パスワードの最短の長さ。Rust 側 `db::vault::PASSWORD_MIN` と同じ。 */
 export const PASSWORD_MIN = 8
 
-/**
- * 帳簿を開く前の画面。初めての起動ならパスワードを決め、前の版の帳簿ならパスワードを決めて暗号化し、
- * それ以外はパスワードを入れて開く。パスワードはどこにも保存しないので、忘れると帳簿を開けない。
- */
+/** 帳簿を開く前の画面。パスワードの設定・入力・再設定を行う。 */
 export function LockScreen({ status }: { status: BookStatus }) {
 	const t = useTranslations("security")
 	const errorMessage = useErrorMessage()
@@ -29,9 +26,12 @@ export function LockScreen({ status }: { status: BookStatus }) {
 	const [password, setPassword] = useState("")
 	const [confirm, setConfirm] = useState("")
 	const [mismatch, setMismatch] = useState(false)
-	const choosing = status.state !== "encrypted"
-	const mode =
-		status.state === "notCreated"
+	const [recovering, setRecovering] = useState(false)
+	const [recoveryCode, setRecoveryCode] = useState("")
+	const choosing = status.state !== "encrypted" || recovering
+	const mode = recovering
+		? "reset"
+		: status.state === "notCreated"
 			? "create"
 			: status.state === "plain"
 				? "encrypt"
@@ -44,6 +44,14 @@ export function LockScreen({ status }: { status: BookStatus }) {
 			return
 		}
 		setMismatch(false)
+		if (recovering) {
+			open.mutate({
+				command: "reset_books_password",
+				recoveryCode,
+				new: password,
+			})
+			return
+		}
 		open.mutate({
 			command:
 				mode === "create"
@@ -55,7 +63,20 @@ export function LockScreen({ status }: { status: BookStatus }) {
 		})
 	}
 
-	const passwordError = fieldError(open.error, "password")
+	const toggleRecovery = () => {
+		open.reset()
+		setPassword("")
+		setConfirm("")
+		setRecoveryCode("")
+		setMismatch(false)
+		setRecovering(!recovering)
+	}
+
+	const passwordError = fieldError(
+		open.error,
+		recovering ? "newPassword" : "password"
+	)
+	const recoveryError = fieldError(open.error, "recoveryCode")
 
 	return (
 		<main className="flex min-h-full items-center justify-center bg-background px-4 py-10">
@@ -69,13 +90,27 @@ export function LockScreen({ status }: { status: BookStatus }) {
 				</CardHeader>
 				<CardContent>
 					<form onSubmit={submit} className="flex flex-col gap-4">
-						{choosing && (
+						{choosing && !recovering && (
 							<p className="rounded-lg border border-warning/40 bg-warning-background px-3 py-2 text-sm text-warning">
 								{t("forgetWarning")}
 							</p>
 						)}
+						{recovering && (
+							<Field
+								label={t("recoveryCode")}
+								error={recoveryError ? errorMessage(recoveryError) : undefined}
+							>
+								<Input
+									autoFocus
+									type="password"
+									autoComplete="off"
+									value={recoveryCode}
+									onChange={(e) => setRecoveryCode(e.target.value)}
+								/>
+							</Field>
+						)}
 						<Field
-							label={t("password")}
+							label={t(recovering ? "newPassword" : "password")}
 							hint={
 								choosing ? t("passwordHint", { min: PASSWORD_MIN }) : undefined
 							}
@@ -84,8 +119,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 							<Input
 								type="password"
 								autoComplete={choosing ? "new-password" : "current-password"}
-								// biome-ignore lint/a11y/noAutofocus: 起動して最初に入れる欄
-								autoFocus
+								autoFocus={!recovering}
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 							/>
@@ -103,17 +137,34 @@ export function LockScreen({ status }: { status: BookStatus }) {
 								/>
 							</Field>
 						)}
-						{open.error && !passwordError && (
+						{open.error && !passwordError && !recoveryError && (
 							<p role="alert" className="text-destructive text-sm">
 								{errorMessage(open.error)}
 							</p>
 						)}
-						<Button type="submit" disabled={open.isPending || password === ""}>
+						<Button
+							type="submit"
+							disabled={
+								open.isPending ||
+								password === "" ||
+								(recovering && !recoveryCode.trim())
+							}
+						>
 							{open.isPending && (
 								<Loader2 aria-hidden="true" className="animate-spin" />
 							)}
 							{t(`${mode}Button`)}
 						</Button>
+						{status.state === "encrypted" && (
+							<Button
+								type="button"
+								variant="ghost"
+								disabled={open.isPending}
+								onClick={toggleRecovery}
+							>
+								{t(recovering ? "backToUnlock" : "forgotPassword")}
+							</Button>
+						)}
 					</form>
 				</CardContent>
 			</Card>

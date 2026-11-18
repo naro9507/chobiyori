@@ -20,6 +20,7 @@ pub mod locks;
 pub mod partners;
 pub mod purposes;
 pub mod receipts;
+pub mod recovery;
 pub mod recurring;
 pub mod reports;
 pub mod rules;

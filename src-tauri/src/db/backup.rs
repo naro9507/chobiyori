@@ -99,9 +99,9 @@ fn timestamp(conn: &Connection) -> AppResult<String> {
 /// バックアップを作る。作ったファイルの名前を返す。
 pub fn create(db: &Database, dir: &Path, kind: BackupKind) -> AppResult<String> {
     std::fs::create_dir_all(dir).map_err(|_| AppError::new(ErrorCode::FileWrite))?;
-    let key = db.key();
     let name = {
         let conn = db.conn();
+        let key = db.key();
         let mut name = format!("books-{}-{}.{EXTENSION}", kind.prefix(), timestamp(&conn)?);
         // 同じ秒に 2 回作ったときは番号を付ける
         let mut n = 2;

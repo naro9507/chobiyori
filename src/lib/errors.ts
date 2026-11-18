@@ -39,6 +39,8 @@ export type ErrorCode =
 	| "openingConfirmed"
 	| "monthLocked"
 	| "wrongPassword"
+	| "invalidRecoveryCode"
+	| "samePassword"
 	| "weakPassword"
 	| "booksLocked"
 	| "backupInvalid"

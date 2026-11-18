@@ -15,6 +15,7 @@ import { FilingReminderSettings } from "@/features/filing/filing-reminder-settin
 import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
 import { PasswordCard } from "@/features/security/password-card"
+import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
 import { FeatureSettingsPanel } from "@/features/setup/feature-settings"
 import { UpdateSettings } from "@/features/updater/update-settings"
@@ -40,6 +41,7 @@ export function SettingsPage() {
 			<BusinessProfileCard />
 			<InvoiceRegistrationCard />
 			<PasswordCard />
+			<RecoveryCard />
 			<ReceiptSettingsCard />
 			<DocumentSettingsCard />
 			<MailSettingsCard />

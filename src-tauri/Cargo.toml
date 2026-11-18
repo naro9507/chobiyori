@@ -48,6 +48,9 @@ tauri-plugin-opener = "=2.7.2"
 # 証憑のハッシュと、画像を API に送るときの base64
 sha2 = "0.10.9"
 base64 = "0.22.1"
+# 復旧コードの生成と、コードで保護した鍵情報の保存（既存の依存を使用）
+ring = "0.17.14"
+tempfile = "3.27.0"
 
 # 自動アップデートはデスクトップだけで使う
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
@@ -72,6 +75,5 @@ panic = "abort"
 strip = true
 
 [dev-dependencies]
-tempfile = "3.27.0"
 # 取込のテストで、Excel 帳簿のフィクスチャを作る
 rust_xlsxwriter = { version = "0.102.0", default-features = false }
