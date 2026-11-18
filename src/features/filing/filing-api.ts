@@ -14,6 +14,7 @@ export type InvoiceRegistration = {
 export type RegistrationInput = {
 	registrationNo: string
 	registeredOn: string
+	fiscalYear: number
 	taxStatus: Exclude<TaxStatus, "exempt">
 	simplifiedCategory: number | null
 }

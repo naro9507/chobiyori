@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -7,6 +7,8 @@ import { createAppRouter } from "@/app/router"
 import type {
 	DocumentInput,
 	DocumentRecord,
+	DocumentSettings,
+	MailSettings,
 } from "@/features/documents/documents-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
@@ -60,9 +62,9 @@ const issued: DocumentRecord = {
 	sends: [],
 }
 
-function renderPage() {
+function renderPage(path = "/documents") {
 	const router = createAppRouter(
-		createMemoryHistory({ initialEntries: ["/documents"] })
+		createMemoryHistory({ initialEntries: [path] })
 	)
 	render(
 		<AppProviders>
@@ -75,7 +77,10 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
-		async (command: string, args?: { input?: DocumentInput }) => {
+		async (
+			command: string,
+			args?: { input?: DocumentInput | DocumentSettings | MailSettings }
+		) => {
 			switch (command) {
 				case "setup_status":
 					return { completed: true, fiscalYear: 2026 }
@@ -90,6 +95,31 @@ beforeEach(() => {
 					]
 				case "list_documents":
 					return [issued]
+				case "document_settings":
+					return {
+						phone: "",
+						email: "",
+						bankAccount: "",
+						defaultNotes: "",
+						dueDays: 30,
+						logoAttachmentId: null,
+						sealAttachmentId: null,
+						mailSubject: "",
+						mailBody: "",
+					}
+				case "save_document_settings": {
+					const input = args?.input as DocumentSettings
+					return { ...input, phone: input.phone.trim() }
+				}
+				case "mail_settings":
+					return { settings: null, hasPassword: false }
+				case "save_mail_settings": {
+					const input = args?.input as MailSettings
+					return {
+						settings: { ...input, username: input.fromAddress },
+						hasPassword: false,
+					}
+				}
 				case "list_partners":
 					return []
 				case "new_document_defaults":
@@ -113,6 +143,31 @@ beforeEach(() => {
 })
 
 describe("書類の画面", () => {
+	it("書類とメールの設定に、保存時に整えられた値を表示する", async () => {
+		const user = userEvent.setup()
+		renderPage("/settings")
+		const phone = await screen.findByLabelText("電話番号")
+		const documentForm = within(phone.closest("form") as HTMLFormElement)
+		await user.type(phone, " 03-1234-5678 ")
+		await user.click(documentForm.getByRole("button", { name: "保存する" }))
+		expect(await documentForm.findByText("保存しました。")).toBeVisible()
+		expect(phone).toHaveValue("03-1234-5678")
+
+		const address = await screen.findByLabelText("送信に使うメールアドレス")
+		const mailForm = within(address.closest("form") as HTMLFormElement)
+		await user.selectOptions(mailForm.getByLabelText("使うメール"), "other")
+		const host = mailForm.getByLabelText("送信サーバー（SMTP）")
+		await user.clear(host)
+		await user.type(host, "smtp.example.test")
+		await user.type(address, "sender@example.test")
+		await user.click(mailForm.getByRole("button", { name: "保存する" }))
+		await waitFor(() =>
+			expect(mailForm.getByLabelText("ログインに使う名前")).toHaveValue(
+				"sender@example.test"
+			)
+		)
+	})
+
 	it("書類を一覧に出し、状態で絞り込める", async () => {
 		const user = userEvent.setup()
 		renderPage()

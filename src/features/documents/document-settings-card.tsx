@@ -44,10 +44,18 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
 		const days = Number(dueDays)
-		save.mutate({
-			type: "save",
-			input: { ...form, dueDays: Number.isInteger(days) ? days : -1 },
-		})
+		save.mutate(
+			{
+				type: "save",
+				input: { ...form, dueDays: Number.isInteger(days) ? days : -1 },
+			},
+			{
+				onSuccess: (saved) => {
+					setForm(saved)
+					setDueDays(String(saved.dueDays))
+				},
+			}
+		)
 	}
 	const image = (role: "logo" | "seal") => {
 		const id = role === "logo" ? form.logoAttachmentId : form.sealAttachmentId
