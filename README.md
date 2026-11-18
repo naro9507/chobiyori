@@ -1,6 +1,8 @@
-# DCS 会計
+# 帳日和（Chobiyori）
 
 個人事業主のための、確定申告までをひとつで済ませる会計アプリです。Windows と Mac で動きます。
+
+**[最新版をダウンロードしてインストールする](https://github.com/naro9507/chobiyori/releases/latest)**（Windows / Mac〈Apple シリコン〉）
 
 レシートやカード明細を読み込んで確かめるだけで、帳簿（お金の出入りの記録）ができあがります。決算と青色申告決算書の金額まで、アプリが計算します。簿記に慣れていなくても使えるよう、画面は「何に使ったか」「どこから払ったか」のような言葉で書いています。
 
@@ -81,7 +83,7 @@
 
 ### 1. インストールする
 
-[Releases](https://github.com/naro9507/dcs-accounting-app/releases) から、使っているパソコンに合うファイルをダウンロードして開きます。
+[Releases](https://github.com/naro9507/chobiyori/releases) から、使っているパソコンに合うファイルをダウンロードして開きます。
 
 | パソコン | ファイル |
 |---|---|
@@ -138,8 +140,8 @@ API キーとメールのパスワードは、パソコンの資格情報の保�
 ## 開発する人へ
 
 ```bash
-git clone https://github.com/naro9507/dcs-accounting-app.git
-cd dcs-accounting-app
+git clone https://github.com/naro9507/chobiyori.git
+cd chobiyori
 make setup   # 依存のインストールと Git hooks の有効化
 make dev     # アプリを起動する
 ```

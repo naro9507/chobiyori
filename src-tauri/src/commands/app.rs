@@ -33,20 +33,20 @@ mod tests {
     #[test]
     fn app_info_matches_cargo_metadata() {
         let info = app_info();
-        assert_eq!(info.name, "dcs-accounting");
+        assert_eq!(info.name, "chobiyori");
         assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
     }
 
     #[test]
     fn app_info_serializes_with_camel_case_keys() {
         let json = serde_json::to_value(AppInfo {
-            name: "dcs-accounting".into(),
+            name: "chobiyori".into(),
             version: "0.1.0".into(),
         })
         .unwrap();
         assert_eq!(
             json,
-            serde_json::json!({ "name": "dcs-accounting", "version": "0.1.0" })
+            serde_json::json!({ "name": "chobiyori", "version": "0.1.0" })
         );
     }
 }

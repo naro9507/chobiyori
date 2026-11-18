@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({ version: "0.2.0" }))
 
 vi.mock("@/features/app-info/app-info", () => ({
 	useAppInfo: () => ({
-		data: { name: "dcs-accounting", version: mocks.version },
+		data: { name: "chobiyori", version: mocks.version },
 	}),
 }))
 

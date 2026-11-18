@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DCS Accounting",
+  "productName": "Chobiyori",
   "version": "../package.json",
   "identifier": "jp.dcs.accounting",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DCS 会計",
+        "title": "帳日和",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -55,7 +55,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFNTk4MDcwRkFCOEZCRjcKUldUMys3ajZjSUJaSGd3M3pmcG9SLyszeFd6aDhRK0hXVVlHajJhS1NhMTlSeUNOaEJWTkJJZWgK",
       "endpoints": [
-        "https://github.com/naro9507/dcs-accounting-app/releases/latest/download/latest.json"
+        "https://github.com/naro9507/chobiyori/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

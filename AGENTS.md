@@ -23,7 +23,7 @@
 ## プロジェクト構造
 
 ```
-dcs-accounting-app/
+chobiyori/
 ├── src/                        # 画面（React + Vite）
 │   ├── app/                    # ルーティング、Provider、メニュー定義
 │   ├── components/

@@ -551,7 +551,7 @@ pub fn render(d: &Document, font: &PdfFont, images: &Images) -> AppResult<Vec<u8
                 kind_name(d.kind),
                 d.number.clone().unwrap_or_default()
             ))
-            .creator("DCS 会計".to_string())
+            .creator("帳日和".to_string())
             .language("ja".to_string()),
     );
     let settings =

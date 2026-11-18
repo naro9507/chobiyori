@@ -14,7 +14,7 @@ test("CLI の診断に秘密が含まれても出力しない", () => {
 })
 
 test("実際の CLI で空パスワードと暗号化鍵、誤ったパスワードを検証する", () => {
-	const directory = mkdtempSync(path.join(tmpdir(), "dcs-signing-test-"))
+	const directory = mkdtempSync(path.join(tmpdir(), "chobiyori-signing-test-"))
 	const cli = path.resolve(import.meta.dirname, "../node_modules/@tauri-apps/cli/tauri.js")
 	try {
 		for (const password of ["", "test-only"]) {

@@ -1,5 +1,5 @@
 {
-  "name": "dcs-accounting-app",
+  "name": "chobiyori",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/naro9507/dcs-accounting-app.git"
+    "url": "git+https://github.com/naro9507/chobiyori.git"
   },
   "engines": {
     "node": ">=22.12.0",

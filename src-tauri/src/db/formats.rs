@@ -65,7 +65,9 @@ pub struct FormatFile {
     pub definition: FormatDefinition,
 }
 
-const APP: &str = "dcs-accounting";
+const APP: &str = "chobiyori";
+// 旧版で書き出した取込形式を引き続き読み込む。
+const LEGACY_APP: &str = "dcs-accounting";
 const KIND: &str = "importFormat";
 
 impl FormatFile {
@@ -84,7 +86,7 @@ impl FormatFile {
     pub fn parse(text: &str) -> AppResult<Self> {
         let file: FormatFile = serde_json::from_str(text.trim_start_matches('\u{feff}'))
             .map_err(|_| AppError::new(ErrorCode::FileRead))?;
-        if file.app != APP || file.kind != KIND || file.version != 1 {
+        if (file.app != APP && file.app != LEGACY_APP) || file.kind != KIND || file.version != 1 {
             return Err(AppError::new(ErrorCode::FileRead));
         }
         Ok(file)
@@ -314,6 +316,16 @@ pub(crate) mod tests {
             FormatFile::parse(&serde_json::to_string(&file).unwrap()).unwrap(),
             file
         );
+    }
+
+    #[test]
+    fn legacy_format_files_remain_readable() {
+        let mut file = FormatFile::of(&presets()[0]);
+        assert_eq!(file.app, "chobiyori");
+        file.app = "dcs-accounting".into();
+        assert!(FormatFile::parse(&serde_json::to_string(&file).unwrap()).is_ok());
+        file.app = "another-app".into();
+        assert!(FormatFile::parse(&serde_json::to_string(&file).unwrap()).is_err());
     }
 
     #[test]

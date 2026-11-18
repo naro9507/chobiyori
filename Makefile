@@ -1,4 +1,4 @@
-# DCS 会計 - よく使うコマンド
+# 帳日和 - よく使うコマンド
 # 中身は package.json の scripts と cargo を呼んでいるだけ
 
 .PHONY: help setup install dev dev-web build build-web test test-web test-rust lint format check typecheck clean
