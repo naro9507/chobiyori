@@ -66,7 +66,9 @@ function Reminder({ notice, day }: { notice: DeadlineNotice; day: string }) {
 					</Link>
 				</Button>
 				<Button asChild variant="ghost" size="sm">
-					<Link to="/settings">{t("reminderSettings")}</Link>
+					<Link to="/settings" search={{ view: "business" }}>
+						{t("reminderSettings")}
+					</Link>
 				</Button>
 				<Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
 					{t("reminderDismiss")}

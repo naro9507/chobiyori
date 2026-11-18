@@ -356,7 +356,7 @@ describe("インボイスの登録と期限", () => {
 	it("登録番号と登録日を保存し、年度の申告方法を変更できる", async () => {
 		const user = userEvent.setup()
 		taxStatus = "exempt"
-		const { unmount } = renderAt("/settings")
+		const { unmount } = renderAt("/settings?view=business")
 		const table = await screen.findByRole("table", {
 			name: "登録申請書に書く内容",
 		})
@@ -393,7 +393,7 @@ describe("インボイスの登録と期限", () => {
 		await within(card as HTMLElement).findByText("設定を保存しました。")
 		expect(newMethod).toHaveValue("standard")
 		unmount()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const method = await screen.findByDisplayValue("本則課税")
 		expect(method).toHaveAccessibleName("消費税の計算のしかた")
 		const savedCard = within(method.closest("[data-slot=card]") as HTMLElement)
@@ -433,7 +433,7 @@ describe("インボイスの登録と期限", () => {
 			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 5 },
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const reminder = await screen.findByRole("region", {
 			name: "申告期限のリマインダー",
 		})
@@ -469,7 +469,7 @@ describe("インボイスの登録と期限", () => {
 			{ ...deadline, fiscalYear: 2024, daysLeft: 31 },
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		await screen.findByRole("region", { name: "申告期限のリマインダー" })
 		const checkbox = screen.getByRole("checkbox", { name: "デスクトップ通知" })
 		expect(checkbox).toHaveAccessibleDescription(/午前9時に通知を予約/)
@@ -519,7 +519,7 @@ describe("インボイスの登録と期限", () => {
 			},
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const desktop = await screen.findByRole("checkbox", {
 			name: "デスクトップ通知",
 		})
@@ -558,7 +558,7 @@ describe("インボイスの登録と期限", () => {
 			filingDesktopNotifications: false,
 		})
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const button = await screen.findByRole("button", {
 			name: "カレンダーに書き出す",
 		})

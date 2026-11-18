@@ -68,7 +68,14 @@
 		"business": "事業者情報",
 		"businessDescription": "決算書や帳簿の表紙に載せる情報です。",
 		"save": "保存",
-		"saved": "保存しました"
+		"saved": "保存しました",
+		"businessGroup": "事業・会計",
+		"featuresGroup": "使う機能・連携",
+		"appearanceGroup": "表示",
+		"securityGroup": "セキュリティ",
+		"appGroup": "アプリ情報",
+		"languageChanged": "表示言語を変更しました。",
+		"themeChanged": "テーマを変更しました。"
 	},
 	"update": {
 		"sectionTitle": "アップデート",
@@ -322,7 +329,10 @@
 		"businessPercentHint": "0〜100 の整数。使用面積・使用時間など、事業に使った記録をもとに決めてください。",
 		"recordedLines": "記録しました（仕訳: {entry}）",
 		"depositTarget": "入金をつなげる",
-		"depositTargetHint": "請求書や定期売上の入金なら選んでください。売掛金の消し込みや、その月の入金として記録します。"
+		"depositTargetHint": "請求書や定期売上の入金なら選んでください。売掛金の消し込みや、その月の入金として記録します。",
+		"purposeManual": "自分で入力する",
+		"purposeManage": "よく使う摘要を登録する",
+		"purposeIncomplete": "この摘要を使うには、マスタで借方と貸方の科目を設定してください。"
 	},
 	"reports": {
 		"trialBalance": "合計残高試算表",
@@ -509,7 +519,8 @@
 		"issue_unknownSubAccount": "補助科目が見つかりません。その科目の下の補助科目コードを確かめてください",
 		"issue_invalidTaxCategory": "税区分が読めません。「課税仕入 10%」などの名前で書いてください",
 		"exportStatement": "青色申告決算書の金額一覧",
-		"exportStatementHint": "決算書に転記する金額です。"
+		"exportStatementHint": "決算書に転記する金額です。",
+		"statementImport": "銀行・カードの明細を取り込む"
 	},
 	"recurring": {
 		"candidatesTitle": "記録を待っている取引",
@@ -570,7 +581,7 @@
 	"inbox": {
 		"tabsLabel": "受信箱の画面",
 		"tab_review": "確認待ち",
-		"tab_statement": "明細を取り込む",
+		"tab_statement": "銀行・カードの明細を取り込む",
 		"tab_formats": "取込形式",
 		"tab_rules": "自動仕訳ルール",
 		"status": "表示する候補",
@@ -729,7 +740,12 @@
 		"unlink": "紐付けを外す",
 		"pairedHint": "この取引には、レシートと明細の両方があります。",
 		"linkedHint": "新しい取引は作らず、すでにある取引に紐付けました。",
-		"postedHint": "確定して、取引になっています。"
+		"postedHint": "確定して、取引になっています。",
+		"addReceipts": "レシートを追加",
+		"reviewImported": "取り込んだ候補を確認する",
+		"backToReview": "確認待ちに戻る",
+		"importSettings": "取込の設定",
+		"bookImport": "他ソフトの仕訳CSVやExcel帳簿を取り込む"
 	},
 	"attachments": {
 		"title": "証憑: {name}",
@@ -998,7 +1014,12 @@
 		"whiteDeduction": "事業専従者控除額（円）",
 		"whiteDeductionSave": "確認した控除額を保存",
 		"whiteDeductionSaved": "控除額を保存しました",
-		"issue_whiteDeductionExceedsIncome": "保存した事業専従者控除が現在の控除前所得を超えています。取引変更後の所得で控除額を計算し直し、保存してください。"
+		"issue_whiteDeductionExceedsIncome": "保存した事業専従者控除が現在の控除前所得を超えています。取引変更後の所得で控除額を計算し直し、保存してください。",
+		"backToChecklist": "チェックリストに戻る",
+		"nextTask": "次の未完了項目　{task}",
+		"openTask_opening": "期首残高を開く",
+		"openTask_assets": "固定資産と減価償却を開く",
+		"openTask_inventory": "棚卸を開く"
 	},
 	"security": {
 		"createTitle": "帳簿のパスワードを決めてください",
@@ -1646,7 +1667,7 @@
 		"remove": "削除",
 		"balance": "開始時点の残高（円）",
 		"opening": "期首残高と開業の案内",
-		"openingHint": "口座の残高を開始時点で入力してください。資産と負債の差額は元入金として保存します。その他の資産・借入金などは下で追加でき、あとから決算の期首残高で見直せます。",
+		"openingHint": "口座ごとに開始時点の残高を入力します。借入金などがあれば、その他の期首残高も入力できます。",
 		"firstYear": "開業 1 年目です",
 		"startupHint": "開業準備のために特別に支出した費用は、開業費として扱う場合があります。資産の購入代金や前払費用は分けて考えます。開業費は資産として記録し、必要経費にする年の償却額を仕訳で記録します（自動償却はしません）。任意償却では未償却残高の範囲で金額を選び、支出内容と償却の記録を残します。元入金は、期首の資産と負債の差額です。",
 		"features": "使う機能",
@@ -1669,6 +1690,13 @@
 		"account_202": "買掛金",
 		"account_203": "借入金",
 		"account_204": "未払金",
-		"account_205": "前受金"
+		"account_205": "前受金",
+		"accountsAndBalances": "口座と開始時点の残高",
+		"additionalBalances": "借入金など、その他の期首残高を入力する",
+		"featuresLater": "機能は標準設定で開始します。「設定」の「使う機能・連携」でいつでも変更できます。",
+		"screens_inventory": "決算の「棚卸」",
+		"screens_receivables": "「請求書」、帳簿の「売掛帳・買掛帳」、かんたん入力の「入金をつなげる」",
+		"screens_recurring": "「売上管理」、取引入力の「毎月の取引」",
+		"screens_allocation": "マスタの「家事按分ルール」、かんたん入力の家事按分"
 	}
 }

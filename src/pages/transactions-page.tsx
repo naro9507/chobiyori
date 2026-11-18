@@ -4,7 +4,6 @@ import { Page } from "@/components/layout/page"
 import { CompoundEntry } from "@/features/journal/compound-entry"
 import { type Transaction, useFiscalYear } from "@/features/journal/journal-api"
 import { JournalGrid } from "@/features/journal/journal-grid"
-import { PurposeEntry } from "@/features/journal/purpose-entry"
 import { SimpleEntry } from "@/features/journal/simple-entry"
 import { currentMonth } from "@/features/reports/reports-api"
 import { useFeatures } from "@/features/setup/setup"
@@ -59,7 +58,6 @@ export function TransactionsPage() {
 						))}
 				</Tabs.List>
 				<Tabs.Content value="simple" className="outline-none">
-					<PurposeEntry key={fiscalYear} fiscalYear={fiscalYear} />
 					<SimpleEntry
 						key={`${fiscalYear}-${revision}`}
 						fiscalYear={fiscalYear}

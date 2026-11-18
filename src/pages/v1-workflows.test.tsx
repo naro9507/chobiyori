@@ -176,6 +176,9 @@ describe("v1 の操作導線", () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
 		await user.click(
+			await screen.findByRole("button", { name: "使う機能・連携" })
+		)
+		await user.click(
 			await screen.findByRole("checkbox", { name: "売掛・買掛と請求書" })
 		)
 		await user.click(
@@ -238,6 +241,20 @@ it("パレットから請求書の作成を開き、移動して戻ると一覧�
 	).not.toBeInTheDocument()
 })
 
+it("摘要が未登録なら、登録リンクでマスタの摘要タブを直接開く", async () => {
+	const user = userEvent.setup()
+	renderApp("/transactions")
+	expect(
+		await screen.findByRole("form", { name: "かんたん入力" })
+	).toBeVisible()
+	await user.click(
+		await screen.findByRole("link", { name: "よく使う摘要を登録する" })
+	)
+	expect(
+		await screen.findByRole("tab", { name: "摘要", selected: true })
+	).toBeVisible()
+})
+
 it("登録した摘要で科目を確認し、日付・金額を入力して記録できる", async () => {
 	const previous = mocks.callCommand.getMockImplementation()
 	mocks.callCommand.mockImplementation(async (command, args) => {
@@ -263,10 +280,13 @@ it("登録した摘要で科目を確認し、日付・金額を入力して記�
 	})
 	const user = userEvent.setup()
 	renderApp("/transactions")
-	const form = await screen.findByRole("form", { name: "登録した摘要から入力" })
+	const form = await screen.findByRole("form", { name: "かんたん入力" })
 	await within(form).findByRole("option", { name: "P1 文房具" })
 	await user.selectOptions(within(form).getByLabelText("摘要"), "10")
 	expect(within(form).getByText(/消耗品費.*現金/)).toBeInTheDocument()
+	const date = within(form).getByLabelText("日付", { exact: false })
+	await user.clear(date)
+	await user.type(date, "2026-01-01")
 	await user.type(within(form).getByLabelText("金額"), "1200")
 	await user.click(within(form).getByRole("button", { name: "記録する" }))
 	await waitFor(() =>

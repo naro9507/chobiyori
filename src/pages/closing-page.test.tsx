@@ -196,7 +196,7 @@ beforeEach(() => {
 					return []
 				case "closing_checklist":
 					return [
-						{ item: "opening", done: false, auto: true },
+						{ item: "opening", done: opening.confirmed, auto: true },
 						{ item: "cashCount", done: false, auto: false },
 					]
 				case "set_closing_check":
@@ -252,7 +252,9 @@ describe("決算", () => {
 	it("期首残高は、貸借がそろうまで確定できず、保存してから確定する", async () => {
 		const user = userEvent.setup()
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "期首残高" }))
+		await user.click(
+			await screen.findByRole("button", { name: "期首残高を開く" })
+		)
 		const cash = await screen.findByLabelText("101 現金 の年度のはじめの残高")
 		await user.type(cash, "50,000")
 		expect(screen.getByText(/合計が 50,000 円ずれています/)).toBeInTheDocument()
@@ -277,6 +279,10 @@ describe("決算", () => {
 		expect(
 			await screen.findByText(/期首残高は確定しています/)
 		).toBeInTheDocument()
+		await user.click(
+			screen.getByRole("button", { name: "チェックリストに戻る" })
+		)
+		expect(await screen.findByText(/次の未完了項目.*現金と預金/)).toBeVisible()
 	})
 
 	it("減価償却は候補として見せ、選んで記録する", async () => {

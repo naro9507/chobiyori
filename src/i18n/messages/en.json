@@ -68,7 +68,14 @@
 		"business": "Business details",
 		"businessDescription": "Shown on your financial statements and the cover of your books.",
 		"save": "Save",
-		"saved": "Saved"
+		"saved": "Saved",
+		"businessGroup": "Business and accounting",
+		"featuresGroup": "Features and integrations",
+		"appearanceGroup": "Appearance",
+		"securityGroup": "Security",
+		"appGroup": "About the app",
+		"languageChanged": "Language changed.",
+		"themeChanged": "Theme changed."
 	},
 	"update": {
 		"sectionTitle": "Updates",
@@ -322,7 +329,10 @@
 		"businessPercentHint": "An integer from 0 to 100. Use records such as business floor area or usage time.",
 		"recordedLines": "Recorded (journal entry: {entry})",
 		"depositTarget": "Link a payment",
-		"depositTargetHint": "Choose it if this is a payment for an invoice or a recurring sale. It clears the receivable or records the payment for that month."
+		"depositTargetHint": "Choose it if this is a payment for an invoice or a recurring sale. It clears the receivable or records the payment for that month.",
+		"purposeManual": "Enter manually",
+		"purposeManage": "Register a frequently used description",
+		"purposeIncomplete": "Set the debit and credit accounts in Master to use this description."
 	},
 	"reports": {
 		"trialBalance": "Trial balance",
@@ -509,7 +519,8 @@
 		"issue_unknownSubAccount": "Sub-account not found. Check the sub-account code under that account",
 		"issue_invalidTaxCategory": "The tax category cannot be read. Write a name such as \"Taxable purchases 10%\"",
 		"exportStatement": "Blue-return statement figures",
-		"exportStatementHint": "Figures to copy into the statement."
+		"exportStatementHint": "Figures to copy into the statement.",
+		"statementImport": "Import bank or card statements"
 	},
 	"recurring": {
 		"candidatesTitle": "Waiting to be recorded",
@@ -570,7 +581,7 @@
 	"inbox": {
 		"tabsLabel": "Inbox screens",
 		"tab_review": "To review",
-		"tab_statement": "Import a statement",
+		"tab_statement": "Import bank or card statements",
 		"tab_formats": "Formats",
 		"tab_rules": "Rules",
 		"status": "Show",
@@ -729,7 +740,12 @@
 		"unlink": "Unlink",
 		"pairedHint": "This transaction has both a receipt and a statement line.",
 		"linkedHint": "Linked to an existing transaction instead of making a new one.",
-		"postedHint": "Recorded as a transaction."
+		"postedHint": "Recorded as a transaction.",
+		"addReceipts": "Add receipts",
+		"reviewImported": "Review imported entries",
+		"backToReview": "Back to pending review",
+		"importSettings": "Import settings",
+		"bookImport": "Import journal CSV or Excel books from other software"
 	},
 	"attachments": {
 		"title": "Files: {name}",
@@ -998,7 +1014,12 @@
 		"whiteDeduction": "Family worker deduction (JPY)",
 		"whiteDeductionSave": "Save confirmed deduction",
 		"whiteDeductionSaved": "Deduction saved",
-		"issue_whiteDeductionExceedsIncome": "The saved family worker deduction exceeds current income before deduction. Recalculate it after transaction changes and save the revised amount."
+		"issue_whiteDeductionExceedsIncome": "The saved family worker deduction exceeds current income before deduction. Recalculate it after transaction changes and save the revised amount.",
+		"backToChecklist": "Back to checklist",
+		"nextTask": "Next unfinished item · {task}",
+		"openTask_opening": "Open opening balances",
+		"openTask_assets": "Open fixed assets and depreciation",
+		"openTask_inventory": "Open inventory"
 	},
 	"security": {
 		"createTitle": "Choose a password for your books",
@@ -1646,7 +1667,7 @@
 		"remove": "Remove",
 		"balance": "Opening balance (JPY)",
 		"opening": "Opening balances and starting a business",
-		"openingHint": "Enter balances at the start. The difference between assets and liabilities is saved as opening capital. Add other assets and loans below, or review them later in Closing / Opening balances.",
+		"openingHint": "Enter each account’s starting balance. If you have loans or other balances, you can add them below.",
 		"firstYear": "This is my first business year",
 		"startupHint": "Special expenses for preparing to start a business may qualify as startup costs. Distinguish asset purchases and prepaid expenses. Record startup costs as an asset and post the amortization expense in the chosen year; amortization is not automatic. Discretionary amortization is limited to the unamortized balance. Keep spending and amortization records. Opening capital is opening assets minus liabilities.",
 		"features": "Features to use",
@@ -1669,6 +1690,13 @@
 		"account_202": "Accounts payable",
 		"account_203": "Loans payable",
 		"account_204": "Accrued payables",
-		"account_205": "Advances received"
+		"account_205": "Advances received",
+		"accountsAndBalances": "Accounts and starting balances",
+		"additionalBalances": "Enter other opening balances, such as loans",
+		"featuresLater": "Start with the default features. You can change them under Settings → Features and integrations.",
+		"screens_inventory": "Inventory in Year-end",
+		"screens_receivables": "Invoices, Receivables and payables in Ledgers, and payment matching in Quick entry",
+		"screens_recurring": "Sales management and recurring transactions in Transaction entry",
+		"screens_allocation": "Allocation rules in Master and allocation in Easy entry"
 	}
 }

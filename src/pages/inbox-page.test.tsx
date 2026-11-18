@@ -192,6 +192,8 @@ beforeEach(() => {
 			case "list_allocation_rules":
 			case "list_rules":
 				return []
+			case "reconciliation":
+				return { paired: 0, statementOnly: [], receiptOnly: [] }
 			case "list_inbox":
 				return [item(1, "文具店", 1080, 3), item(2, "カフェ", 900, null)]
 			case "confirm_inbox_item":
@@ -271,7 +273,9 @@ describe("取込受信箱", () => {
 	it("合う形式のない明細は、形式エディタで読み方と取込先を決めて取り込む", async () => {
 		const user = userEvent.setup()
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "明細を取り込む" }))
+		await user.click(
+			await screen.findByRole("link", { name: "銀行・カードの明細を取り込む" })
+		)
 		await user.click(
 			screen.getByRole("button", { name: "明細のファイルを選ぶ" })
 		)
@@ -324,7 +328,9 @@ describe("取込受信箱", () => {
 			},
 		}
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "明細を取り込む" }))
+		await user.click(
+			await screen.findByRole("link", { name: "銀行・カードの明細を取り込む" })
+		)
 		await user.click(
 			screen.getByRole("button", { name: "明細のファイルを選ぶ" })
 		)

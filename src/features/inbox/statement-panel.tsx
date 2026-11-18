@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { CircleAlert, CircleCheck, FileUp, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -202,13 +203,20 @@ function ImportResultView({
 	const t = useTranslations("inbox")
 	if (result.kind === "imported") {
 		return (
-			<p role="status" className="flex items-center gap-2 text-sm">
-				<CircleCheck aria-hidden="true" className="size-4 text-success" />
-				{t("importedToInbox", {
-					added: result.added,
-					duplicates: result.duplicates,
-				})}
-			</p>
+			<div className="flex flex-col items-start gap-2">
+				<p role="status" className="flex items-center gap-2 text-sm">
+					<CircleCheck aria-hidden="true" className="size-4 text-success" />
+					{t("importedToInbox", {
+						added: result.added,
+						duplicates: result.duplicates,
+					})}
+				</p>
+				{result.added > 0 && (
+					<Button asChild size="sm" variant="outline">
+						<Link to="/inbox">{t("reviewImported")}</Link>
+					</Button>
+				)}
+			</div>
 		)
 	}
 	return (

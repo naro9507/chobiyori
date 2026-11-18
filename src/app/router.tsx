@@ -54,7 +54,8 @@ const screenRoutes = navItems.map((item) => {
 		path: item.path,
 		validateSearch: (
 			search: Record<string, unknown>
-		): { q?: string; article?: string } => ({
+		): { q?: string; article?: string; view?: string } => ({
+			view: typeof search.view === "string" ? search.view : undefined,
 			q: typeof search.q === "string" ? search.q : undefined,
 			article: typeof search.article === "string" ? search.article : undefined,
 		}),
