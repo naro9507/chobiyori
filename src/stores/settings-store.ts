@@ -9,6 +9,8 @@ type FilingReminderDay = (typeof filingReminderDays)[number]
 
 type SettingsState = {
 	filingReminders: FilingReminderDay[]
+	filingDesktopNotifications: boolean
+	setFilingDesktopNotifications: (enabled: boolean) => void
 	setFilingReminder: (day: FilingReminderDay, enabled: boolean) => void
 	locale: Locale
 	theme: Theme
@@ -30,6 +32,9 @@ export const useSettingsStore = create<SettingsState>()(
 			theme: "system",
 			lastSeenVersion: null,
 			filingReminders: [...filingReminderDays],
+			filingDesktopNotifications: false,
+			setFilingDesktopNotifications: (filingDesktopNotifications) =>
+				set({ filingDesktopNotifications }),
 			setFilingReminder: (day, enabled) =>
 				set(({ filingReminders }) => ({
 					filingReminders: filingReminderDays.filter((option) =>
@@ -43,7 +48,14 @@ export const useSettingsStore = create<SettingsState>()(
 		{
 			name: "dcs-settings",
 			storage: createJSONStorage(() => localStorage),
-			partialize: ({ locale, theme, lastSeenVersion, filingReminders }) => ({
+			partialize: ({
+				locale,
+				theme,
+				lastSeenVersion,
+				filingReminders,
+				filingDesktopNotifications,
+			}) => ({
+				filingDesktopNotifications,
 				filingReminders,
 				locale,
 				theme,

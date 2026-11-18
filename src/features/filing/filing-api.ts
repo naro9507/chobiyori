@@ -237,8 +237,7 @@ export function useSetFilingCheck(fiscalYear: number | null) {
 	})
 }
 
-export function useFilingDeadlines(enabled = true) {
-	const date = today()
+export function useFilingDeadlines(enabled = true, date = today()) {
 	return useQuery({
 		queryKey: ["filing-deadlines", date],
 		queryFn: () =>

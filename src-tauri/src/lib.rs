@@ -24,6 +24,7 @@ pub fn run() {
     tauri::Builder::default()
         // 更新後にアプリを再起動するため
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         // 保存先と取り込むファイルを選ぶ画面。Rust 側からだけ開く
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::import::ImportState::default())

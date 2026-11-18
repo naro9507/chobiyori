@@ -1,36 +1,55 @@
 import { Link } from "@tanstack/react-router"
 import { Bell } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useTranslations } from "@/i18n/use-translations"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
-import { type DeadlineNotice, useFilingDeadlines } from "./filing-api"
+import { type DeadlineNotice, today, useFilingDeadlines } from "./filing-api"
+import { notifyFilingDeadline } from "./filing-desktop-notifications"
 
 // 一番短い期間を先に調べ、設定ごとに重ならないようにする。
 const reminderWindows = [...filingReminderDays].reverse()
 
 export function FilingReminderBanner() {
 	const selected = useSettingsStore((state) => state.filingReminders)
-	const { data } = useFilingDeadlines(selected.length > 0)
+	const day = today()
+	const { data } = useFilingDeadlines(selected.length > 0, day)
 
 	return data?.map((notice) => {
 		if (notice.submitted || notice.daysLeft < 0) return null
-		const day = reminderWindows.find((days) => notice.daysLeft <= days)
-		if (day === undefined || !selected.includes(day)) return null
+		const window = reminderWindows.find((days) => notice.daysLeft <= days)
+		if (window === undefined || !selected.includes(window)) return null
 		return (
 			<Reminder
-				key={`${notice.kind}-${notice.fiscalYear}-${notice.date}-${day}`}
+				key={`${notice.kind}-${notice.fiscalYear}-${notice.date}-${window}`}
 				notice={notice}
+				day={day}
 			/>
 		)
 	})
 }
 
-function Reminder({ notice }: { notice: DeadlineNotice }) {
+function Reminder({ notice, day }: { notice: DeadlineNotice; day: string }) {
 	const t = useTranslations("filing")
 	const selectYear = useYearStore((state) => state.select)
 	const [dismissed, setDismissed] = useState(false)
+	const desktop = useSettingsStore((state) => state.filingDesktopNotifications)
+	const title = t(
+		notice.kind === "income" ? "deadlineIncome" : "deadlineConsumption",
+		{ year: notice.fiscalYear }
+	)
+	const body =
+		(notice.daysLeft === 0
+			? t("reminderDueToday", { date: notice.date })
+			: t("deadlineLeft", { date: notice.date, days: notice.daysLeft })) +
+		(notice.estimated ? ` ${t("deadlineEstimated")}` : "")
+	const key = `${notice.kind}-${notice.fiscalYear}-${notice.date}`
+
+	useEffect(() => {
+		if (desktop) void notifyFilingDeadline({ day, key, title, body })
+	}, [desktop, day, key, title, body])
+
 	if (dismissed) return null
 
 	return (
@@ -40,18 +59,8 @@ function Reminder({ notice }: { notice: DeadlineNotice }) {
 		>
 			<Bell aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
 			<div role="status" className="min-w-0 flex-1">
-				<p className="font-bold">
-					{t(
-						notice.kind === "income" ? "deadlineIncome" : "deadlineConsumption",
-						{ year: notice.fiscalYear }
-					)}
-				</p>
-				<p>
-					{notice.daysLeft === 0
-						? t("reminderDueToday", { date: notice.date })
-						: t("deadlineLeft", { date: notice.date, days: notice.daysLeft })}
-					{notice.estimated && ` ${t("deadlineEstimated")}`}
-				</p>
+				<p className="font-bold">{title}</p>
+				<p>{body}</p>
 			</div>
 			<div className="flex flex-wrap gap-2">
 				<Button asChild variant="outline" size="sm">
