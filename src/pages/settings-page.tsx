@@ -11,6 +11,7 @@ import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
 import { DocumentSettingsCard } from "@/features/documents/document-settings-card"
 import { MailSettingsCard } from "@/features/documents/mail-settings-card"
+import { FilingReminderSettings } from "@/features/filing/filing-reminder-settings"
 import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
 import { PasswordCard } from "@/features/security/password-card"
@@ -81,6 +82,7 @@ export function SettingsPage() {
 					</RadioCards>
 				</CardContent>
 			</Card>
+			<FilingReminderSettings />
 			<UpdateSettings />
 			<ChangelogCard />
 		</Page>

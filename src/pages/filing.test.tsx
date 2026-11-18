@@ -6,10 +6,11 @@ import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
 import type {
 	ConsumptionReport,
+	DeadlineNotice,
 	IncomeGuide,
 } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
-import { useSettingsStore } from "@/stores/settings-store"
+import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
 
@@ -175,8 +176,25 @@ function renderAt(path: string) {
 	)
 }
 
+const deadline: DeadlineNotice = {
+	kind: "income",
+	fiscalYear: 2026,
+	date: "2027-03-15",
+	estimated: false,
+	daysLeft: 20,
+	submitted: false,
+	done: 2,
+	total: 7,
+}
+let notices: DeadlineNotice[]
+
 beforeEach(() => {
-	useSettingsStore.setState({ locale: "ja", theme: "light" })
+	notices = [deadline]
+	useSettingsStore.setState({
+		locale: "ja",
+		theme: "light",
+		filingReminders: [...filingReminderDays],
+	})
 	useYearStore.setState({ selected: null })
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(async (command: string) => {
@@ -233,17 +251,7 @@ beforeEach(() => {
 					checkDigitOk: true,
 				}
 			case "filing_deadlines":
-				return [
-					{
-						kind: "income",
-						fiscalYear: 2026,
-						date: "2027-03-15",
-						estimated: false,
-						daysLeft: 20,
-						done: 2,
-						total: 7,
-					},
-				]
+				return notices
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}
@@ -346,10 +354,45 @@ describe("インボイスの登録と期限", () => {
 
 	it("ホームに申告の期限と進み具合を出す", async () => {
 		renderAt("/")
-		expect(await screen.findByText("2026年分の確定申告")).toBeInTheDocument()
+		const progress = await screen.findByText("チェックリスト: 2 / 7 済み")
+		const card = within(progress.closest("[data-slot=card]") as HTMLElement)
+		expect(card.getByText("2026年分の確定申告")).toBeInTheDocument()
 		expect(
-			screen.getByText("期限は 2027-03-15、あと 20 日です。")
+			card.getByText("期限は 2027-03-15、あと 20 日です。")
 		).toBeInTheDocument()
-		expect(screen.getByText("チェックリスト: 2 / 7 済み")).toBeInTheDocument()
+	})
+
+	it("設定した期間の未提出だけを通知し、設定を端末に保存する", async () => {
+		notices = [
+			{ ...deadline, daysLeft: 7 },
+			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 7 },
+		]
+		const user = userEvent.setup()
+		renderAt("/settings")
+		const reminder = await screen.findByRole("region", {
+			name: "申告期限のリマインダー",
+		})
+		expect(reminder).toHaveTextContent("2026年分の確定申告")
+		const sevenDays = screen.getByRole("checkbox", {
+			name: "7日前（残り7〜2日）",
+		})
+		await user.click(sevenDays)
+		expect(
+			screen.queryByRole("region", {
+				name: "申告期限のリマインダー",
+			})
+		).not.toBeInTheDocument()
+		const saved = JSON.parse(localStorage.getItem("dcs-settings") ?? "{}")
+		expect(saved.state.filingReminders).toEqual([30, 1])
+		await user.click(sevenDays)
+		const restored = await screen.findByRole("region", {
+			name: "申告期限のリマインダー",
+		})
+		await user.click(
+			within(restored).getByRole("button", {
+				name: "リマインダーを閉じる",
+			})
+		)
+		expect(restored).not.toBeInTheDocument()
 	})
 })

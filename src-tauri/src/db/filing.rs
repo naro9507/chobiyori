@@ -585,6 +585,7 @@ pub struct DeadlineNotice {
     pub estimated: bool,
     /// 残りの日数（過ぎていれば負）
     pub days_left: i64,
+    pub submitted: bool,
     pub done: usize,
     pub total: usize,
 }
@@ -616,12 +617,20 @@ pub fn deadlines(conn: &Connection, today: &str) -> AppResult<Vec<DeadlineNotice
             let show = (0..=NOTICE_FROM_DAYS).contains(&days_left)
                 || ((-NOTICE_AFTER_DAYS..0).contains(&days_left) && done < total);
             if show {
+                let submitted_key = match kind {
+                    DeadlineKind::Income => "submitted",
+                    DeadlineKind::Consumption => "consumption_submitted",
+                };
+                let submitted = items
+                    .iter()
+                    .any(|item| item.key == submitted_key && item.done_at.is_some());
                 notices.push(DeadlineNotice {
                     kind,
                     fiscal_year: fy.year,
                     date,
                     estimated: !from_data,
                     days_left,
+                    submitted,
                     done,
                     total,
                 });
@@ -899,6 +908,7 @@ mod tests {
             (DeadlineKind::Income, "2027-03-15", 30)
         );
         assert_eq!((n[0].done, n[0].total), (1, INCOME_ITEMS.len()));
+        assert!(n[0].submitted);
         // 期限を過ぎても終わっていなければ 30 日まで知らせる
         assert_eq!(deadlines(&conn, "2027-04-10").unwrap()[0].days_left, -26);
         drop(conn);

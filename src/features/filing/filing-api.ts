@@ -133,6 +133,7 @@ export type DeadlineNotice = {
 	date: string
 	estimated: boolean
 	daysLeft: number
+	submitted: boolean
 	done: number
 	total: number
 }
@@ -236,12 +237,13 @@ export function useSetFilingCheck(fiscalYear: number | null) {
 	})
 }
 
-export function useFilingDeadlines() {
+export function useFilingDeadlines(enabled = true) {
 	const date = today()
 	return useQuery({
 		queryKey: ["filing-deadlines", date],
 		queryFn: () =>
 			callCommand<DeadlineNotice[]>("filing_deadlines", { today: date }),
+		enabled,
 		retry: false,
 		retryOnMount: false,
 	})
