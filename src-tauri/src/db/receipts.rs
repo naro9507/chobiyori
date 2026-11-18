@@ -353,6 +353,9 @@ fn ensure_editable(receipt: &Receipt) -> AppResult<()> {
 
 /// 受信箱の候補を作る（あれば直す）。
 fn upsert_item(conn: &Connection, receipt: &Receipt, fields: &ReceiptFields) -> AppResult<i64> {
+    if fields.date.trim().is_empty() {
+        return Err(AppError::field(ErrorCode::Required, "date"));
+    }
     let date = crate::domain::journal::parse_date(fields.date.trim())
         .map(|_| fields.date.trim().to_string())
         .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;

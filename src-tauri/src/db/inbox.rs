@@ -83,6 +83,8 @@ pub struct InboxItem {
     /// 同じ口座・同じ金額・近い日付（前後 3 日）の取引がすでにある（手で入力した分や、
     /// 同じ買い物のレシート・明細から作った取引）。新しく作らず、この取引に紐付けられる
     pub possible_duplicate_id: Option<i64>,
+    /// 同じ口座に日付・金額・店名が一致する別の明細がある。
+    pub similar_statement: bool,
     /// 新しい取引を作らず、既存の取引に紐付けた
     pub linked: bool,
     /// 取引に、レシートと明細の両方がある（突合できている）
@@ -204,7 +206,13 @@ const SELECT: &str = "
            END,
            i.source, (SELECT r.id FROM receipts r WHERE r.inbox_item_id = i.id), i.linked,
            i.transaction_id IS NOT NULL AND EXISTS (
-               SELECT 1 FROM inbox_items o WHERE o.transaction_id = i.transaction_id AND o.source <> i.source)
+               SELECT 1 FROM inbox_items o WHERE o.transaction_id = i.transaction_id AND o.source <> i.source),
+           i.source = 'statement' AND EXISTS (
+               SELECT 1 FROM inbox_items o
+               WHERE o.source = 'statement' AND o.id <> i.id AND o.date = i.date
+                 AND o.spend = i.spend AND o.merchant = i.merchant
+                 AND o.payment_account_id = i.payment_account_id
+                 AND o.payment_sub_account_id IS i.payment_sub_account_id)
     FROM inbox_items i";
 
 fn read_items(
@@ -241,6 +249,7 @@ fn read_items(
             transaction_id,
             suggestion: None,
             possible_duplicate_id: r.get(12)?,
+            similar_statement: r.get(17)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -832,7 +841,15 @@ pub(crate) mod tests {
                 duplicates: 3
             }
         );
-        assert_eq!(list(&conn, None).unwrap().len(), 4);
+        let items = list(&conn, None).unwrap();
+        assert_eq!(items.len(), 4);
+        assert_eq!(
+            items.iter().filter(|item| item.similar_statement).count(),
+            2
+        );
+        assert!(items
+            .iter()
+            .all(|item| item.similar_statement == (item.merchant == "カフェ")));
         assert_eq!(pending_count(&conn).unwrap(), 4);
     }
 

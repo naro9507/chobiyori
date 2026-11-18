@@ -110,6 +110,7 @@ const receiptItem: InboxItem = {
 	transactionId: null,
 	suggestion: null,
 	possibleDuplicateId: 77,
+	similarStatement: false,
 }
 
 function renderPage(path = "/inbox") {

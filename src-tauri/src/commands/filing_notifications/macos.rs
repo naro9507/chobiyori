@@ -3,8 +3,9 @@ use block2::RcBlock;
 use objc2::{rc::autoreleasepool, runtime::Bool};
 use objc2_foundation::{NSArray, NSBundle, NSError, NSString};
 use objc2_user_notifications::{
-    UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest,
-    UNTimeIntervalNotificationTrigger, UNUserNotificationCenter,
+    UNAuthorizationOptions, UNAuthorizationStatus, UNMutableNotificationContent,
+    UNNotificationRequest, UNNotificationSettings, UNTimeIntervalNotificationTrigger,
+    UNUserNotificationCenter,
 };
 use std::{ptr::NonNull, sync::mpsc, time::Duration};
 
@@ -20,6 +21,9 @@ pub fn sync(identifier: &str, entries: &[FilingNotification]) -> Result<Schedule
             return Ok(ScheduleResult::Unavailable);
         }
         let center = UNUserNotificationCenter::currentNotificationCenter();
+        if !entries.is_empty() && !notifications_allowed(&center)? {
+            return Ok(ScheduleResult::Denied);
+        }
         let (tx, rx) = mpsc::channel();
         center.getPendingNotificationRequestsWithCompletionHandler(&RcBlock::new(
             move |requests: NonNull<NSArray<UNNotificationRequest>>| {
@@ -45,21 +49,6 @@ pub fn sync(identifier: &str, entries: &[FilingNotification]) -> Result<Schedule
         }
         if entries.is_empty() {
             return Ok(ScheduleResult::Ready);
-        }
-
-        let (tx, rx) = mpsc::channel();
-        center.requestAuthorizationWithOptions_completionHandler(
-            UNAuthorizationOptions::Alert,
-            &RcBlock::new(move |granted: Bool, error: *mut NSError| {
-                let _ = tx.send(error.is_null().then(|| granted.as_bool()));
-            }),
-        );
-        if !rx
-            .recv_timeout(Duration::from_secs(90))
-            .map_err(|_| ())?
-            .ok_or(())?
-        {
-            return Ok(ScheduleResult::Unavailable);
         }
 
         let (tx, rx) = mpsc::channel();
@@ -96,4 +85,31 @@ pub fn sync(identifier: &str, entries: &[FilingNotification]) -> Result<Schedule
         }
         Ok(ScheduleResult::Ready)
     })
+}
+
+fn notifications_allowed(center: &UNUserNotificationCenter) -> Result<bool, ()> {
+    let (tx, rx) = mpsc::channel();
+    center.getNotificationSettingsWithCompletionHandler(&RcBlock::new(
+        move |settings: NonNull<UNNotificationSettings>| {
+            // OS が渡した設定はコールバックの間だけ読む。
+            let status = unsafe { settings.as_ref() }.authorizationStatus();
+            let _ = tx.send(status);
+        },
+    ));
+    match rx.recv_timeout(TIMEOUT).map_err(|_| ())? {
+        UNAuthorizationStatus::Denied => Ok(false),
+        UNAuthorizationStatus::NotDetermined => {
+            let (tx, rx) = mpsc::channel();
+            center.requestAuthorizationWithOptions_completionHandler(
+                UNAuthorizationOptions::Alert,
+                &RcBlock::new(move |granted: Bool, error: *mut NSError| {
+                    let _ = tx.send(error.is_null().then(|| granted.as_bool()));
+                }),
+            );
+            rx.recv_timeout(Duration::from_secs(90))
+                .map_err(|_| ())?
+                .ok_or(())
+        }
+        _ => Ok(true),
+    }
 }

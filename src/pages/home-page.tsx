@@ -15,11 +15,13 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
+import { useOpeningBalances } from "@/features/closing/closing-api"
 import { DeadlineNotices } from "@/features/filing/deadline-notices"
 import { useInboxPendingCount } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
@@ -31,15 +33,45 @@ export function HomePage() {
 	const t = useTranslations("home")
 	const fiscalYear = useFiscalYear()
 	const month = currentMonth(fiscalYear)
+	const years = useFiscalYears().data
+	const firstYear = years?.length === 1 && years[0].year === fiscalYear
+	const opening = useOpeningBalances(firstYear ? fiscalYear : null)
+	const firstSteps = firstYear && opening.data?.confirmed === false
 
 	return (
 		<Page screen="home">
 			<div className="grid gap-4 md:grid-cols-[2fr_1fr]">
 				<Card>
 					<CardHeader>
-						<CardTitle>{t("welcome")}</CardTitle>
-						<CardDescription>{t("welcomeBody")}</CardDescription>
+						<CardTitle>{t(firstSteps ? "firstSteps" : "welcome")}</CardTitle>
+						{!firstSteps && (
+							<CardDescription>{t("welcomeBody")}</CardDescription>
+						)}
 					</CardHeader>
+					{firstSteps && (
+						<CardContent>
+							<ol className="list-decimal space-y-2 pl-5 text-sm [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4">
+								<li>
+									<Link to="/master">{t("firstAccounts")}</Link>
+								</li>
+								<li>
+									<Link to="/closing" search={{ tab: "opening" }}>
+										{t("firstOpening")}
+									</Link>
+								</li>
+								<li>
+									<Link
+										to="/transactions"
+										onClick={() =>
+											useTransactionsTab.getState().setTab("simple")
+										}
+									>
+										{t("firstTransaction")}
+									</Link>
+								</li>
+							</ol>
+						</CardContent>
+					)}
 				</Card>
 				<Card>
 					<CardHeader>
@@ -63,6 +95,7 @@ export function HomePage() {
 					<AccountBalances
 						fiscalYear={fiscalYear}
 						month={month}
+						showNegativeBalanceHelp
 						title={t("balancesAsOf", { month })}
 					/>
 				</CardContent>

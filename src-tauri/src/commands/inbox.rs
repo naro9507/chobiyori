@@ -220,11 +220,11 @@ pub enum StatementImport {
     Imported {
         added: usize,
         duplicates: usize,
+        ignored_count: usize,
+        ignored: Vec<RowNote>,
     },
     /// 見出しが保存した形式と違う。取り込んでいない
-    Mismatch {
-        diff: HeaderDiff,
-    },
+    Mismatch { diff: HeaderDiff },
     /// 読めない行がある。取り込んでいない
     Problems {
         errors: Vec<RowNote>,
@@ -258,7 +258,12 @@ pub async fn import_statement(
     }
     let AddResult { added, duplicates } =
         db.transaction(|tx| inbox::add_statement(tx, &format, &file_name, &statement.rows))?;
-    Ok(StatementImport::Imported { added, duplicates })
+    Ok(StatementImport::Imported {
+        added,
+        duplicates,
+        ignored_count: statement.ignored.len(),
+        ignored: statement.ignored.into_iter().take(NOTES_MAX).collect(),
+    })
 }
 
 #[tauri::command]

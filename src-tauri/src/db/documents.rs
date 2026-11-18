@@ -69,6 +69,7 @@ pub struct Document {
     pub totals: Totals,
     /// 入金の合計（請求書だけ）
     pub paid: i64,
+    pub last_payment_account_id: Option<i64>,
     pub source_document_id: Option<i64>,
     /// 売上の仕訳
     pub transaction_id: Option<i64>,
@@ -424,6 +425,19 @@ fn paid_of(conn: &Connection, id: i64) -> AppResult<i64> {
     )?)
 }
 
+fn last_payment_account(conn: &Connection, id: i64) -> AppResult<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT l.account_id
+         FROM document_payments p JOIN journal_lines l ON l.transaction_id = p.transaction_id
+         WHERE p.document_id = ?1 AND l.side = 'debit'
+         ORDER BY p.id DESC, l.line_no LIMIT 1",
+            [id],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 fn sends_of(conn: &Connection, id: i64) -> AppResult<Vec<Send>> {
     let mut stmt = conn.prepare_cached(
         "SELECT method, to_address, sent_at FROM document_sends WHERE document_id = ?1 ORDER BY id",
@@ -476,6 +490,11 @@ fn build(conn: &Connection, row: Row, today: &str) -> AppResult<Document> {
         lines,
         totals,
         paid,
+        last_payment_account_id: if paid > 0 {
+            last_payment_account(conn, row.id)?
+        } else {
+            None
+        },
         source_document_id: row.source_document_id,
         transaction_id: row.transaction_id,
         pdf_attachment_id: row.pdf_attachment_id,
@@ -639,6 +658,7 @@ pub fn preview(
         lines: v.lines,
         totals,
         paid: 0,
+        last_payment_account_id: None,
         source_document_id: None,
         transaction_id: None,
         pdf_attachment_id: None,
@@ -1123,7 +1143,9 @@ mod tests {
         );
 
         // 一部入金 → 残りより多くは入れられない → 残りを入金して入金済み
+        assert_eq!(d.last_payment_account_id, None);
         let d = record_payment(&db, d.id, &pay(10_000)).unwrap();
+        assert_eq!(d.last_payment_account_id, Some(bank));
         assert_eq!(
             (d.paid, d.display_status),
             (10_000, DisplayStatus::PartlyPaid)

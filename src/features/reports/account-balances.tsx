@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
@@ -13,11 +14,13 @@ export function AccountBalances({
 	month,
 	title,
 	className,
+	showNegativeBalanceHelp = false,
 }: {
 	fiscalYear: number | null
 	month: number
 	title: string
 	className?: string
+	showNegativeBalanceHelp?: boolean
 }) {
 	const t = useTranslations("reports")
 	const masters = useJournalMasters()
@@ -58,6 +61,21 @@ export function AccountBalances({
 					))}
 				</dl>
 			)}
+			{showNegativeBalanceHelp &&
+				shown.some(
+					(account) => account.category === "asset" && balanceOf(account.id) < 0
+				) && (
+					<p className="text-sm text-warning">
+						{t("negativeBalanceHint")}{" "}
+						<Link
+							to="/closing"
+							search={{ tab: "opening" }}
+							className="text-primary underline underline-offset-4"
+						>
+							{t("checkOpeningBalance")}
+						</Link>
+					</p>
+				)}
 		</section>
 	)
 }

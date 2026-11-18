@@ -381,6 +381,7 @@ pub struct IncomeGuide {
     pub deduction: i64,
     /// e-Tax でも優良な電子帳簿でもないときの控除の額（65 万円 → 55 万円）
     pub deduction_on_paper: i64,
+    pub income_on_paper: i64,
     /// 申告書の事業所得の所得金額
     pub income: i64,
     /// 決算書の金額に直すところがある（決算の画面で確かめる）
@@ -461,7 +462,11 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         .iter()
         .find(|l| l.key == "sales")
         .map_or(0, |l| l.amount);
-    let deduction_on_paper = st.deduction.min(filing::paper_deduction_cap());
+    let deduction_on_paper = if amounts.filing_type == FilingType::Blue65 {
+        st.deduction.min(filing::paper_deduction_cap())
+    } else {
+        st.deduction
+    };
     let mut returns = vec![
         item("return_revenue", "ア", "", "", business_revenue, false),
         item("return_income", "①", "", "", st.income, false),
@@ -499,6 +504,7 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         income_before_deduction: st.income_before_deduction,
         deduction: st.deduction,
         deduction_on_paper,
+        income_on_paper: st.income_before_deduction - deduction_on_paper,
         income: st.income,
         issue_count: st.issues.len(),
     })
@@ -898,10 +904,7 @@ mod tests {
         );
         let conn = db.conn();
         assert_eq!(year_status(&conn, 2026).unwrap(), TaxStatus::Simplified);
-        assert_eq!(
-            registered_on(&conn).unwrap().as_deref(),
-            Some("2026-10-01")
-        );
+        assert_eq!(registered_on(&conn).unwrap().as_deref(), Some("2026-10-01"));
     }
 
     #[test]
@@ -1048,6 +1051,10 @@ mod tests {
         assert_eq!(march.value, 300_000);
         // 65 万円の控除は、紙で出すなら 55 万円まで
         assert_eq!(guide.deduction_on_paper, guide.deduction.min(550_000));
+        assert_eq!(
+            guide.income_on_paper,
+            guide.income_before_deduction - guide.deduction_on_paper
+        );
         let ret = &guide.sections[4].items;
         assert_eq!(ret[0].value, 300_000);
         assert_eq!(ret[1].value, guide.income);

@@ -7,7 +7,7 @@ use super::locks::ensure_date_open;
 use super::{audit, Database};
 use crate::domain::allocation;
 use crate::domain::journal::{
-    self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput,
+    self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput, SimpleKind,
     TransactionInput, TransactionKind, ValidTransaction,
 };
 use crate::domain::master::{Rounding, TaxCategory, TaxStatus};
@@ -273,15 +273,45 @@ pub(crate) fn owner_accounts(conn: &Connection) -> AppResult<OwnerAccounts> {
 /// かんたん入力の取引を保存する。仕訳（借方 1 行 + 貸方 1 行）に直してから、同じ検証を通す。
 pub fn create_simple(db: &Database, year: i64, input: &SimpleInput) -> AppResult<Transaction> {
     db.transaction(|tx| {
-        ensure_payment_account(tx, input.payment_account_id, "paymentAccountId")?;
-        if input.kind == journal::SimpleKind::Transfer {
+        if !(1..=journal::AMOUNT_MAX).contains(&input.amount) {
+            return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+        }
+        let mut input = input.clone();
+        match input.kind {
+            SimpleKind::UnpaidIncome => {
+                let account = input
+                    .account_id
+                    .ok_or(AppError::field(ErrorCode::Required, "accountId"))?;
+                let revenue: bool = tx.query_row(
+                    "SELECT EXISTS (SELECT 1 FROM accounts WHERE id = ?1 AND category = 'revenue')",
+                    [account],
+                    |row| row.get(0),
+                )?;
+                if !revenue {
+                    return Err(AppError::field(ErrorCode::InvalidFormat, "accountId"));
+                }
+                input.payment_account_id =
+                    super::closing::account_by_line(tx, "bs.accounts_receivable")?;
+            }
+            SimpleKind::PersonalExpense => (),
+            _ => {
+                if input.payment_account_id == 0 {
+                    return Err(AppError::field(ErrorCode::Required, "paymentAccountId"));
+                }
+                ensure_payment_account(tx, input.payment_account_id, "paymentAccountId")?;
+            }
+        }
+        if input.kind == SimpleKind::Transfer {
             if let Some(to) = input.account_id {
                 ensure_payment_account(tx, to, "accountId")?;
             }
         }
         let owner = owner_accounts(tx)?;
-        let mut transaction = journal::simple_to_transaction(input, owner)?;
-        if input.kind == journal::SimpleKind::Expense {
+        let mut transaction = journal::simple_to_transaction(&input, owner)?;
+        if matches!(
+            input.kind,
+            SimpleKind::Expense | SimpleKind::PersonalExpense
+        ) {
             // インボイス: 登録番号のある取引先からの支払いなら、印を付けておく
             let qualified = has_invoice_no(tx, input.partner_id)?;
             for line in transaction.lines.iter_mut() {
@@ -292,16 +322,34 @@ pub fn create_simple(db: &Database, year: i64, input: &SimpleInput) -> AppResult
                     return Err(AppError::field(ErrorCode::OutOfRange, "allocationPercent"));
                 }
                 let rounding = account_rounding(tx, transaction.lines[0].account_id)?;
-                transaction.lines = allocation::split_line(
-                    &transaction.lines,
-                    0,
-                    owner.drawings,
-                    percent,
-                    rounding,
-                );
+                if input.kind == SimpleKind::PersonalExpense {
+                    // 私用の口座で払った家事分は、事業の帳簿には入れない。
+                    let business = allocation::allocate(input.amount, percent, rounding).business;
+                    if business == 0 {
+                        return Err(AppError::field(ErrorCode::OutOfRange, "allocationPercent"));
+                    }
+                    for line in &mut transaction.lines {
+                        line.amount = business;
+                    }
+                } else {
+                    transaction.lines = allocation::split_line(
+                        &transaction.lines,
+                        0,
+                        owner.drawings,
+                        percent,
+                        rounding,
+                    );
+                }
             }
         }
-        insert(tx, year, &transaction).map_err(|e| journal::simple_error(input.kind, e))
+        insert(tx, year, &transaction).map_err(|error| {
+            let error = journal::simple_error(input.kind, error);
+            if input.kind == SimpleKind::UnpaidIncome && error.field == Some("paymentAccountId") {
+                AppError::field(error.code, "kind")
+            } else {
+                error
+            }
+        })
     })
 }
 
@@ -807,6 +855,62 @@ pub(crate) mod tests {
         assert_eq!(
             (t.lines[0].account_id, t.lines[1].account_id),
             (cash, contributions)
+        );
+    }
+
+    #[test]
+    fn simple_personal_expense_and_unpaid_sale_use_non_payment_accounts() {
+        let db = set_up_db();
+        let (utilities, contributions, receivable, sales) = {
+            let conn = db.conn();
+            (
+                account(&conn, "603"),
+                account(&conn, "301"),
+                account(&conn, "106"),
+                account(&conn, "401"),
+            )
+        };
+        let mut expense = simple(SimpleKind::PersonalExpense, Some(utilities), 0, 10_001);
+        let full = create_simple(&db, 2026, &expense).unwrap();
+        assert_eq!(full.lines[0].amount, 10_001);
+        assert_eq!(full.lines[1].account_id, contributions);
+        expense.allocation_percent = Some(50);
+        let split = create_simple(&db, 2026, &expense).unwrap();
+        assert_eq!(
+            split
+                .lines
+                .iter()
+                .map(|l| (l.side, l.account_id, l.amount))
+                .collect::<Vec<_>>(),
+            [
+                (Side::Debit, utilities, 5_000),
+                (Side::Credit, contributions, 5_000)
+            ]
+        );
+
+        let unpaid = simple(SimpleKind::UnpaidIncome, Some(sales), 0, 11_000);
+        let sale = create_simple(&db, 2026, &unpaid).unwrap();
+        assert_eq!(
+            sale.lines
+                .iter()
+                .map(|l| (l.side, l.account_id, l.amount))
+                .collect::<Vec<_>>(),
+            [
+                (Side::Debit, receivable, 11_000),
+                (Side::Credit, sales, 11_000)
+            ]
+        );
+        assert_eq!(
+            create_simple(
+                &db,
+                2026,
+                &SimpleInput {
+                    account_id: Some(utilities),
+                    ..unpaid
+                }
+            )
+            .unwrap_err(),
+            AppError::field(ErrorCode::InvalidFormat, "accountId")
         );
     }
 

@@ -55,7 +55,11 @@
 		"recurringLink": "毎月の取引を開く",
 		"inboxTitle": "確認を待っている明細",
 		"inboxBody": "取込受信箱に、確認待ちの候補が {count} 件あります。",
-		"inboxLink": "受信箱を開く"
+		"inboxLink": "受信箱を開く",
+		"firstSteps": "開業後にやること",
+		"firstAccounts": "使う口座を確認する（マスタの「勘定科目」）",
+		"firstOpening": "開業時の残高を入れる（残高がなければ 0 円のまま確定）",
+		"firstTransaction": "最初の売上や経費を記録する"
 	},
 	"settings": {
 		"language": "表示する言語",
@@ -250,7 +254,7 @@
 		"kind_owner": "事業主の出し入れ",
 		"ownerDirection": "お金の向き",
 		"owner_draw": "事業のお金を私用に使った・引き出した",
-		"owner_contribution": "私用のお金を事業に入れた・事業の支払いに使った",
+		"owner_contribution": "私用のお金を事業の口座に入れた",
 		"date": "日付",
 		"amount": "金額",
 		"amountHint": "円。カンマはなくてもかまいません",
@@ -322,7 +326,22 @@
 		"businessPercentHint": "0〜100 の整数。使用面積・使用時間など、事業に使った記録をもとに決めてください。",
 		"recordedLines": "記録しました（仕訳: {entry}）",
 		"depositTarget": "入金をつなげる",
-		"depositTargetHint": "請求書や定期売上の入金なら選んでください。売掛金の消し込みや、その月の入金として記録します。"
+		"depositTargetHint": "請求書や定期売上の入金なら選んでください。売掛金の消し込みや、その月の入金として記録します。",
+		"dateRequired": "取引の日付を入れてください。",
+		"amountRequired": "金額を入れてください。",
+		"amountInvalid": "金額を 1 円以上の整数で入れてください。",
+		"contentRequired": "取引の内容を選んでください。",
+		"paymentRequired": "お金が出入りした口座を選んでください。",
+		"personalPayment": "私用のお金・カードで立て替えた",
+		"personalPaymentHint": "事業用の口座残高は変えず、経費と事業主借を記録します。家事按分する場合は事業分だけを記録します。",
+		"unpaidIncome": "まだ入金されていない売上",
+		"unpaidIncomeHint": "他で発行した請求書などの売上を記録します。入金時は「収入」で「売掛金」を選んでください。帳日和で請求書を作る場合は、発行した請求書から売上を記帳できます。",
+		"unpaidAccount": "何の売上か",
+		"newInvoiceInstead": "帳日和で請求書を作る",
+		"reviewSaved": "この取引を確認・修正",
+		"backToEntry": "取引入力へ戻る",
+		"entryNotFound": "この取引は見つかりませんでした。",
+		"edit": "修正する"
 	},
 	"reports": {
 		"trialBalance": "合計残高試算表",
@@ -346,7 +365,9 @@
 		"balances": "口座残高",
 		"balancesAsOf": "{month}月末の残高",
 		"noPaymentAccounts": "口座がありません。マスタ画面で、現金や預金の科目を「口座として使う」にしてください。",
-		"loading": "読み込んでいます"
+		"loading": "読み込んでいます",
+		"negativeBalanceHint": "残高がマイナスの口座があります。入力漏れや、支払元を選び間違えていないか確かめてください。",
+		"checkOpeningBalance": "期首残高を確認する"
 	},
 	"errors": {
 		"required": "入力してください。",
@@ -729,7 +750,11 @@
 		"unlink": "紐付けを外す",
 		"pairedHint": "この取引には、レシートと明細の両方があります。",
 		"linkedHint": "新しい取引は作らず、すでにある取引に紐付けました。",
-		"postedHint": "確定して、取引になっています。"
+		"postedHint": "確定して、取引になっています。",
+		"ignoredRowsTitle": "取込から除いた行が {count} 件あります。",
+		"otherIgnoredRows": "ほか {count} 行",
+		"sourceRow": "{file} の {row} 行目",
+		"similarStatement": "同じ日付・金額・店名の明細あり"
 	},
 	"attachments": {
 		"title": "証憑: {name}",
@@ -770,7 +795,7 @@
 		"enterByHand": "画像を見ながら入力し、「確認待ちに入れる」を押してください。",
 		"fieldsLabel": "レシートの内容",
 		"date": "日付",
-		"dateHint": "レシートに書いてある日付です。",
+		"dateHint": "レシートの日付を「2026-11-19」のように入れます。",
 		"total": "合計（税込）",
 		"merchant": "店名",
 		"paidFrom": "払ったところ",
@@ -799,7 +824,11 @@
 		"statementOnly": "レシートがない明細の行",
 		"statementOnlyHint": "レシートを取り込むか、なければそのままで構いません（明細も記録として残ります）。",
 		"nothingLeft": "ありません。",
-		"goToSettings": "設定画面で API キーを登録する"
+		"goToSettings": "設定画面で API キーを登録する",
+		"dateRequired": "レシートの日付を入れてください。",
+		"dateInvalid": "日付を「2026-11-19」のように、年・月・日の順に入れてください。",
+		"totalInvalid": "合計（税込）に 1 円以上の金額を入れてください。",
+		"reducedAmountInvalid": "軽減税率の対象額は、合計（税込）以下にしてください。"
 	},
 	"receiptSettings": {
 		"title": "レシートの読み取り",
@@ -1101,6 +1130,7 @@
 		"reopenYear": "年度の締めを外す"
 	},
 	"documents": {
+		"choosePaymentAccount": "入金した口座を選んでください",
 		"createTitle": "書類を作る",
 		"createDescription": "作りたい書類を選んでください。下書きを保存して、あとで発行できます。",
 		"listTitle": "書類の一覧",
@@ -1282,7 +1312,6 @@
 		"incomeBeforeDeduction": "青色申告特別控除の前の所得",
 		"deduction": "青色申告特別控除",
 		"businessIncome": "事業所得の金額",
-		"deduction65Note": "65 万円の控除は、e-Tax で出すか、優良な電子帳簿で保存していることが条件です。紙で出すときは控除が {paper} 円になり、所得もその分ふえます。",
 		"monthSales": "{month}月の売上",
 		"monthPurchases": "{month}月の仕入",
 		"item_personal_consumption": "家事消費等",
@@ -1399,7 +1428,7 @@
 		"reminderDesktop": "デスクトップ通知",
 		"reminderDesktopTiming": "Windows・Macで帳簿を開くと、選んだ日の午前9時に通知を予約します。",
 		"reminderDesktopHint": "30日前・7日前・前日のうち、選んだ日に予約します。予約した通知は帳日和を閉じていても届きます。予約のない日も、帳簿を開いて画面にお知らせが出ると、期限ごとに1日1回通知します。",
-		"reminderScheduleFailed": "通知を予約できませんでした。OSの通知設定を確認し、帳簿を開き直してください。",
+		"reminderScheduleFailed": "OS に通知を予約できませんでした。システム設定で帳日和の通知を確認して再試行するか、期限をカレンダーに書き出してください。",
 		"reminderScheduleUnavailable": "この環境では通知を予約できません。Windows・Macのインストール版で、OSの通知を許可してください。",
 		"reminderDismiss": "リマインダーを閉じる",
 		"reminderSettings": "設定を開く",
@@ -1446,7 +1475,16 @@
 		"purchaseGroupAmounts": "税込 {included} 円 → 引ける税 {deductible} 円",
 		"whiteTitle": "収支内訳書（一般用）の金額",
 		"whiteBeforeDeduction": "専従者控除前の所得金額",
-		"whiteIntro": "白色申告の収支内訳書（一般用）の金額です。作成コーナーで白色申告を選び、各欄に転記してください。事業専従者控除は決算で保存した金額です。要件と計算方法は国税庁 No.2075 と決算画面の説明で確認できます。"
+		"whiteIntro": "白色申告の収支内訳書（一般用）の金額です。作成コーナーで白色申告を選び、各欄に転記してください。事業専従者控除は決算で保存した金額です。要件と計算方法は国税庁 No.2075 と決算画面の説明で確認できます。",
+		"deductionTransferMode": "転記に使う青色申告特別控除",
+		"deductionTransferHint": "55 万円を使う場合（優良な電子帳簿の要件を満たさず紙で出す場合など）は切り替えてください。適用できる額は申告年分の要件で確かめてください。",
+		"deductionTransferConfigured": "年度の設定（上限 65 万円）",
+		"deductionTransferPaper": "上限 55 万円",
+		"reminderScheduling": "OS に通知の予約を確認しています。",
+		"reminderScheduleReady": "通知を {count} 件予約しました。次は {next} です。",
+		"reminderScheduleEmpty": "今後の予約はありません。未提出の申告期限と通知日を確かめてください。",
+		"reminderScheduleDenied": "OS で帳日和の通知が許可されていません。システム設定の「通知」で帳日和を許可し、再試行してください。",
+		"reminderScheduleRetry": "通知予約を再試行"
 	},
 	"receivables": {
 		"tabsLabel": "売上管理の表示",
@@ -1547,7 +1585,7 @@
 		"keyboard": "キーボード操作",
 		"startBody": "最初に事業者情報・申告区分・口座・期首残高を設定します。日々のお金の出入りを取引入力で記録し、月に一度、帳簿の残高と現金・通帳を比べましょう。",
 		"sales": "売上を記録したい",
-		"salesBody": "取引入力の「かんたん入力」で収入を選び、日付・金額・内容・入金口座を入力して記録します。まだ入金されていない売上は、複合仕訳で売掛金と売上高を選びます。",
+		"salesBody": "「取引入力 → かんたん入力 → 収入」で売上を記録できます。入金前なら「まだ入金されていない売上」を選びます。帳日和で作る請求書は、発行後の請求書画面から売上の記帳と入金の記録ができます。",
 		"receipt": "レシートを読み込みたい",
 		"receiptBody": "取込受信箱でレシートを選び、読み取った日付・金額・科目を確認してから確定します。読み取りにはインターネット接続が必要です。",
 		"closing": "決算・申告をしたい",
@@ -1624,7 +1662,9 @@
 		"stockPurchase": "販売する商品を現金で仕入れた",
 		"stockPurchaseBody": "支出・仕入高・現金。借方は仕入高、貸方は現金です。年末に残った商品の金額は、決算の「棚卸」で確認します。",
 		"collectReceivable": "未入金だった売上が振り込まれた",
-		"collectReceivableBody": "収入・売掛金・普通預金。借方は普通預金、貸方は売掛金です。すでに売上を記録しているため、売上高をもう一度選ばないようにします。請求書への入金なら、かんたん入力で該当の請求書も選んでください。"
+		"collectReceivableBody": "収入・売掛金・普通預金。借方は普通預金、貸方は売掛金です。すでに売上を記録しているため、売上高をもう一度選ばないようにします。請求書への入金なら、かんたん入力で該当の請求書も選んでください。",
+		"personalExpense": "私用のお金やカードで立て替えた",
+		"personalExpenseBody": "「取引入力 → かんたん入力 → 支出」で、支払元に「私用のお金・カードで立て替えた」を選びます。何に使ったかと金額を入れると、事業主借を使って記録します。"
 	},
 	"commands": {
 		"title": "コマンドパレット",

@@ -1,8 +1,15 @@
+import { Link, useNavigate } from "@tanstack/react-router"
 import { Tabs } from "radix-ui"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
+import { QueryMessage } from "@/features/closing/query-message"
 import { CompoundEntry } from "@/features/journal/compound-entry"
-import { type Transaction, useFiscalYear } from "@/features/journal/journal-api"
+import {
+	isSingleEntry,
+	type Transaction,
+	useFiscalYear,
+	useTransactions,
+} from "@/features/journal/journal-api"
 import { JournalGrid } from "@/features/journal/journal-grid"
 import { PurposeEntry } from "@/features/journal/purpose-entry"
 import { SimpleEntry } from "@/features/journal/simple-entry"
@@ -21,7 +28,15 @@ const tabs = transactionTabs
 type Tab = TransactionTab
 
 /** 取引入力。かんたん入力・仕訳グリッド・複合仕訳を切り替える。どれも同じ仕訳になる。 */
-export function TransactionsPage() {
+export function TransactionsPage({
+	editTransaction,
+	editMonth,
+	editYear,
+}: {
+	editTransaction?: number
+	editMonth?: number
+	editYear?: number
+}) {
 	const features = useFeatures()
 	const revision = useEntryIntent((s) => s.revision)
 	const t = useTranslations("journal")
@@ -31,6 +46,23 @@ export function TransactionsPage() {
 	const [month, setMonth] = useState(() => currentMonth(fiscalYear))
 	/** 仕訳グリッドから開いた、変更する複合仕訳 */
 	const [editing, setEditing] = useState<Transaction | undefined>(undefined)
+
+	if (
+		editTransaction &&
+		editMonth &&
+		fiscalYear !== null &&
+		editYear === fiscalYear
+	) {
+		return (
+			<EditTransactionPage
+				key={editTransaction}
+				id={editTransaction}
+				fiscalYear={fiscalYear}
+				month={editMonth}
+				onExit={setMonth}
+			/>
+		)
+	}
 
 	return (
 		<Page screen="transactions">
@@ -97,6 +129,68 @@ export function TransactionsPage() {
 					<RecurringPanel fiscalYear={fiscalYear} />
 				</Tabs.Content>
 			</Tabs.Root>
+		</Page>
+	)
+}
+
+function EditTransactionPage({
+	id,
+	fiscalYear,
+	month,
+	onExit,
+}: {
+	id: number
+	fiscalYear: number
+	month: number
+	onExit: (month: number) => void
+}) {
+	const t = useTranslations("journal")
+	const navigate = useNavigate()
+	const query = useTransactions(fiscalYear, month)
+	const transaction = query.data?.find((entry) => entry.id === id)
+	const done = (nextMonth = month) => {
+		onExit(nextMonth)
+		useTransactionsTab.getState().setTab("grid")
+		void navigate({ to: "/transactions", search: {}, replace: true })
+	}
+	return (
+		<Page screen="transactions">
+			<Link
+				to="/transactions"
+				search={{}}
+				className="w-fit text-primary text-sm underline underline-offset-4"
+			>
+				{t("backToEntry")}
+			</Link>
+			{!query.data ? (
+				<QueryMessage query={query} fiscalYear={fiscalYear} />
+			) : !transaction ? (
+				<p role="status">{t("entryNotFound")}</p>
+			) : isSingleEntry(transaction) ? (
+				<JournalGrid
+					fiscalYear={fiscalYear}
+					month={month}
+					initialEditingId={id}
+					onMonthChange={done}
+					onEditCompound={(entry) => {
+						void navigate({
+							to: "/transactions",
+							search: {
+								editTransaction: entry.id,
+								editMonth: month,
+								editYear: fiscalYear,
+							},
+						})
+					}}
+				/>
+			) : (
+				<CompoundEntry
+					fiscalYear={fiscalYear}
+					month={month}
+					transaction={transaction}
+					onDone={done}
+				/>
+			)}
 		</Page>
 	)
 }

@@ -55,7 +55,11 @@
 		"recurringLink": "Open monthly entries",
 		"inboxTitle": "Statement rows to review",
 		"inboxBody": "{count} candidates are waiting in the inbox.",
-		"inboxLink": "Open the inbox"
+		"inboxLink": "Open the inbox",
+		"firstSteps": "Get started with your books",
+		"firstAccounts": "Check the accounts you use",
+		"firstOpening": "Enter your opening balances, or confirm zero balances",
+		"firstTransaction": "Record your first sale or expense"
 	},
 	"settings": {
 		"language": "Display language",
@@ -250,7 +254,7 @@
 		"kind_owner": "Owner's money",
 		"ownerDirection": "Direction",
 		"owner_draw": "Business money used or withdrawn for personal use",
-		"owner_contribution": "Personal money put into or spent on the business",
+		"owner_contribution": "Moved personal money into a business account",
 		"date": "Date",
 		"amount": "Amount",
 		"amountHint": "Yen. Commas are optional",
@@ -322,7 +326,22 @@
 		"businessPercentHint": "An integer from 0 to 100. Use records such as business floor area or usage time.",
 		"recordedLines": "Recorded (journal entry: {entry})",
 		"depositTarget": "Link a payment",
-		"depositTargetHint": "Choose it if this is a payment for an invoice or a recurring sale. It clears the receivable or records the payment for that month."
+		"depositTargetHint": "Choose it if this is a payment for an invoice or a recurring sale. It clears the receivable or records the payment for that month.",
+		"dateRequired": "Enter the transaction date.",
+		"amountRequired": "Enter an amount.",
+		"amountInvalid": "Enter a whole amount of at least 1 yen.",
+		"contentRequired": "Choose the account that describes the transaction.",
+		"paymentRequired": "Choose the account the money went into or came out of.",
+		"personalPayment": "I paid with personal funds or a personal card",
+		"personalPaymentHint": "Records the business expense against owner contributions. If you split the expense, only the business portion is recorded.",
+		"unpaidIncome": "The customer has not paid yet",
+		"unpaidIncomeHint": "Use this for sales invoiced outside Chobiyori. When paid, choose Accounts Receivable under Income. For a Chobiyori invoice, record the sale from the issued invoice.",
+		"unpaidAccount": "What the sale was for",
+		"newInvoiceInstead": "Create an invoice in Chobiyori",
+		"reviewSaved": "Review or edit this entry",
+		"backToEntry": "Back to transaction entry",
+		"entryNotFound": "This transaction could not be found.",
+		"edit": "Edit"
 	},
 	"reports": {
 		"trialBalance": "Trial balance",
@@ -346,7 +365,9 @@
 		"balances": "Account balances",
 		"balancesAsOf": "Balance at the end of month {month}",
 		"noPaymentAccounts": "There are no money accounts. On the Master data screen, mark cash or bank accounts as \"Use as a money account\".",
-		"loading": "Loading"
+		"loading": "Loading",
+		"negativeBalanceHint": "An account has a negative balance. Check for missing entries or payments recorded against the wrong account.",
+		"checkOpeningBalance": "Check opening balances"
 	},
 	"errors": {
 		"required": "Please fill this in.",
@@ -729,7 +750,11 @@
 		"unlink": "Unlink",
 		"pairedHint": "This transaction has both a receipt and a statement line.",
 		"linkedHint": "Linked to an existing transaction instead of making a new one.",
-		"postedHint": "Recorded as a transaction."
+		"postedHint": "Recorded as a transaction.",
+		"ignoredRowsTitle": "{count} rows are excluded from the import.",
+		"otherIgnoredRows": "{count} more rows",
+		"sourceRow": "{file}, row {row}",
+		"similarStatement": "Another statement row has the same date, amount, and merchant"
 	},
 	"attachments": {
 		"title": "Files: {name}",
@@ -770,7 +795,7 @@
 		"enterByHand": "Type the details while looking at the image, then press \"Add to To review\".",
 		"fieldsLabel": "Receipt details",
 		"date": "Date",
-		"dateHint": "The date on the receipt.",
+		"dateHint": "Enter the receipt date in this format: 2026-11-19.",
 		"total": "Total (tax included)",
 		"merchant": "Shop",
 		"paidFrom": "Paid from",
@@ -799,7 +824,11 @@
 		"statementOnly": "Statement lines without a receipt",
 		"statementOnlyHint": "Bring in the receipt, or leave it as is if there is none (the statement is a record too).",
 		"nothingLeft": "None.",
-		"goToSettings": "Register an API key in Settings"
+		"goToSettings": "Register an API key in Settings",
+		"dateRequired": "Enter the date shown on the receipt.",
+		"dateInvalid": "Enter a valid date in year-month-day order, such as 2026-11-19.",
+		"totalInvalid": "Enter a total of at least 1 yen, including tax.",
+		"reducedAmountInvalid": "Enter a reduced-rate amount no greater than the total including tax."
 	},
 	"receiptSettings": {
 		"title": "Receipt reading",
@@ -1101,6 +1130,7 @@
 		"reopenYear": "Reopen the year"
 	},
 	"documents": {
+		"choosePaymentAccount": "Choose the account that received the payment",
 		"createTitle": "Create a document",
 		"createDescription": "Choose the document to make. You can save a draft and issue it later.",
 		"listTitle": "Documents",
@@ -1282,7 +1312,6 @@
 		"incomeBeforeDeduction": "Income before the blue-return deduction",
 		"deduction": "Blue-return deduction",
 		"businessIncome": "Business income",
-		"deduction65Note": "The 650,000-yen deduction requires filing by e-Tax or keeping qualifying electronic books. Filing on paper gives a deduction of {paper} yen, and the income goes up by the difference.",
 		"monthSales": "Sales in month {month}",
 		"monthPurchases": "Purchases in month {month}",
 		"item_personal_consumption": "Personal consumption",
@@ -1399,7 +1428,7 @@
 		"reminderDesktop": "Desktop notifications",
 		"reminderDesktopTiming": "On Windows and Mac, opening your books schedules notifications for 9 a.m. local time on the selected days.",
 		"reminderDesktopHint": "Pick from 30, 7, or 1 day before the deadline. Scheduled notifications arrive even if Chobiyori is closed. On other days, opening your books also sends a desktop notification for each on-screen reminder, once per deadline per day.",
-		"reminderScheduleFailed": "Could not schedule reminders. Check system notification settings and reopen your books.",
+		"reminderScheduleFailed": "The operating system could not schedule the notifications. Check notification settings and retry, or export the deadlines to your calendar.",
 		"reminderScheduleUnavailable": "Scheduled notifications are unavailable here. Allow notifications for the installed Windows or Mac app.",
 		"reminderDismiss": "Dismiss reminder",
 		"reminderSettings": "Open settings",
@@ -1446,7 +1475,16 @@
 		"purchaseGroupAmounts": "{included} yen incl. tax → {deductible} yen deductible",
 		"whiteTitle": "White-return income and expense statement",
 		"whiteBeforeDeduction": "Income before family worker deduction",
-		"whiteIntro": "Amounts for the white-return income and expense statement. Select white return in the NTA filing site and copy each amount. The family worker deduction is the amount saved in closing. See NTA No.2075 and the closing screen for eligibility and calculation."
+		"whiteIntro": "Amounts for the white-return income and expense statement. Select white return in the NTA filing site and copy each amount. The family worker deduction is the amount saved in closing. See NTA No.2075 and the closing screen for eligibility and calculation.",
+		"deductionTransferMode": "Blue-return deduction to use for these figures",
+		"deductionTransferHint": "Choose 550,000 yen when it applies, for example when filing on paper without qualifying electronic books. Check the rules for your filing year.",
+		"deductionTransferConfigured": "Fiscal-year setting (up to ¥650,000)",
+		"deductionTransferPaper": "Up to ¥550,000",
+		"reminderScheduling": "Checking notification reservations with the operating system.",
+		"reminderScheduleReady": "Scheduled {count} notifications. Next: {next}.",
+		"reminderScheduleEmpty": "No notifications are scheduled. Check the unfiled deadlines and selected reminder days.",
+		"reminderScheduleDenied": "Notifications for Chobiyori are blocked. Allow them in the system notification settings, then retry.",
+		"reminderScheduleRetry": "Retry scheduling"
 	},
 	"receivables": {
 		"tabsLabel": "Sales view",
@@ -1547,7 +1585,7 @@
 		"keyboard": "Keyboard shortcuts",
 		"startBody": "Set up your business, filing type, accounts and opening balances first. Record money coming in and out in Transactions. Once a month, compare your books with cash and bank statements.",
 		"sales": "Record sales",
-		"salesBody": "Choose Income in simple entry and enter the date, amount, category and receiving account. For unpaid sales, use compound entry with accounts receivable and sales.",
+		"salesBody": "Record sales under Transaction entry, Simple entry, Income. Select the unpaid option when payment has not arrived. For invoices created in Chobiyori, record sales and payments from the issued invoice.",
 		"receipt": "Read a receipt",
 		"receiptBody": "Select receipts in the import inbox. Check the extracted date, amount and account before confirming. Receipt recognition needs an internet connection.",
 		"closing": "Close the year and file",
@@ -1624,7 +1662,9 @@
 		"stockPurchase": "Purchase goods for sale with cash",
 		"stockPurchaseBody": "Expense / Purchases / Cash. Debit Purchases and credit Cash. Review the value of goods remaining at year end in Closing / Inventory.",
 		"collectReceivable": "Collect a sale previously recorded as receivable",
-		"collectReceivableBody": "Income / Accounts receivable / Ordinary deposits. Debit Ordinary deposits and credit Accounts receivable. The sale has already been recorded. For an invoice payment, also select the invoice in simple entry."
+		"collectReceivableBody": "Income / Accounts receivable / Ordinary deposits. Debit Ordinary deposits and credit Accounts receivable. The sale has already been recorded. For an invoice payment, also select the invoice in simple entry.",
+		"personalExpense": "I paid a business expense with personal funds",
+		"personalExpenseBody": "In Transaction entry, choose Simple entry, then Expense. Choose the personal funds or card option and enter the expense account and amount."
 	},
 	"commands": {
 		"title": "Command palette",
