@@ -594,10 +594,11 @@ export function useAttachFiles() {
 	})
 }
 
-export function useDeleteAttachment() {
+export function useDeleteAttachment(transactionId: number) {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (id: number) => callCommand<void>("delete_attachment", { id }),
+		mutationFn: (id: number) =>
+			callCommand<void>("delete_attachment", { id, transactionId }),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: ["attachments"] }),
 	})

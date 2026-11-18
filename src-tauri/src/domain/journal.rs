@@ -304,14 +304,14 @@ pub struct ValidTransaction {
 ///
 /// - 日付は年度 `fiscal_year` の中
 /// - 金額は 1 円以上の整数
-/// - 借方と貸方がそれぞれ 1 行以上あり、同じ科目が借方と貸方の両方にない
+/// - 借方と貸方がそれぞれ 1 行以上あり、同じ科目は税率の異なる売上・値引きの複合仕訳に限って両側に置ける
 /// - 有効なマスタだけ（`allowed_inactive` にある科目・取引先は、無効でも使ってよい。
 ///   変更前の取引がすでに使っていたもの）
 /// - 借方合計 = 貸方合計
 pub fn validate(
     input: &TransactionInput,
     fiscal_year: i64,
-    masters: &impl MasterLookup,
+    masters: &(impl MasterLookup + ?Sized),
     allowed_inactive: &AllowedInactive,
 ) -> AppResult<ValidTransaction> {
     match parse_date(input.date.trim()) {
@@ -379,10 +379,21 @@ pub fn validate(
     if !has(Side::Debit) || !has(Side::Credit) {
         return Err(AppError::field(ErrorCode::Required, "lines"));
     }
+    // 請求書の税率別の売上と値引きを、複合仕訳の同じ科目で表せる。
+    let taxable_sales = |l: &LineInput| {
+        matches!(
+            l.tax_category,
+            Some(TaxCategory::TaxableSales8 | TaxCategory::TaxableSales10)
+        )
+    };
     for (index, line) in lines.iter().enumerate() {
-        let opposite = lines
-            .iter()
-            .any(|other| other.side != line.side && other.account_id == line.account_id);
+        let opposite = lines.iter().any(|other| {
+            other.side != line.side
+                && other.account_id == line.account_id
+                && (lines.len() == 2
+                    || other.tax_category == line.tax_category
+                    || !(taxable_sales(line) || taxable_sales(other)))
+        });
         if opposite && line.side == Side::Credit {
             return Err(AppError::line(ErrorCode::SameAccount, index, "accountId"));
         }

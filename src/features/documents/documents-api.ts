@@ -180,6 +180,9 @@ function useInvalidate() {
 			queryClient.invalidateQueries({ queryKey: ["transactions"] }),
 			queryClient.invalidateQueries({ queryKey: ["trial-balance"] }),
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
+			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-targets"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-suggestions"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }

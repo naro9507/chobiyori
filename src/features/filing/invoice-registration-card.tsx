@@ -10,7 +10,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input, NativeSelect } from "@/components/ui/input"
+import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useBusinessProfile } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
@@ -29,7 +29,7 @@ const methods = ["special20", "simplified", "standard"] as const
 
 /**
  * インボイス（適格請求書発行事業者）の登録。申請書に書く内容と手順を案内し、
- * 登録番号と登録日を入れると、登録日から課税事業者として扱う。
+ * 登録日と、登録前に免税だったかどうかを記録する。
  */
 export function InvoiceRegistrationCard({
 	fiscalYear,
@@ -42,20 +42,32 @@ export function InvoiceRegistrationCard({
 	const errorMessage = useErrorMessage()
 	const profile = useBusinessProfile().data
 	const registration = useInvoiceRegistration().data
-	const year = useFiscalYears().data?.find((item) => item.year === fiscalYear)
+	const years = useFiscalYears().data
+	const year = years?.find((item) => item.year === fiscalYear)
 	const save = useSaveInvoiceRegistration()
 	const [form, setForm] = useState<{
 		registrationNo: string
 		registeredOn: string
 		taxStatus: RegistrationInput["taxStatus"] | ""
 		category: string
+		wasExempt?: boolean
 	} | null>(null)
 	const current = form ?? {
 		registrationNo: registration?.registrationNo ?? "",
 		registeredOn: registration?.registeredOn ?? "",
 		taxStatus: year && year.taxStatus !== "exempt" ? year.taxStatus : "",
 		category: String(registration?.simplifiedCategory ?? ""),
+		wasExempt: undefined,
 	}
+	const registrationYear = years?.find(
+		(year) => String(year.year) === current.registeredOn.slice(0, 4)
+	)
+	const wasExempt =
+		current.wasExempt ??
+		(registrationYear?.taxStatus === "exempt" ||
+			registrationYear?.taxStatus === "special20" ||
+			(registrationYear?.taxableFrom != null &&
+				!registrationYear.taxableFrom.endsWith("-01-01")))
 	const update = (patch: Partial<typeof current>) =>
 		setForm({ ...current, ...patch })
 	const errorFor = (field: string) => {
@@ -72,6 +84,9 @@ export function InvoiceRegistrationCard({
 				registeredOn: current.registeredOn,
 				fiscalYear: year.year,
 				taxStatus: current.taxStatus,
+				...(current.wasExempt === undefined
+					? {}
+					: { wasExempt: current.wasExempt }),
 				simplifiedCategory: current.category ? Number(current.category) : null,
 			},
 			{ onSuccess: () => setForm(null) }
@@ -196,6 +211,11 @@ export function InvoiceRegistrationCard({
 							</Field>
 						)}
 					</div>
+					<LabeledCheckbox
+						label={t("wasExempt")}
+						checked={wasExempt}
+						onChange={(e) => update({ wasExempt: e.target.checked })}
+					/>
 					<p className="text-muted-foreground text-xs">{t("midYearHint")}</p>
 					{year?.closed && (
 						<p className="text-muted-foreground text-sm">

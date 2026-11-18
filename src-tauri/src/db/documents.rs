@@ -266,7 +266,8 @@ fn tax_mode_for(conn: &Connection, issue_date: &str) -> AppResult<TaxMode> {
         return Err(AppError::field(ErrorCode::InvalidFormat, "issueDate"));
     }
     let exempt = transactions::date_is_exempt(conn, issue_date)?;
-    let registered = setup::profile(conn)?.invoice_registration_no.is_some();
+    let registered = setup::profile(conn)?.invoice_registration_no.is_some()
+        && super::filing::registered_on(conn)?.is_none_or(|date| date.as_str() <= issue_date);
     Ok(if !exempt && registered {
         TaxMode::Qualified
     } else {
@@ -820,25 +821,28 @@ pub fn sale_proposal(conn: &Connection, id: i64) -> AppResult<TransactionInput> 
         partner_id: d.partner_id,
         ..journal::LineInput::new(Side::Debit, receivable, d.totals.total)
     }];
-    for r in d.totals.by_rate.iter().filter(|r| r.base + r.tax > 0) {
-        lines.push(journal::LineInput {
-            partner_id: d.partner_id,
-            tax_category: Some(sales_category(r.rate)),
-            ..journal::LineInput::new(Side::Credit, sales, r.base + r.tax)
-        });
-    }
-    // 値引きの行で税率ごとの額が負になったときは、貸方の合計と合わない。そのときは 1 行にまとめる
-    let credit: i64 = lines
-        .iter()
-        .filter(|l| l.side == Side::Credit)
-        .map(|l| l.amount)
-        .sum();
-    if credit != d.totals.total {
-        lines.truncate(1);
+    if transactions::date_is_exempt(conn, &d.issue_date)? {
         lines.push(journal::LineInput {
             partner_id: d.partner_id,
             ..journal::LineInput::new(Side::Credit, sales, d.totals.total)
         });
+    } else {
+        for r in &d.totals.by_rate {
+            let amount = r.base + r.tax;
+            if amount == 0 {
+                continue;
+            }
+            let side = if amount > 0 {
+                Side::Credit
+            } else {
+                Side::Debit
+            };
+            lines.push(journal::LineInput {
+                partner_id: d.partner_id,
+                tax_category: Some(sales_category(r.rate)),
+                ..journal::LineInput::new(side, sales, amount.abs())
+            });
+        }
     }
     Ok(TransactionInput {
         date: d.issue_date.clone(),
@@ -929,6 +933,33 @@ pub(crate) fn record_payment_in(
         params![id, t.id, input.amount],
     )?;
     Ok(t)
+}
+
+/// 仕訳の金額を訂正したときも、請求額の範囲で入金の記録をそろえる。
+pub(crate) fn update_payment_amount(
+    conn: &Connection,
+    transaction_id: i64,
+    amount: i64,
+) -> AppResult<()> {
+    let Some((id, previous)) = conn
+        .query_row(
+            "SELECT document_id, amount FROM document_payments WHERE transaction_id = ?1",
+            [transaction_id],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()?
+    else {
+        return Ok(());
+    };
+    let document = get(conn, id)?;
+    if amount > document.totals.total - (document.paid - previous) {
+        return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+    }
+    conn.execute(
+        "UPDATE document_payments SET amount = ?2 WHERE transaction_id = ?1",
+        params![transaction_id, amount],
+    )?;
+    Ok(())
 }
 
 /// 請求書の画面から入金を記帳する。

@@ -19,7 +19,7 @@ struct Deadlines {
 }
 
 #[derive(Debug, Deserialize)]
-struct Special20 {
+struct YearRange {
     first_year: i64,
     last_year: i64,
 }
@@ -34,7 +34,8 @@ struct Transitional {
 #[derive(Debug, Deserialize)]
 struct FilingData {
     deadlines: BTreeMap<String, Deadlines>,
-    special20: Special20,
+    special20: YearRange,
+    special30: YearRange,
     deemed_purchase_rates: BTreeMap<String, i64>,
     paper_deduction_cap: i64,
     invoice_start: String,
@@ -161,17 +162,6 @@ pub fn check_digit_ok(registration_no: &str) -> Option<bool> {
 
 // ---- 免税と課税の切り替え ----
 
-/// その日の取引を免税として扱うか。登録日のある年は、登録日の前が免税、登録日からが課税。
-/// それ以外の年は、年度の消費税の区分に従う。
-pub fn exempt_on(year_exempt: bool, registered_on: Option<&str>, date: &str) -> bool {
-    if let (Some(reg), Some((year, _, _))) = (registered_on, ymd(date)) {
-        if ymd(reg).map(|(y, _, _)| y) == Some(year) {
-            return date < reg;
-        }
-    }
-    year_exempt
-}
-
 /// 年度の中で課税として扱う最初の日。課税の取引がなければ `None`。
 pub fn taxable_from(year: i64, year_exempt: bool, registered_on: Option<&str>) -> Option<String> {
     if let Some(reg) = registered_on {
@@ -277,6 +267,7 @@ pub struct ConsumptionTax {
     pub national_tax: i64,
     /// 2 割特例で納める額。使えない年度は `None`
     pub special20: Option<Payable>,
+    pub special30: Option<Payable>,
     /// 簡易課税で納める額
     pub simplified: Payable,
     pub categories: Vec<CategoryTotal>,
@@ -373,6 +364,9 @@ pub fn consumption_tax(year: i64, sales: &[SalesAmount]) -> ConsumptionTax {
         base,
         national_tax,
         special20: special20_year(year).then(|| payable(national_tax, national_tax * 8 / 10)),
+        special30: (data().special30.first_year..=data().special30.last_year)
+            .contains(&year)
+            .then(|| payable(national_tax, national_tax * 7 / 10)),
         simplified: payable(national_tax, simplified_deductible),
         categories,
     }
@@ -390,7 +384,7 @@ pub struct PurchaseAmount {
 }
 
 /// 登録番号のない仕入先からの仕入れで、仕入れの消費税を引ける割合（%）。
-/// インボイス制度の前は 100%、経過措置の期間は 80% か 50%、その後は 0%。
+/// インボイス制度の前は 100%、経過措置の期間は 80%・70%・50%・30%、その後は 0%。
 pub fn transitional_percent(date: &str) -> i64 {
     let d = data();
     if date < d.invoice_start.as_str() {
@@ -426,7 +420,7 @@ pub struct StandardEstimate {
 /// 本則課税で納める額の目安（割戻し計算）。
 ///
 /// - 仕入れの消費税（国税）= 税込の課税仕入れ × 7.8/110（軽減 8% は 6.24/108）、円未満切り捨て
-/// - 登録番号のない仕入先からの分は、日付で決まる経過措置の割合（80% / 50%）だけ引く
+/// - 登録番号のない仕入先からの分は、日付で決まる経過措置の割合（80%・70%・50%・30%）だけ引く
 /// - 課税売上割合が 95% 未満のときの按分、個別対応方式、積上げ計算は扱わない
 pub fn standard_estimate(national_tax: i64, purchases: &[PurchaseAmount]) -> StandardEstimate {
     let mut groups: BTreeMap<(Rate, bool, i64), i64> = BTreeMap::new();
@@ -484,9 +478,14 @@ mod tests {
         assert_eq!(transitional_percent("2023-09-30"), 100);
         assert_eq!(transitional_percent("2023-10-01"), 80);
         assert_eq!(transitional_percent("2026-09-30"), 80);
-        assert_eq!(transitional_percent("2026-10-01"), 50);
+        assert_eq!(transitional_percent("2026-10-01"), 70);
+        assert_eq!(transitional_percent("2028-09-30"), 70);
+        assert_eq!(transitional_percent("2028-10-01"), 50);
         assert_eq!(transitional_percent("2029-09-30"), 50);
-        assert_eq!(transitional_percent("2029-10-01"), 0);
+        assert_eq!(transitional_percent("2030-09-30"), 50);
+        assert_eq!(transitional_percent("2030-10-01"), 30);
+        assert_eq!(transitional_percent("2031-09-30"), 30);
+        assert_eq!(transitional_percent("2031-10-01"), 0);
     }
 
     #[test]
@@ -501,7 +500,7 @@ mod tests {
                 purchase(Rate::Reduced8, true, "2026-04-01", 108_000),
                 // インボイスなし 10%（9 月まで 80%）: 110,000 × 7.8/110 = 7,800 → 6,240
                 purchase(Rate::Standard10, false, "2026-09-15", 110_000),
-                // インボイスなし 10%（10 月から 50%）: 55,000 × 7.8/110 = 3,900 → 1,950
+                // インボイスなし 10%（10 月から 70%）: 55,000 × 7.8/110 = 3,900 → 2,730
                 purchase(Rate::Standard10, false, "2026-10-15", 55_000),
             ],
         );
@@ -515,16 +514,16 @@ mod tests {
             [
                 (true, 100, 23_400),
                 (false, 80, 6_240),
-                (false, 50, 1_950),
+                (false, 70, 2_730),
                 (true, 100, 6_240)
             ]
         );
-        // 引ける額 37,830 → 納める国税 78,000 − 37,830 = 40,170 → 百円未満切り捨て 40,100
-        // 地方 40,100 × 22/78 = 11,310.2 → 11,300
-        assert_eq!(est.payable.deductible, 37_830);
-        assert_eq!(est.payable.national, 40_100);
-        assert_eq!(est.payable.local, 11_300);
-        assert_eq!(est.payable.total, 51_400);
+        // 引ける額 38,610 → 納める国税 78,000 − 38,610 = 39,390 → 百円未満切り捨て 39,300
+        // 地方 39,300 × 22/78 = 11,084.6 → 11,000
+        assert_eq!(est.payable.deductible, 38_610);
+        assert_eq!(est.payable.national, 39_300);
+        assert_eq!(est.payable.local, 11_000);
+        assert_eq!(est.payable.total, 50_300);
     }
 
     #[test]
@@ -607,15 +606,6 @@ mod tests {
     #[test]
     fn mid_year_registration_switches_on_the_date() {
         let reg = Some("2025-10-01");
-        // 登録の年: 登録日の前は免税、登録日から課税（年度の区分に関係なく）
-        assert!(exempt_on(true, reg, "2025-09-30"));
-        assert!(!exempt_on(true, reg, "2025-10-01"));
-        assert!(exempt_on(false, reg, "2025-01-05"));
-        // ほかの年は年度の区分に従う
-        assert!(!exempt_on(false, reg, "2026-01-05"));
-        assert!(exempt_on(true, reg, "2024-12-31"));
-        assert!(exempt_on(true, None, "2025-12-31"));
-
         assert_eq!(taxable_from(2025, true, reg), Some("2025-10-01".into()));
         assert_eq!(taxable_from(2026, false, reg), Some("2026-01-01".into()));
         assert_eq!(taxable_from(2024, true, reg), None);

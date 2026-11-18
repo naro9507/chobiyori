@@ -81,13 +81,13 @@ export function ClosingPage() {
 							<AssetsPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="inventory" className="outline-none">
-							<InventoryPanel fiscalYear={fiscalYear} />
+							<InventoryPanel key={fiscalYear} fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="statement" className="outline-none">
 							<StatementPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="carry" className="outline-none">
-							<CarryForwardPanel fiscalYear={fiscalYear} />
+							<CarryForwardPanel key={fiscalYear} fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="income" className="outline-none">
 							<IncomePanel fiscalYear={fiscalYear} />

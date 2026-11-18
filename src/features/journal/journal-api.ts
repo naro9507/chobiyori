@@ -118,6 +118,9 @@ export function useInvalidateBooks() {
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
 			queryClient.invalidateQueries({ queryKey: ["templates"] }),
 			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
+			queryClient.invalidateQueries({ queryKey: ["documents"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-targets"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-suggestions"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }

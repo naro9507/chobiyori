@@ -10,7 +10,7 @@ use crate::domain::journal::{
     self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput,
     TransactionInput, TransactionKind, ValidTransaction,
 };
-use crate::domain::master::{Rounding, TaxCategory, TaxStatus};
+use crate::domain::master::{Rounding, TaxCategory};
 use crate::domain::standard_accounts::{OWNER_CONTRIBUTIONS_LINE, OWNER_DRAWINGS_LINE};
 use crate::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -61,29 +61,20 @@ pub(crate) fn ensure_year_open(conn: &Connection, year: i64) -> AppResult<()> {
     }
 }
 
-/// 年度の消費税の扱いが免税事業者か。
-pub(crate) fn year_is_exempt(conn: &Connection, year: i64) -> AppResult<bool> {
-    let status: Option<TaxStatus> = conn
-        .query_row(
-            "SELECT tax_status FROM fiscal_years WHERE year = ?1",
-            [year],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(status.is_none_or(|s| s == TaxStatus::Exempt))
-}
-
-/// その日の取引を免税として扱うか。年の途中でインボイスに登録した年は、登録日の前が免税（F12-3）。
+/// その日の取引を免税として扱うか。
 pub(crate) fn date_is_exempt(conn: &Connection, date: &str) -> AppResult<bool> {
-    let year = journal::parse_date(date.trim())
+    let date = date.trim();
+    let year = journal::parse_date(date)
         .map(|(y, _, _)| y)
         .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;
-    let registered_on = crate::db::filing::registered_on(conn)?;
-    Ok(crate::domain::filing::exempt_on(
-        year_is_exempt(conn, year)?,
-        registered_on.as_deref(),
-        date.trim(),
-    ))
+    Ok(tax_start(conn, year)?.is_none_or(|start| date < start.as_str()))
+}
+
+fn tax_start(conn: &Connection, year: i64) -> AppResult<Option<String>> {
+    match super::filing::taxable_from(conn, year) {
+        Err(error) if error.code == ErrorCode::NotFound => Ok(None),
+        other => other,
+    }
 }
 
 /// 科目・取引先・補助科目の有効・無効と、科目の既定の税区分。件数は多くても数百なので、まとめて読む。
@@ -91,8 +82,7 @@ pub(crate) struct DbMasters {
     accounts: HashMap<i64, (bool, Option<TaxCategory>)>,
     partners: HashMap<i64, bool>,
     sub_accounts: HashMap<i64, (i64, bool)>,
-    year_exempt: bool,
-    registered_on: Option<String>,
+    taxable_from: Option<String>,
 }
 
 impl DbMasters {
@@ -113,8 +103,7 @@ impl DbMasters {
             accounts,
             partners,
             sub_accounts,
-            year_exempt: year_is_exempt(conn, year)?,
-            registered_on: crate::db::filing::registered_on(conn)?,
+            taxable_from: tax_start(conn, year)?,
         })
     }
 }
@@ -133,7 +122,9 @@ impl MasterLookup for DbMasters {
         self.accounts.get(&id).and_then(|a| a.1)
     }
     fn tax_exempt(&self, date: &str) -> bool {
-        crate::domain::filing::exempt_on(self.year_exempt, self.registered_on.as_deref(), date)
+        self.taxable_from
+            .as_deref()
+            .is_none_or(|start| date < start)
     }
 }
 
@@ -195,6 +186,15 @@ pub(crate) fn insert_kind(
 pub(crate) fn remove(conn: &Connection, id: i64) -> AppResult<()> {
     let current = get(conn, id)?;
     ensure_date_open(conn, current.fiscal_year, &current.date)?;
+    let has_payments: bool = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM documents d JOIN document_payments p ON p.document_id = d.id
+                        WHERE d.transaction_id = ?1)",
+        [id],
+        |row| row.get(0),
+    )?;
+    if has_payments {
+        return Err(AppError::new(ErrorCode::HasPayments));
+    }
     // 明細行は ON DELETE CASCADE で一緒に消える
     conn.execute("DELETE FROM transactions WHERE id = ?1", [id])?;
     audit::transaction(conn, "delete", Some(&current), None)
@@ -333,10 +333,64 @@ pub(crate) fn account_rounding(conn: &Connection, account_id: i64) -> AppResult<
         .unwrap_or(Rounding::Floor))
 }
 
+/// 入金と売上の紐付けを保ったまま編集する。入金額の修正は同じ仕訳内の明細に反映する。
+fn update_linked_posting(
+    conn: &Connection,
+    current: &Transaction,
+    valid: &ValidTransaction,
+) -> AppResult<()> {
+    let (sale, invoice_payment, recurring_payment): (bool, bool, bool) = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM documents WHERE transaction_id = ?1),
+                EXISTS (SELECT 1 FROM document_payments WHERE transaction_id = ?1),
+                EXISTS (SELECT 1 FROM recurring_payments WHERE transaction_id = ?1)",
+        [current.id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    if !sale && !invoice_payment && !recurring_payment {
+        return Ok(());
+    }
+    let matches = |old: &Line, new: &journal::LineInput| {
+        old.side == new.side
+            && old.account_id == new.account_id
+            && old.partner_id == new.partner_id
+            && old.sub_account_id == new.sub_account_id
+            && old.tax_category == new.tax_category
+            && old.is_qualified_invoice == new.is_qualified_invoice
+            && (!sale || old.amount == new.amount)
+    };
+    if (sale && valid.date != current.date)
+        || valid.lines.len() != current.lines.len()
+        || !current
+            .lines
+            .iter()
+            .zip(&valid.lines)
+            .all(|(old, new)| matches(old, new))
+    {
+        return Err(AppError::new(ErrorCode::LinkedPosting));
+    }
+    if invoice_payment || recurring_payment {
+        if valid.lines.len() != 2 {
+            return Err(AppError::new(ErrorCode::LinkedPosting));
+        }
+        let amount = valid.lines[0].amount;
+        if invoice_payment {
+            super::documents::update_payment_amount(conn, current.id, amount)?;
+        }
+        if recurring_payment {
+            conn.execute(
+                "UPDATE recurring_payments SET amount = CASE WHEN amount < 0 THEN -?2 ELSE ?2 END
+                 WHERE transaction_id = ?1",
+                params![current.id, amount],
+            )?;
+        }
+    }
+    Ok(())
+}
+
 /// 取引を変更する。年度は変えられない（日付は同じ年度の中で動かせる）。
 /// 入力方法（`entry_mode`）は作ったときのままにする。
 pub fn update(db: &Database, id: i64, input: &TransactionInput) -> AppResult<Transaction> {
-    db.transaction(|tx| update_in(tx, id, input))
+    db.transaction(|tx| update_in(tx, id, input, true))
 }
 
 /// 取引を変更する（呼び出し側の DB トランザクションの中で）。締めと変更履歴は `update` と同じ。
@@ -344,6 +398,7 @@ pub(crate) fn update_in(
     tx: &Connection,
     id: i64,
     input: &TransactionInput,
+    sync_linked_posting: bool,
 ) -> AppResult<Transaction> {
     {
         let current = get(tx, id)?;
@@ -365,6 +420,9 @@ pub(crate) fn update_in(
         )?;
         // 締めた月へ動かすこともできない
         ensure_date_open(tx, current.fiscal_year, &valid.date)?;
+        if sync_linked_posting {
+            update_linked_posting(tx, &current, &valid)?;
+        }
         tx.execute(
             "UPDATE transactions SET date = ?2, memo = ?3, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1",

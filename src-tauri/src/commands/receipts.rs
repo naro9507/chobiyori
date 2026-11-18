@@ -290,8 +290,12 @@ pub async fn attach_files(
 
 /// 証憑を消す。レシートとして取り込んだものは消せない（受信箱から消す）。
 #[tauri::command]
-pub async fn delete_attachment(db: State<'_, Database>, id: i64) -> AppResult<()> {
-    attachments::delete(&db.conn(), id)
+pub async fn delete_attachment(
+    db: State<'_, Database>,
+    id: i64,
+    transaction_id: i64,
+) -> AppResult<()> {
+    db.transaction(|tx| attachments::detach(tx, id, transaction_id))
 }
 
 // ---- 突合 ----

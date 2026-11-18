@@ -95,7 +95,6 @@ export function FilingNotificationScheduler() {
 	const t = useTranslations("filing")
 	const { data, isError } = useFilingDeadlines(
 		enabled && selected.length > 0,
-		today(),
 		true
 	)
 	const plan =
