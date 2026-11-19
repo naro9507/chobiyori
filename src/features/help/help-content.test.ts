@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { defaultFeatures } from "@/features/setup/setup"
+import { defaultFeatures, industryTemplates } from "@/features/setup/setup"
 import { visibleHelpArticles } from "./help-content"
 
 const ids = (
@@ -13,6 +13,18 @@ describe("業種と機能に合わせたヘルプ", () => {
 		expect(ids("service")).toContain("referenceBooks")
 		expect(ids("service")).not.toContain("teachingMaterials")
 		expect(ids("general")).not.toContain("teachingMaterials")
+	})
+	it.each([
+		["restaurant", "restaurantSanitation"],
+		["construction", "constructionToolRental"],
+		["beauty", "beautySupplies"],
+		["itWeb", "webHosting"],
+		["delivery", "deliveryToll"],
+	] as const)("%s の入力例は選んだ業種にだけ表示する", (template, example) => {
+		expect(ids(template)).toContain(example)
+		for (const other of industryTemplates) {
+			if (other !== template) expect(ids(other)).not.toContain(example)
+		}
 	})
 	it("使わない機能の入力例と案内への導線を隠し、汎用の案内は残す", () => {
 		const features = {
@@ -30,5 +42,8 @@ describe("業種と機能に合わせたヘルプ", () => {
 		expect(school).not.toContain("screen_documents")
 		expect(school).not.toContain("screen_receivables")
 		expect(ids("retailFood", features)).not.toContain("stockPurchase")
+		expect(ids("retail", features)).not.toContain("stockPurchase")
+		expect(ids("retailFood")).toContain("stockPurchase")
+		expect(ids("retail")).toContain("stockPurchase")
 	})
 })

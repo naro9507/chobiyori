@@ -397,34 +397,35 @@ pub(crate) mod tests {
 
     #[test]
     fn industry_templates_add_accounts_before_misc_and_allocation_rules() {
-        let db = Database::open_in_memory().unwrap();
-        complete(
-            &db,
-            &SetupInput {
-                template: IndustryTemplate::School,
-                ..input()
-            },
-        )
-        .unwrap();
-        let conn = db.conn();
-        let accounts = crate::db::accounts::list(&conn).unwrap();
-        let position = |code: &str| accounts.iter().position(|a| a.code == code).unwrap();
-        // 教材費は標準の経費（貸倒金）のあと、雑費の前
-        assert!(position("617") < position("620") && position("620") < position("699"));
-        let materials = &accounts[position("620")];
-        assert_eq!(materials.name_ja, "教材費");
-        assert!(materials.statement_line.is_none() && !materials.is_system);
-        let rules = crate::db::allocation_rules::list(&conn).unwrap();
-        assert_eq!(
-            rules.iter().map(|r| r.business_percent).collect::<Vec<_>>(),
-            [50, 50]
-        );
-        // 汎用は足さない
-        drop(conn);
-        let general = set_up_db();
-        assert!(crate::db::allocation_rules::list(&general.conn())
-            .unwrap()
-            .is_empty());
+        for template in IndustryTemplate::ALL {
+            let db = Database::open_in_memory().unwrap();
+            complete(
+                &db,
+                &SetupInput {
+                    template,
+                    ..input()
+                },
+            )
+            .unwrap();
+            let conn = db.conn();
+            assert_eq!(industry_template(&conn).unwrap(), template);
+            let accounts = crate::db::accounts::list(&conn).unwrap();
+            let position = |code: &str| accounts.iter().position(|a| a.code == code).unwrap();
+            // 追加科目は貸倒金のあと、雑費の前に並ぶ
+            let extras = &accounts[position("617") + 1..position("699")];
+            assert_eq!(extras.len(), template.accounts().len());
+            for (actual, expected) in extras.iter().zip(template.accounts()) {
+                assert_eq!(actual.code, expected.code);
+                assert_eq!(actual.name_ja, expected.name_ja);
+                assert!(actual.statement_line.is_none() && !actual.is_system);
+            }
+            let rules = crate::db::allocation_rules::list(&conn).unwrap();
+            assert_eq!(rules.len(), template.allocation_rules().len());
+            for (actual, expected) in rules.iter().zip(template.allocation_rules()) {
+                assert_eq!(actual.code, expected.code);
+                assert_eq!(actual.business_percent, expected.business_percent);
+            }
+        }
     }
 
     #[test]
