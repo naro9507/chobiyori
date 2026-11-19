@@ -433,8 +433,11 @@ function PaymentPanel({
 	const [date, setDate] = useState(localToday)
 	const [amount, setAmount] = useState(String(d.totals.total - d.paid))
 	const [accountId, setAccountId] = useState<number | null>(null)
-	const account =
-		accountId ?? accounts.find((a) => a.code === "104")?.id ?? accounts[0]?.id
+	const preferred =
+		d.lastPaymentAccountId == null
+			? (accounts.find((a) => a.code === "104")?.id ?? accounts[0]?.id)
+			: accounts.find((a) => a.id === d.lastPaymentAccountId)?.id
+	const account = accountId ?? preferred
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
@@ -482,6 +485,9 @@ function PaymentPanel({
 						value={account ?? ""}
 						onChange={(e) => setAccountId(Number(e.target.value))}
 					>
+						<option value="" disabled>
+							{t("choosePaymentAccount")}
+						</option>
 						{accounts.map((a) => (
 							<option key={a.id} value={a.id}>
 								{masters.accountLabel(a.id)}
@@ -496,7 +502,11 @@ function PaymentPanel({
 				</p>
 			)}
 			<div className="flex gap-2">
-				<Button type="submit" size="sm" disabled={action.isPending}>
+				<Button
+					type="submit"
+					size="sm"
+					disabled={action.isPending || account === undefined}
+				>
 					{t("savePayment")}
 				</Button>
 				<Button type="button" size="sm" variant="ghost" onClick={onClose}>

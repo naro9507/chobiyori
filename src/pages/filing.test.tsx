@@ -1,5 +1,12 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import {
+	act,
+	render,
+	renderHook,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -11,7 +18,7 @@ import type {
 	InvoiceRegistration,
 	RegistrationInput,
 } from "@/features/filing/filing-api"
-import { today } from "@/features/filing/filing-api"
+import { today, useFilingDay } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
@@ -89,6 +96,7 @@ const guide: IncomeGuide = {
 	incomeBeforeDeduction: 2_200_000,
 	deduction: 650_000,
 	deductionOnPaper: 550_000,
+	incomeOnPaper: 1_650_000,
 	income: 1_550_000,
 	issueCount: 0,
 }
@@ -190,12 +198,14 @@ const deadline: DeadlineNotice = {
 	total: 7,
 }
 let notices: DeadlineNotice[]
+let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
 let registration: InvoiceRegistration
 let taxStatus: ConsumptionReport["taxStatus"]
 
 beforeEach(() => {
 	notices = [deadline]
+	scheduleResult = "ready"
 	calendarResult = "saved"
 	registration = {
 		registrationNo: null,
@@ -276,7 +286,7 @@ beforeEach(() => {
 			case "export_filing_calendar":
 				return calendarResult
 			case "sync_filing_notifications":
-				return "ready"
+				return scheduleResult
 			case "plugin:notification|notify":
 				return undefined
 			default:
@@ -304,9 +314,18 @@ describe("確定申告の補助", () => {
 			screen.getByRole("button", { name: "「売上（収入）金額」をコピー" })
 		).toBeInTheDocument()
 		expect(screen.getByText("3月の売上")).toBeInTheDocument()
-		expect(
-			screen.getByText(/紙で出すときは控除が 550,000 円/)
-		).toBeInTheDocument()
+		await user.selectOptions(
+			screen.getByLabelText("転記に使う青色申告特別控除"),
+			"paper"
+		)
+		const returnTable = screen.getByRole("table", { name: "申告書" })
+		expect(returnTable).toHaveTextContent("1,650,000")
+		expect(returnTable).not.toHaveTextContent("1,550,000")
+		await user.selectOptions(
+			screen.getByLabelText("転記に使う青色申告特別控除"),
+			"configured"
+		)
+		expect(returnTable).toHaveTextContent("1,550,000")
 		expect(
 			screen.getAllByText(/国税庁の様式・手引きで確かめてください/).length
 		).toBeGreaterThan(0)
@@ -552,6 +571,26 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
 	})
 
+	it("OSで通知が拒否されたときは許可の案内が出て、再試行で予約できる", async () => {
+		const due = new Date()
+		due.setDate(due.getDate() + 90)
+		notices = [{ ...deadline, date: today(due), daysLeft: 90 }]
+		scheduleResult = "denied"
+		const user = userEvent.setup()
+		renderAt("/settings")
+		await user.click(
+			await screen.findByRole("checkbox", { name: "デスクトップ通知" })
+		)
+		expect(
+			await screen.findByText(/OS で帳日和の通知が許可されていません/)
+		).toBeInTheDocument()
+		scheduleResult = "ready"
+		await user.click(screen.getByRole("button", { name: "通知予約を再試行" }))
+		expect(
+			await screen.findByText(/通知を 3 件予約しました/)
+		).toBeInTheDocument()
+	})
+
 	it("通知をオフにしていてもカレンダーに書き出せ、期限がなければ案内する", async () => {
 		useSettingsStore.setState({
 			filingReminders: [],
@@ -588,4 +627,18 @@ describe("インボイスの登録と期限", () => {
 			).not.toBeInTheDocument()
 		})
 	})
+})
+
+it("画面を開いたまま午前0時を過ぎると申告期限の照会日が変わる", async () => {
+	vi.useFakeTimers()
+	try {
+		vi.setSystemTime(new Date(2027, 2, 7, 23, 59, 59, 500))
+		const { result, unmount } = renderHook(() => useFilingDay())
+		expect(result.current).toBe("2027-03-07")
+		await act(() => vi.advanceTimersByTimeAsync(500))
+		expect(result.current).toBe("2027-03-08")
+		unmount()
+	} finally {
+		vi.useRealTimers()
+	}
 })

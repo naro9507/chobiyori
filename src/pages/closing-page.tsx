@@ -36,14 +36,18 @@ type Tab = (typeof tabs)[number]
  * 決算。期首残高・固定資産と減価償却・棚卸・決算整理のチェックリスト・決算書の金額一覧・年度の繰越。
  * 決算の仕訳（減価償却・棚卸）は候補として見せ、「記録する」を押すまで帳簿に入れない。
  */
-export function ClosingPage() {
+export function ClosingPage({
+	initialTab = "checklist",
+}: {
+	initialTab?: Tab
+}) {
 	const t = useTranslations("closing")
 	const fiscalYear = useFiscalYear()
 	const features = useFeatures()
 	const white =
 		useFiscalYears().data?.find((y) => y.year === fiscalYear)?.filingType ===
 		"white"
-	const [tab, setTab] = useState<Tab>("checklist")
+	const [tab, setTab] = useState<Tab>(initialTab)
 	const activeTab =
 		tab === "inventory" && !features.inventory ? "checklist" : tab
 
@@ -98,13 +102,13 @@ export function ClosingPage() {
 							<AssetsPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="inventory" className="outline-none">
-							<InventoryPanel fiscalYear={fiscalYear} />
+							<InventoryPanel key={fiscalYear} fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="statement" className="outline-none">
 							<StatementPanel fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="carry" className="outline-none">
-							<CarryForwardPanel fiscalYear={fiscalYear} />
+							<CarryForwardPanel key={fiscalYear} fiscalYear={fiscalYear} />
 						</Tabs.Content>
 						<Tabs.Content value="income" className="outline-none">
 							<IncomePanel fiscalYear={fiscalYear} />

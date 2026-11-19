@@ -71,12 +71,32 @@ pub struct OpeningBalances {
     pub confirmed: bool,
 }
 
-/// 年度の期首残高（科目 → 金額）。試算表・元帳の繰越に足す。
+/// 帳簿に反映する期首残高。編集中の残高は期首残高の画面だけで読む。
 pub(crate) fn opening_map(conn: &Connection, year: i64) -> AppResult<HashMap<i64, i64>> {
-    let mut stmt =
-        conn.prepare("SELECT account_id, amount FROM opening_balances WHERE fiscal_year = ?1")?;
-    let rows = stmt.query_map([year], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    read_opening(conn, year, true)
+}
+
+fn read_opening(conn: &Connection, year: i64, published: bool) -> AppResult<HashMap<i64, i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT b.account_id, b.amount FROM opening_balances b
+         JOIN fiscal_years fy ON fy.year = b.fiscal_year
+         WHERE b.fiscal_year = ?1 AND (NOT ?2 OR fy.opening_confirmed_at IS NOT NULL OR fy.opening_legacy)",
+    )?;
+    let rows = stmt.query_map(params![year, published], |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+fn ensure_opening_ready(conn: &Connection, year: i64) -> AppResult<()> {
+    let draft: bool = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM opening_balances b JOIN fiscal_years fy ON fy.year = b.fiscal_year
+                        WHERE fy.year = ?1 AND fy.opening_confirmed_at IS NULL AND NOT fy.opening_legacy)",
+        [year],
+        |row| row.get(0),
+    )?;
+    if draft {
+        return Err(AppError::new(ErrorCode::OpeningNotConfirmed));
+    }
+    Ok(())
 }
 
 fn totals_of(conn: &Connection, rows: &[OpeningRow]) -> AppResult<OpeningTotals> {
@@ -93,7 +113,7 @@ fn totals_of(conn: &Connection, rows: &[OpeningRow]) -> AppResult<OpeningTotals>
 
 pub fn opening(conn: &Connection, year: i64) -> AppResult<OpeningBalances> {
     let info = year_info(conn, year)?;
-    let mut rows: Vec<OpeningRow> = opening_map(conn, year)?
+    let mut rows: Vec<OpeningRow> = read_opening(conn, year, false)?
         .into_iter()
         .map(|(account_id, amount)| OpeningRow { account_id, amount })
         .collect();
@@ -127,7 +147,7 @@ fn write_opening(conn: &Connection, year: i64, rows: &[OpeningRow]) -> AppResult
             // 期首残高があるのは、資産・負債・資本の科目だけ
             Some(_) => return Err(AppError::line(ErrorCode::InvalidFormat, index, "accountId")),
         }
-        if row.amount.abs() > AMOUNT_MAX {
+        if !(-AMOUNT_MAX..=AMOUNT_MAX).contains(&row.amount) {
             return Err(AppError::line(ErrorCode::OutOfRange, index, "amount"));
         }
         if !seen.insert(row.account_id) {
@@ -148,6 +168,10 @@ pub fn save_opening(db: &Database, year: i64, rows: &[OpeningRow]) -> AppResult<
             return Err(AppError::new(ErrorCode::OpeningConfirmed));
         }
         write_opening(tx, year, rows)?;
+        tx.execute(
+            "UPDATE fiscal_years SET opening_legacy = 0 WHERE year = ?1",
+            [year],
+        )?;
         opening(tx, year)
     })
 }
@@ -161,7 +185,7 @@ pub fn confirm_opening(db: &Database, year: i64, confirmed: bool) -> AppResult<O
             return Err(AppError::new(ErrorCode::Unbalanced));
         }
         tx.execute(
-            "UPDATE fiscal_years SET opening_confirmed_at = CASE WHEN ?2 THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END
+            "UPDATE fiscal_years SET opening_confirmed_at = CASE WHEN ?2 THEN strftime('%Y-%m-%dT%H:%M:%SZ', 'now') END, opening_legacy = 0
              WHERE year = ?1",
             params![year, confirmed],
         )?;
@@ -223,15 +247,55 @@ pub fn inventory(conn: &Connection, year: i64) -> AppResult<InventoryStatus> {
         )
         .optional()?;
     let closing = saved.map(|s| s.0);
+    let opening_recorded = match saved.and_then(|s| s.2) {
+        Some(id) => {
+            matches_inventory_posting(conn, id, year, inventory_account, opening, Side::Credit)?
+        }
+        None => opening == 0,
+    };
+    let recorded = match saved {
+        Some((amount, Some(id), _)) => {
+            matches_inventory_posting(conn, id, year, inventory_account, amount, Side::Debit)?
+        }
+        Some((0, None, _)) => true,
+        _ => false,
+    };
     Ok(InventoryStatus {
         fiscal_year: year,
         opening,
         purchases,
         closing,
         cost_of_sales: closing.map(|c| opening + purchases - c),
-        recorded: saved.is_some_and(|s| s.1.is_some() || s.0 == 0),
-        opening_recorded: opening == 0 || saved.is_some_and(|s| s.2.is_some()),
+        recorded,
+        opening_recorded,
     })
+}
+
+fn matches_inventory_posting(
+    conn: &Connection,
+    id: i64,
+    year: i64,
+    account: i64,
+    amount: i64,
+    side: Side,
+) -> AppResult<bool> {
+    let posting = transactions::get(conn, id)?;
+    let (date, statement_line) = match side {
+        Side::Debit => (format!("{year:04}-12-31"), "pl.closing_inventory"),
+        Side::Credit => (format!("{year:04}-01-01"), "pl.opening_inventory"),
+    };
+    let counter = account_by_line(conn, statement_line)?;
+    Ok(amount > 0
+        && posting.date == date
+        && posting.lines.len() == 2
+        && posting
+            .lines
+            .iter()
+            .any(|l| l.side == side && l.account_id == account && l.amount == amount)
+        && posting
+            .lines
+            .iter()
+            .any(|l| l.side != side && l.account_id == counter && l.amount == amount))
 }
 
 /// 期末の棚卸高を記録する。
@@ -247,6 +311,7 @@ pub fn record_inventory(
     }
     db.transaction(|tx| {
         ensure_year_open(tx, year)?;
+        ensure_opening_ready(tx, year)?;
         let status = inventory(tx, year)?;
         let inventory_account = account_by_line(tx, "bs.inventory")?;
         let previous: Option<(Option<i64>, Option<i64>)> = tx
@@ -289,6 +354,11 @@ pub fn record_inventory(
             None
         };
         let mut opening_id = previous.and_then(|p| p.1);
+        if !status.opening_recorded {
+            if let Some(id) = opening_id.take() {
+                transactions::remove(tx, id)?;
+            }
+        }
         if status.opening > 0 && opening_id.is_none() {
             opening_id = Some(entry(
                 format!("{year:04}-01-01"),
@@ -622,10 +692,11 @@ pub struct CarryForward {
 /// 年 `year` の期末残高を、翌年の期首残高にする。翌年度がなければ作る（申告区分と消費税の扱いは同じ）。
 /// 資産・負債は期末残高のまま、事業主貸・事業主借は 0、元入金は
 /// `期末元入金 + 青色控除前所得 + 事業主借 − 事業主貸`。翌年の期首残高は確定した状態にする。
-/// 翌年の期首残高をもう確定していたら、`overwrite` のときだけ上書きする。
+/// 翌年に保存済みの期首残高があれば、`overwrite` のときだけ上書きする。
 pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<CarryForward> {
     db.transaction(|tx| {
         let info = year_info(tx, year)?;
+        ensure_opening_ready(tx, year)?;
         let next_year = year + 1;
         if next_year > 2100 {
             return Err(AppError::field(ErrorCode::OutOfRange, "fiscalYear"));
@@ -634,7 +705,11 @@ pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<Car
         if !tb.balanced {
             return Err(AppError::new(ErrorCode::Unbalanced));
         }
-        let next = year_info(tx, next_year).ok();
+        let next = match year_info(tx, next_year) {
+            Ok(info) => Some(info),
+            Err(e) if e.code == ErrorCode::NotFound => None,
+            Err(e) => return Err(e),
+        };
         let created = next.is_none();
         match next {
             None => {
@@ -643,10 +718,12 @@ pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<Car
                     params![next_year, info.filing_type, info.tax_status],
                 )?;
             }
-            Some(n) if n.opening_confirmed && !overwrite => {
-                return Err(AppError::new(ErrorCode::OpeningConfirmed));
+            Some(n) => {
+                ensure_year_open(tx, next_year)?;
+                if !overwrite && (n.opening_confirmed || !read_opening(tx, next_year, false)?.is_empty()) {
+                    return Err(AppError::new(ErrorCode::OpeningConfirmed));
+                }
             }
-            Some(_) => ensure_year_open(tx, next_year)?,
         }
 
         let accounts: HashMap<i64, Account> = accounts::list(tx)?.into_iter().map(|a| (a.id, a)).collect();
@@ -678,7 +755,7 @@ pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<Car
         });
         write_opening(tx, next_year, &rows)?;
         tx.execute(
-            "UPDATE fiscal_years SET opening_confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE year = ?1",
+            "UPDATE fiscal_years SET opening_confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), opening_legacy = 0 WHERE year = ?1",
             [next_year],
         )?;
         Ok(CarryForward {
@@ -797,6 +874,7 @@ mod tests {
             &[row(inventory_account, 50_000), row(capital, 50_000)],
         )
         .unwrap();
+        confirm_opening(&db, 2026, true).unwrap();
         create(&db, 2026, &entry("2026-05-01", purchases, bank, 300_000)).unwrap();
         let before = inventory(&db.conn(), 2026).unwrap();
         assert_eq!(

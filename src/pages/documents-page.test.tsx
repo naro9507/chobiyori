@@ -54,6 +54,7 @@ const issued: DocumentRecord = {
 		total: 110000,
 	},
 	paid: 0,
+	lastPaymentAccountId: null,
 	sourceDocumentId: null,
 	transactionId: null,
 	pdfAttachmentId: 3,

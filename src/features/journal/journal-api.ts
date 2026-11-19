@@ -8,7 +8,9 @@ export type Side = "debit" | "credit"
 
 export const simpleKinds = [
 	"income",
+	"unpaid_income",
 	"expense",
+	"personal_expense",
 	"transfer",
 	"owner_draw",
 	"owner_contribution",
@@ -118,6 +120,9 @@ export function useInvalidateBooks() {
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
 			queryClient.invalidateQueries({ queryKey: ["templates"] }),
 			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
+			queryClient.invalidateQueries({ queryKey: ["documents"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-targets"] }),
+			queryClient.invalidateQueries({ queryKey: ["deposit-suggestions"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
 		])
 }

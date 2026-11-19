@@ -692,6 +692,7 @@ pub(crate) mod tests {
             totals: totals(&lines, mode),
             lines,
             paid: 0,
+            last_payment_account_id: None,
             source_document_id: None,
             transaction_id: None,
             pdf_attachment_id: None,

@@ -97,7 +97,9 @@ fn validate(conn: &Connection, input: &PlanInput) -> AppResult<(String, String)>
 
 const SELECT: &str = "
     SELECT p.id, p.partner_id, p.name, p.amount, p.revenue_account_id, p.start_month, p.end_month, p.memo,
-           EXISTS (SELECT 1 FROM recurring_payments WHERE plan_id = p.id)
+           (EXISTS (SELECT 1 FROM recurring_payments WHERE plan_id = p.id)
+            OR EXISTS (SELECT 1 FROM recurring_invoices i JOIN document_payments d ON d.document_id = i.document_id
+                       WHERE i.plan_id = p.id))
     FROM recurring_plans p";
 
 fn from_row(row: &Row<'_>) -> rusqlite::Result<Plan> {
@@ -378,46 +380,41 @@ fn payments_by_month(conn: &Connection) -> AppResult<HashMap<(i64, String), (i64
     Ok(map)
 }
 
-/// 請求書への入金を、プランと月ごとに分けたもの。全額入金なら予定額ちょうど。
+/// 請求書への実入金を、請求書作成時の割合でプランごとに配分する。
 fn invoice_payments(conn: &Connection) -> AppResult<Vec<((i64, String), i64)>> {
     let mut stmt = conn.prepare(
-        "SELECT r.plan_id, r.month, r.document_id FROM recurring_invoices r
+        "SELECT r.plan_id, r.month, r.document_id, r.allocation_weight FROM recurring_invoices r
          JOIN documents d ON d.id = r.document_id
          WHERE d.status NOT IN ('draft', 'canceled')
          ORDER BY r.document_id, r.plan_id, r.month",
     )?;
-    let links: Vec<(i64, String, i64)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-        .collect::<Result<_, _>>()?;
-    if links.is_empty() {
-        return Ok(Vec::new());
-    }
-    let plans: HashMap<i64, Plan> = list(conn)?.into_iter().map(|p| (p.id, p)).collect();
-    let mut by_document: HashMap<i64, Vec<(i64, String, i64)>> = HashMap::new();
-    for (plan_id, month, document_id) in links {
-        let scheduled = plans
-            .get(&plan_id)
-            .map_or(0, |p| schedule(p).scheduled(&month));
-        by_document
-            .entry(document_id)
-            .or_default()
-            .push((plan_id, month, scheduled));
-    }
+    let links = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, i64>(3)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
     let mut result = Vec::new();
-    for (document_id, items) in by_document {
-        let d = super::documents::get(conn, document_id)?;
-        let total_scheduled: i64 = items.iter().map(|i| i.2).sum();
-        let fully_paid = d.paid >= d.totals.total;
-        for (plan_id, month, scheduled) in items {
-            let received = if fully_paid {
-                scheduled
-            } else if total_scheduled > 0 {
-                d.paid * scheduled / total_scheduled
-            } else {
-                0
-            };
+    for items in links.chunk_by(|a, b| a.2 == b.2) {
+        let d = super::documents::get(conn, items[0].2)?;
+        let total_weight: i128 = items.iter().map(|i| i128::from(i.3)).sum();
+        if d.paid <= 0 || total_weight == 0 {
+            continue;
+        }
+        let mut cumulative = 0;
+        let mut allocated = 0;
+        for (plan_id, month, _, weight) in items {
+            cumulative += i128::from(*weight);
+            let through = (i128::from(d.paid) * cumulative / total_weight) as i64;
+            let received = through - allocated;
+            allocated = through;
             if received > 0 {
-                result.push(((plan_id, month), received));
+                result.push(((*plan_id, month.clone()), received));
             }
         }
     }
@@ -667,6 +664,7 @@ pub fn assign(
                 },
                 lines,
             },
+            false,
         )?;
         tx.execute(
             "UPDATE recurring_payments SET plan_id = ?2, partner_id = ?3, target_month = ?4
@@ -785,8 +783,8 @@ pub fn draft_invoices(db: &Database, year: i64, month: u32) -> AppResult<DraftIn
             )?;
             for p in &plans {
                 tx.execute(
-                    "INSERT INTO recurring_invoices (plan_id, month, document_id) VALUES (?1, ?2, ?3)",
-                    params![p.id, key, id],
+                    "INSERT INTO recurring_invoices (plan_id, month, document_id, allocation_weight) VALUES (?1, ?2, ?3, ?4)",
+                    params![p.id, key, id, schedule(p).scheduled(&key)],
                 )?;
             }
             documents.push(super::documents::get(tx, id)?);

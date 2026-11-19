@@ -7,7 +7,7 @@
 //! | 定額法 | 取得価額 × 定額法の償却率 × 使った月数 / 12 |
 //! | 定率法（200%） | 期首の帳簿価額 × 定率法の償却率。償却保証額（取得価額 × 保証率）を下回った年からは、改定取得価額 × 改定償却率 |
 //! | 一括償却資産 | 取得価額 / 3 を 3 年。月割しない。帳簿価額は 0 まで |
-//! | 少額減価償却資産の特例 | 取得した年に全額。帳簿価額は 0 まで（青色申告・30 万円未満） |
+//! | 少額減価償却資産の特例 | 取得した年に全額。帳簿価額は 0 まで（青色申告・取得時期ごとの上限あり） |
 //!
 //! - 定額法・定率法は、帳簿価額を 1 円（備忘価額）残す。取得した年と手放した年は月割にする
 //!   （1 か月未満は 1 か月）
@@ -40,7 +40,13 @@ string_enum! {
 }
 
 /// 少額減価償却資産の特例を使える取得価額の上限（この額未満）。
-pub const SMALL_ASSET_LIMIT: i64 = 300_000;
+fn small_asset_limit(acquired: (i64, u32)) -> Option<i64> {
+    match acquired {
+        (2006, 4..=12) | (2007..=2025, _) | (2026, 1..=3) => Some(300_000),
+        (2026, 4..=12) | (2027..=2028, _) | (2029, 1..=3) => Some(400_000),
+        _ => None,
+    }
+}
 /// 少額減価償却資産の特例を使える、1 年の合計の上限。
 pub const SMALL_ASSET_YEARLY_LIMIT: i64 = 3_000_000;
 /// 一括償却資産にできる取得価額の上限（この額未満）。
@@ -179,7 +185,11 @@ pub fn validate(asset: &Asset) -> AppResult<()> {
             }
         }
         Method::SmallAsset => {
-            if asset.cost >= SMALL_ASSET_LIMIT {
+            let limit = small_asset_limit(asset.acquired).ok_or(AppError::field(
+                ErrorCode::SmallAssetIneligible,
+                "acquiredOn",
+            ))?;
+            if !(100_000..limit).contains(&asset.cost) {
                 return Err(AppError::field(ErrorCode::OutOfRange, "cost"));
             }
         }
@@ -483,7 +493,7 @@ mod tests {
         assert_eq!(validate(&old).unwrap_err().field, Some("acquiredOn"));
         let no_rate = asset(240_000, (2026, 4), Method::DecliningBalance, 30);
         assert_eq!(validate(&no_rate).unwrap_err().field, Some("usefulLife"));
-        let too_big = asset(300_000, (2026, 4), Method::SmallAsset, 4);
+        let too_big = asset(400_000, (2026, 4), Method::SmallAsset, 4);
         assert_eq!(validate(&too_big).unwrap_err().field, Some("cost"));
         let lump = asset(200_000, (2026, 4), Method::LumpSum, 0);
         assert_eq!(validate(&lump).unwrap_err().field, Some("cost"));

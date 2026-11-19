@@ -66,6 +66,8 @@ pub struct RegistrationInput {
     pub tax_status: TaxStatus,
     #[serde(default)]
     pub simplified_category: Option<i64>,
+    #[serde(default)]
+    pub was_exempt: Option<bool>,
 }
 
 fn valid_category(category: Option<i64>) -> AppResult<Option<i64>> {
@@ -109,6 +111,14 @@ pub fn save_registration(
         if changed == 0 {
             return Err(AppError::new(ErrorCode::NotSetUp));
         }
+        tx.execute(
+            "UPDATE fiscal_years
+             SET invoice_tax_start = CASE WHEN
+                 coalesce(?2, tax_status IN ('exempt', 'special20') OR invoice_tax_start IS NOT NULL)
+                 THEN ?3 END
+             WHERE year = ?1 AND status = 'open'",
+            params![registration_year, input.was_exempt, date],
+        )?;
         tx.execute(
             "UPDATE fiscal_years SET tax_status = ?1
              WHERE year = ?2 AND (year >= ?3 OR tax_status <> 'exempt')",
@@ -215,11 +225,23 @@ fn year_status(conn: &Connection, year: i64) -> AppResult<TaxStatus> {
 
 /// 年度で課税として扱う最初の日。
 pub(crate) fn taxable_from(conn: &Connection, year: i64) -> AppResult<Option<String>> {
-    let status = year_status(conn, year)?;
+    let (status, start) = conn
+        .query_row(
+            "SELECT tax_status, invoice_tax_start FROM fiscal_years WHERE year = ?1",
+            [year],
+            |row| {
+                Ok((
+                    row.get::<_, TaxStatus>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or(AppError::field(ErrorCode::NotFound, "fiscalYear"))?;
     Ok(filing::taxable_from(
         year,
         status == TaxStatus::Exempt,
-        registered_on(conn)?.as_deref(),
+        start.as_deref(),
     ))
 }
 
@@ -381,6 +403,7 @@ pub struct IncomeGuide {
     pub deduction: i64,
     /// e-Tax でも優良な電子帳簿でもないときの控除の額（65 万円 → 55 万円）
     pub deduction_on_paper: i64,
+    pub income_on_paper: i64,
     /// 申告書の事業所得の所得金額
     pub income: i64,
     /// 決算書の金額に直すところがある（決算の画面で確かめる）
@@ -461,7 +484,11 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         .iter()
         .find(|l| l.key == "sales")
         .map_or(0, |l| l.amount);
-    let deduction_on_paper = st.deduction.min(filing::paper_deduction_cap());
+    let deduction_on_paper = if amounts.filing_type == FilingType::Blue65 {
+        st.deduction.min(filing::paper_deduction_cap())
+    } else {
+        st.deduction
+    };
     let mut returns = vec![
         item("return_revenue", "ア", "", "", business_revenue, false),
         item("return_income", "①", "", "", st.income, false),
@@ -499,6 +526,7 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         income_before_deduction: st.income_before_deduction,
         deduction: st.deduction,
         deduction_on_paper,
+        income_on_paper: st.income_before_deduction - deduction_on_paper,
         income: st.income,
         issue_count: st.issues.len(),
     })
@@ -828,6 +856,7 @@ mod tests {
                 fiscal_year: 2026,
                 tax_status: status,
                 simplified_category: category,
+                was_exempt: None,
             },
         )
     }
@@ -898,10 +927,7 @@ mod tests {
         );
         let conn = db.conn();
         assert_eq!(year_status(&conn, 2026).unwrap(), TaxStatus::Simplified);
-        assert_eq!(
-            registered_on(&conn).unwrap().as_deref(),
-            Some("2026-10-01")
-        );
+        assert_eq!(registered_on(&conn).unwrap().as_deref(), Some("2026-10-01"));
     }
 
     #[test]
@@ -1048,6 +1074,10 @@ mod tests {
         assert_eq!(march.value, 300_000);
         // 65 万円の控除は、紙で出すなら 55 万円まで
         assert_eq!(guide.deduction_on_paper, guide.deduction.min(550_000));
+        assert_eq!(
+            guide.income_on_paper,
+            guide.income_before_deduction - guide.deduction_on_paper
+        );
         let ret = &guide.sections[4].items;
         assert_eq!(ret[0].value, 300_000);
         assert_eq!(ret[1].value, guide.income);

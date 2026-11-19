@@ -275,7 +275,8 @@ it("登録した摘要で科目を確認し、日付・金額を入力して記�
 					defaultPartnerId: null,
 				},
 			]
-		if (command === "post_purpose") return { id: 10, lines: [] }
+		if (command === "post_purpose")
+			return { id: 10, date: "2026-01-01", fiscalYear: 2026, lines: [] }
 		return previous?.(command, args)
 	})
 	const user = userEvent.setup()

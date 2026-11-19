@@ -121,15 +121,32 @@ function Methods({ report }: { report: ConsumptionReport }) {
 			<h3 className="font-bold text-sm">{t("methodsTitle")}</h3>
 			<div className="grid gap-4 md:grid-cols-2">
 				<div className="flex flex-col gap-2 rounded-lg border p-4">
-					<p className="font-bold text-sm">{t("special20")}</p>
-					<p className="text-muted-foreground text-xs">{t("special20Hint")}</p>
-					{report.tax.special20 ? (
-						<PayableList
-							payable={report.tax.special20}
-							label={t("special20")}
-						/>
+					{report.tax.special30 ? (
+						<>
+							<p className="font-bold text-sm">{t("special30")}</p>
+							<p className="text-muted-foreground text-xs">
+								{t("special30Hint")}
+							</p>
+							<PayableList
+								payable={report.tax.special30}
+								label={t("special30")}
+							/>
+						</>
 					) : (
-						<p className="text-sm">{t("special20NotPeriod")}</p>
+						<>
+							<p className="font-bold text-sm">{t("special20")}</p>
+							<p className="text-muted-foreground text-xs">
+								{t("special20Hint")}
+							</p>
+							{report.tax.special20 ? (
+								<PayableList
+									payable={report.tax.special20}
+									label={t("special20")}
+								/>
+							) : (
+								<p className="text-sm">{t("special20NotPeriod")}</p>
+							)}
+						</>
 					)}
 				</div>
 				<div className="flex flex-col gap-2 rounded-lg border p-4">

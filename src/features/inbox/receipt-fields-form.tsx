@@ -50,7 +50,13 @@ export function ReceiptFieldsForm({
 		flagged(check) ? t(`check_${check}`) : undefined
 	const error = (field: string) => {
 		const e = fieldError(save.error, field)
-		return e ? errorMessage(e) : undefined
+		if (!e) return undefined
+		if (field === "date")
+			return t(e.code === "required" ? "dateRequired" : "dateInvalid")
+		if (field === "reducedAmount" && e.code === "outOfRange")
+			return t("reducedAmountInvalid")
+		if (field === "total" && e.code === "outOfRange") return t("totalInvalid")
+		return errorMessage(e)
 	}
 
 	const submit = (e: FormEvent) => {
@@ -86,7 +92,7 @@ export function ReceiptFieldsForm({
 				error={error("date")}
 			>
 				<Input
-					type="date"
+					placeholder="YYYY-MM-DD"
 					value={date}
 					onChange={(e) => setDate(e.target.value)}
 					className={

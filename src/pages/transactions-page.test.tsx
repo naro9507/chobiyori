@@ -7,6 +7,7 @@ import { createAppRouter } from "@/app/router"
 import type { Transaction } from "@/features/journal/journal-api"
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useSimpleEntryDrafts } from "@/stores/simple-entry-draft-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
 
@@ -47,6 +48,8 @@ const accounts = [
 	account(4, "401", "売上高", "revenue"),
 	account(5, "610", "消耗品費", "expense"),
 	account(6, "613", "給料賃金", "expense"),
+	account(7, "106", "売掛金", "asset"),
+	account(8, "301", "事業主借", "equity"),
 ]
 
 const compound: Transaction = {
@@ -138,9 +141,9 @@ function saved(input: Transaction | Record<string, unknown>, id = 99) {
 	return { id, fiscalYear: 2026, kind: "normal", ...input } as Transaction
 }
 
-function renderPage() {
+function renderPage(path = "/transactions") {
 	const router = createAppRouter(
-		createMemoryHistory({ initialEntries: ["/transactions"] })
+		createMemoryHistory({ initialEntries: [path] })
 	)
 	render(
 		<AppProviders>
@@ -150,6 +153,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+	useSimpleEntryDrafts.setState({ forms: {} })
 	transactions = []
 	failNext = null
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
@@ -163,6 +167,22 @@ beforeEach(() => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
+			case "list_fiscal_years":
+				return [
+					{
+						year: 2026,
+						filingType: "blue65",
+						taxStatus: "exempt",
+						closed: false,
+					},
+				]
+			case "opening_balances":
+				return {
+					fiscalYear: 2026,
+					rows: [],
+					totals: { assets: 0, liabilitiesAndCapital: 0, balanced: true },
+					confirmed: false,
+				}
 			case "list_accounts":
 				return accounts
 			case "list_partners":
@@ -193,41 +213,53 @@ beforeEach(() => {
 				}
 			case "create_simple_transaction": {
 				const { input } = args
-				const debit =
-					input.kind === "expense" ? input.accountId : input.paymentAccountId
-				const credit =
-					input.kind === "expense" ? input.paymentAccountId : input.accountId
-				return saved({
-					date: input.date,
-					entryMode: "simple",
-					memo: input.memo,
-					lines: [
-						{
-							id: 1,
-							lineNo: 1,
-							side: "debit",
-							accountId: debit,
-							amount: input.amount,
-							partnerId: null,
-							memo: "",
-							subAccountId: null,
-							taxCategory: null,
-							isQualifiedInvoice: false,
-						},
-						{
-							id: 2,
-							lineNo: 2,
-							side: "credit",
-							accountId: credit,
-							amount: input.amount,
-							partnerId: null,
-							memo: "",
-							subAccountId: null,
-							taxCategory: null,
-							isQualifiedInvoice: false,
-						},
-					],
-				})
+				const isExpense = ["expense", "personal_expense"].includes(input.kind)
+				const debit = isExpense
+					? input.accountId
+					: input.kind === "unpaid_income"
+						? 7
+						: input.paymentAccountId
+				const credit = !isExpense
+					? input.accountId
+					: input.kind === "personal_expense"
+						? 8
+						: input.paymentAccountId
+				const transaction = saved(
+					{
+						date: input.date,
+						entryMode: "simple",
+						memo: input.memo,
+						lines: [
+							{
+								id: 1,
+								lineNo: 1,
+								side: "debit",
+								accountId: debit,
+								amount: input.amount,
+								partnerId: null,
+								memo: "",
+								subAccountId: null,
+								taxCategory: null,
+								isQualifiedInvoice: false,
+							},
+							{
+								id: 2,
+								lineNo: 2,
+								side: "credit",
+								accountId: credit,
+								amount: input.amount,
+								partnerId: null,
+								memo: "",
+								subAccountId: null,
+								taxCategory: null,
+								isQualifiedInvoice: false,
+							},
+						],
+					},
+					99 + transactions.length
+				)
+				transactions.push(transaction)
+				return transaction
 			}
 			case "create_transaction":
 			case "update_transaction":
@@ -286,6 +318,83 @@ describe("かんたん入力", () => {
 		// 続けて入力できるよう、金額とメモだけを空にする
 		expect(within(form).getByLabelText("金額")).toHaveValue("")
 		expect(within(form).getByLabelText("どこから払ったか")).toHaveValue("1")
+		await user.click(
+			within(form).getByRole("link", { name: "この取引を確認・修正" })
+		)
+		expect(await screen.findByLabelText("変更する行の金額")).toHaveValue("1200")
+	})
+
+	it("ヘルプやタブに移動しても同じ年度の下書きが残る", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		const simple = () => screen.findByRole("form", { name: "かんたん入力" })
+		const form = await simple()
+		await user.type(within(form).getByLabelText("金額"), "1,280")
+		await user.type(within(form).getByLabelText("メモ"), "立替分")
+		await user.click(screen.getByRole("link", { name: "この画面のヘルプ" }))
+		await screen.findByRole("heading", { name: "ヘルプ", level: 1 })
+		const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+		await user.click(within(nav).getByRole("link", { name: "取引入力" }))
+		expect(within(await simple()).getByLabelText("金額")).toHaveValue("1,280")
+		await user.click(screen.getByRole("tab", { name: "複合仕訳" }))
+		await user.click(screen.getByRole("tab", { name: "かんたん入力" }))
+		expect(within(await simple()).getByLabelText("メモ")).toHaveValue("立替分")
+	})
+
+	it("空欄のまま記録すると項目ごとに入力方法を示す", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		const form = await screen.findByRole("form", { name: "かんたん入力" })
+		await user.click(within(form).getByRole("button", { name: "記録する" }))
+		expect(within(form).getByLabelText("金額")).toHaveAccessibleDescription(
+			/金額を入れてください/
+		)
+		expect(
+			within(form).getByLabelText("どこから払ったか")
+		).toHaveAccessibleDescription(/口座を選んでください/)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"create_simple_transaction",
+			expect.anything()
+		)
+	})
+
+	it("開業時のホームから期首残高のタブへ進める", async () => {
+		const user = userEvent.setup()
+		renderPage("/")
+		await user.click(
+			await screen.findByRole("link", { name: /開業時の残高を入れる/ })
+		)
+		expect(
+			await screen.findByRole("tab", { name: "期首残高" })
+		).toHaveAttribute("aria-selected", "true")
+	})
+
+	it("立替経費と未入金の売上を事業用口座の選択なしで記録できる", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		const form = within(
+			await screen.findByRole("form", { name: "かんたん入力" })
+		)
+		await user.type(form.getByLabelText("金額"), "1280")
+		await user.selectOptions(
+			form.getByLabelText("何に使ったか"),
+			"610 消耗品費"
+		)
+		await user.selectOptions(
+			form.getByLabelText("どこから払ったか"),
+			"私用のお金・カードで立て替えた"
+		)
+		await user.click(form.getByRole("button", { name: "記録する" }))
+		await form.findByText(/消耗品費.*事業主借/)
+		await user.click(form.getByRole("radio", { name: "収入" }))
+		await user.click(
+			form.getByRole("checkbox", { name: "まだ入金されていない売上" })
+		)
+		expect(form.queryByLabelText("どこに入ったか")).not.toBeInTheDocument()
+		await user.type(form.getByLabelText("金額"), "11000")
+		await user.selectOptions(form.getByLabelText("何の売上か"), "401 売上高")
+		await user.click(form.getByRole("button", { name: "記録する" }))
+		await form.findByText(/売掛金.*売上高/)
 	})
 
 	it("事業主の出し入れでは、内容の科目を尋ねない", async () => {
@@ -381,10 +490,12 @@ describe("かんたん入力", () => {
 
 	it("年度の外の日付は、直し方が分かる文で入力欄に示す", async () => {
 		const user = userEvent.setup()
-		failNext = { code: "outOfRange", field: "date" }
 		renderPage()
 		const form = await screen.findByRole("form", { name: "かんたん入力" })
 
+		const date = within(form).getByLabelText("日付")
+		await user.clear(date)
+		await user.type(date, "2025-11-19")
 		await user.click(within(form).getByRole("button", { name: "記録する" }))
 
 		expect(

@@ -64,7 +64,7 @@ windows = { version = "=0.62.2", features = ["Data_Xml_Dom", "Foundation", "UI_N
 block2 = "=0.6.2"
 objc2 = "=0.6.5"
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSBundle", "NSError", "NSString"] }
-objc2-user-notifications = { version = "=0.3.2", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationTrigger", "UNUserNotificationCenter"] }
+objc2-user-notifications = { version = "=0.3.2", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSettings", "UNNotificationTrigger", "UNUserNotificationCenter"] }
 
 [profile.release]
 # 配布サイズとメモリ使用量を抑える

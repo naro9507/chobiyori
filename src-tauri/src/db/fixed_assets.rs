@@ -105,6 +105,16 @@ impl FixedAsset {
     }
 }
 
+fn filing_type(conn: &Connection, year: i64) -> AppResult<Option<FilingType>> {
+    Ok(conn
+        .query_row(
+            "SELECT filing_type FROM fiscal_years WHERE year = ?1",
+            [year],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 /// 入力を確かめて、保存する値にする。
 fn validate(conn: &Connection, input: &FixedAssetInput) -> AppResult<(FixedAssetInput, Asset)> {
     let name = master::required(&input.name, NAME_MAX, "name")?;
@@ -155,6 +165,11 @@ fn validate(conn: &Connection, input: &FixedAssetInput) -> AppResult<(FixedAsset
         disposed,
     };
     depreciation::validate(&asset)?;
+    if asset.method == Method::SmallAsset
+        && filing_type(conn, acquired.0)? == Some(FilingType::White)
+    {
+        return Err(AppError::field(ErrorCode::SmallAssetIneligible, "method"));
+    }
     Ok((
         FixedAssetInput {
             name,
@@ -209,8 +224,25 @@ pub fn create(conn: &Connection, input: &FixedAssetInput) -> AppResult<FixedAsse
 }
 
 pub fn update(conn: &Connection, id: i64, input: &FixedAssetInput) -> AppResult<FixedAsset> {
-    get(conn, id)?;
-    let (v, _) = validate(conn, input)?;
+    let current = get(conn, id)?;
+    let (v, next) = validate(conn, input)?;
+    if current.in_use {
+        let old = current
+            .to_asset()
+            .ok_or(AppError::new(ErrorCode::Database))?;
+        let mut stmt =
+            conn.prepare("SELECT fiscal_year FROM depreciation_postings WHERE asset_id = ?1")?;
+        for year in stmt.query_map([id], |row| row.get::<_, i64>(0))? {
+            let year = year?;
+            if current.account_id != v.account_id
+                || depreciation::for_year(&old, year) != depreciation::for_year(&next, year)
+                || old.disposed.filter(|(y, _)| *y == year)
+                    != next.disposed.filter(|(y, _)| *y == year)
+            {
+                return Err(AppError::new(ErrorCode::InUse));
+            }
+        }
+    }
     conn.execute(
         "UPDATE fixed_assets SET name = ?2, account_id = ?3, acquired_on = ?4, cost = ?5, useful_life = ?6,
              method = ?7, business_percent = ?8, book_value_year = ?9, book_value = ?10, disposed_on = ?11, memo = ?12
@@ -275,14 +307,8 @@ fn postings(conn: &Connection, year: i64) -> AppResult<HashMap<i64, i64>> {
 
 /// 年 `year` の償却の一覧。その年に持っていた資産（記録した資産も）を出す。
 pub fn for_year(conn: &Connection, year: i64) -> AppResult<DepreciationYear> {
-    let filing: Option<FilingType> = conn
-        .query_row(
-            "SELECT filing_type FROM fiscal_years WHERE year = ?1",
-            [year],
-            |r| r.get(0),
-        )
-        .optional()?;
-    let filing = filing.ok_or(AppError::field(ErrorCode::NotFound, "fiscalYear"))?;
+    let filing =
+        filing_type(conn, year)?.ok_or(AppError::field(ErrorCode::NotFound, "fiscalYear"))?;
     let posted = postings(conn, year)?;
     let mut assets = Vec::new();
     let mut small_asset_total = 0;
@@ -320,15 +346,33 @@ pub fn record(db: &Database, year: i64, asset_ids: &[i64]) -> AppResult<usize> {
         ensure_year_open(tx, year)?;
         let expense = account_by_line(tx, "pl.depreciation")?;
         let drawings = account_by_line(tx, "bs.owner_drawings")?;
+        let filing = filing_type(tx, year)?;
         let posted = postings(tx, year)?;
+        let mut small_asset_total: i64 = tx.query_row(
+            "SELECT coalesce(sum(f.cost), 0) FROM depreciation_postings p
+             JOIN fixed_assets f ON f.id = p.asset_id
+             WHERE p.fiscal_year = ?1 AND f.method = 'small_asset'",
+            [year], |row| row.get(0),
+        )?;
+        let mut seen = std::collections::HashSet::new();
         let mut count = 0;
         for &id in asset_ids {
             let asset = get(tx, id).map_err(|_| AppError::field(ErrorCode::NotFound, "assetId"))?;
-            if posted.contains_key(&id) {
+            if posted.contains_key(&id) || !seen.insert(id) {
                 continue;
             }
             let Some(calc) = asset.to_asset() else { continue };
             let Some(d) = depreciation::for_year(&calc, year) else { continue };
+            if calc.method == Method::SmallAsset {
+                if filing == Some(FilingType::White) {
+                    return Err(AppError::new(ErrorCode::SmallAssetIneligible));
+                }
+                depreciation::validate(&calc)?;
+                small_asset_total += calc.cost;
+                if small_asset_total > depreciation::SMALL_ASSET_YEARLY_LIMIT {
+                    return Err(AppError::new(ErrorCode::SmallAssetLimit));
+                }
+            }
             let date = match calc.disposed {
                 Some((y, m)) if y == year => format!("{y:04}-{m:02}-{:02}", journal::days_in_month(y, m)),
                 _ => format!("{year:04}-12-31"),
