@@ -17,6 +17,7 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 }))
 
 let book: BookStatus
+let linked: "google" | null
 let locks: LockStatus
 
 function renderApp(path = "/") {
@@ -34,11 +35,16 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
 	book = { state: "encrypted", unlocked: false }
+	linked = null
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
+				case "login_status":
+					return { google: true, microsoft: true, linked }
+				case "open_with_login":
+					throw { code: args?.online ? "loginMismatch" : "deviceAuthFailed" }
 				case "book_status":
 					return book
 				case "unlock_books":
@@ -94,12 +100,31 @@ describe("起動時のパスワード", () => {
 		).toBeInTheDocument()
 	})
 
+	it("別アカウントや端末認証の失敗では帳簿を読み込まない", async () => {
+		linked = "google"
+		const user = userEvent.setup()
+		renderApp()
+		await user.click(
+			await screen.findByRole("button", { name: "Google でログインして開く" })
+		)
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"この帳簿に連携したアカウント"
+		)
+		await user.click(
+			screen.getByRole("button", { name: "端末の本人確認で開く" })
+		)
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"端末での本人確認を完了できませんでした"
+		)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
+		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
+	})
 	it("初めての起動では、2 回入れたパスワードがそろうまで作らない", async () => {
 		const user = userEvent.setup()
 		book = { state: "notCreated", unlocked: false }
 		renderApp()
 		expect(
-			await screen.findByText(/忘れると帳簿もバックアップも開けなくなります/)
+			await screen.findByText(/バックアップの復元には帳簿パスワードが必要です/)
 		).toBeInTheDocument()
 		await user.type(screen.getByLabelText("パスワード"), "first password")
 		await user.type(

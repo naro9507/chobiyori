@@ -36,9 +36,11 @@ export function useOpenBooks() {
 }
 
 export function useChangePassword() {
+	const client = useQueryClient()
 	return useMutation({
 		mutationFn: (input: { current: string; new: string }) =>
 			callCommand<void>("change_password", input),
+		onSuccess: () => client.invalidateQueries({ queryKey: ["device-login"] }),
 	})
 }
 

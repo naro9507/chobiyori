@@ -42,12 +42,12 @@ pub async fn book_status(app: AppHandle, files: State<'_, BookFiles>) -> AppResu
 }
 
 /// 開けた帳簿をアプリに登録する。2 回目以降は何もしない（もう開いている）。
-fn open_books(app: &AppHandle, db: Database) {
+pub(super) fn open_books(app: &AppHandle, db: Database) {
     db.mark_backed_up();
     app.manage(db);
 }
 
-fn ensure_not_open(app: &AppHandle) -> AppResult<()> {
+pub(super) fn ensure_not_open(app: &AppHandle) -> AppResult<()> {
     if app.try_state::<Database>().is_some() {
         return Err(AppError::new(ErrorCode::AlreadySetUp));
     }
@@ -100,10 +100,13 @@ pub async fn encrypt_books(
 #[tauri::command]
 pub async fn change_password(
     db: State<'_, Database>,
+    login: State<'_, super::account_login::LoginState>,
     current: String,
     new: String,
 ) -> AppResult<()> {
+    let _guard = login.0.lock().await;
     vault::change_password(&db, &current, &new)?;
+    super::account_login::discard_device_record();
     audit::event(&db.conn(), "books", "change_password", None, None)
 }
 
@@ -221,6 +224,7 @@ pub async fn inspect_backup(
 /// 選んだバックアップから復元する。入れ替える前に、いまの帳簿のバックアップを作る。
 #[tauri::command]
 pub async fn restore_backup(
+    login: State<'_, super::account_login::LoginState>,
     db: State<'_, Database>,
     files: State<'_, BookFiles>,
     state: State<'_, RestoreState>,
@@ -228,7 +232,9 @@ pub async fn restore_backup(
 ) -> AppResult<()> {
     let path = chosen(&state)?;
     let dir = backup_dir(&db, &files)?;
+    let _guard = login.0.lock().await;
     backup::restore(&db, &path, password.as_deref(), &dir)?;
+    super::account_login::discard_device_record();
     *state.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     Ok(())
 }

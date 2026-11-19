@@ -10,6 +10,7 @@ import { LabeledCheckbox } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 import { FilingCalendarExport } from "./filing-calendar-export"
+import { FilingCalendarSyncSettings } from "./filing-calendar-sync"
 
 export function FilingReminderSettings() {
 	const t = useTranslations("filing")
@@ -60,6 +61,7 @@ export function FilingReminderSettings() {
 						</p>
 					)}
 				</div>
+				<FilingCalendarSyncSettings />
 				<FilingCalendarExport />
 			</CardContent>
 		</Card>

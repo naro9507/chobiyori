@@ -29,6 +29,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::import::ImportState::default())
         .manage(commands::inbox::StatementState::default())
+        .manage(commands::filing_calendar_sync::CalendarSyncState::default())
         .setup(|app| {
             // 自動アップデート。更新の確認と適用は画面側から行う
             #[cfg(desktop)]
@@ -45,12 +46,17 @@ pub fn run() {
             });
             Ok(())
         })
+        .manage(commands::account_login::LoginState::default())
         .manage(commands::security::RestoreState::default())
         .invoke_handler(tauri::generate_handler![
             commands::app::app_info,
             commands::security::book_status,
             commands::security::create_books,
             commands::security::unlock_books,
+            commands::account_login::login_status,
+            commands::account_login::link_login,
+            commands::account_login::unlink_login,
+            commands::account_login::open_with_login,
             commands::security::encrypt_books,
             commands::security::change_password,
             commands::security::backup_settings,
@@ -111,6 +117,10 @@ pub fn run() {
             commands::books::sales_book,
             commands::export::export_report,
             commands::export::export_filing_calendar,
+            commands::filing_calendar_sync::filing_calendar_connection,
+            commands::filing_calendar_sync::connect_filing_calendar,
+            commands::filing_calendar_sync::disconnect_filing_calendar,
+            commands::filing_calendar_sync::sync_filing_calendar,
             commands::import::choose_import_file,
             commands::import::preview_import,
             commands::import::run_import,

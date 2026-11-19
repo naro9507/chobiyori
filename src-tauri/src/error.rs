@@ -91,6 +91,15 @@ pub enum ErrorCode {
     MailAuth,
     /// メールを送れなかった（つながらない・相手のアドレスが受け付けられない）
     MailFailed,
+    /// カレンダーの承認が取り消されたか、期限が切れた
+    CalendarAuth,
+    /// ブラウザでの連携を取り消したか、制限時間を過ぎた
+    CalendarCancelled,
+    /// カレンダーサービスへの接続や同期が失敗した
+    CalendarFailed,
+    LoginFailed,
+    LoginMismatch,
+    DeviceAuthFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

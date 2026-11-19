@@ -8,6 +8,21 @@
 4. 利用者が「今すぐ更新」を押すと、ダウンロードして入れ替え、アプリを再起動する。
 5. 再起動したあと、画面の上部に「バージョン ○○ に更新しました」と変更点を出す。設定画面の「変更履歴」で、これまでの変更点をいつでも見られる。
 
+## カレンダー同期を有効にする
+
+カレンダー同期には、帳日和用の OAuth アプリ登録が必要。ローカルビルドでは下記の名前で環境変数を設定する。リリースでは GitHub Actions の Variables と Secrets に設定する。値がそろっているサービスを設定画面から連携できる。両サービスとも、同じアカウントで再連携したときに専用カレンダーを再利用するために `openid` を使う。
+
+| サービス | アプリ登録 | GitHub Actions |
+|---|---|---|
+| Google カレンダー | Calendar API を有効にし、デスクトップ アプリの OAuth クライアントを作成。OAuth 同意画面には `https://www.googleapis.com/auth/calendar.app.created` を設定する。公開前の確認ではテストユーザーを登録し、一般配布前に同意画面を公開する。 | Variable `CHOBIYORI_GOOGLE_CALENDAR_CLIENT_ID` と Secret `CHOBIYORI_GOOGLE_CALENDAR_CLIENT_SECRET` |
+| Outlook | Microsoft Entra で、組織アカウントと個人の Microsoft アカウントをサポートするアプリを作成。「モバイル アプリケーションとデスクトップ アプリケーション」のリダイレクト URI に `http://localhost`、Microsoft Graph の委任アクセス許可に `Calendars.ReadWrite` を設定する。 | Variable `CHOBIYORI_OUTLOOK_CALENDAR_CLIENT_ID` |
+
+Google のデスクトップ用クライアントシークレットは実行ファイルに含まれる。配布用のアプリにはデスクトップ用のクライアントを使う。利用者が許可したあとの更新トークンは、Windows の資格情報マネージャーまたは macOS のキーチェーンに保存する。
+
+帳簿ログインにも同じデスクトップ用 OAuth クライアントを使います。ログイン時のスコープは `openid` のみです。リリース前に Windows Hello を設定した Windows PC と Secure Enclave を搭載した Mac で、設定・終了・再起動、オフライン解除、別アカウントの拒否、端末認証のキャンセル、バックアップ復元後の再連携を確認してください。
+
+ビルドしたアプリの「設定 → 申告期限のお知らせ」で両方を連携し、未提出の申告期限が各カレンダーに終日で表示されることを確かめる。同じ条件で再同期しても予定が増えず、提出済みにすると消え、取り消すと戻ることを確認する。
+
 ## 変更点の書き方
 
 変更点は、リポジトリ直下の `CHANGELOG.md` だけに書く。ここに書いた文が、次の 3 か所にそのまま表示される。

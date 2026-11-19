@@ -13,6 +13,7 @@ name = "chobiyori_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
+cc = "1"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
@@ -46,6 +47,7 @@ lettre = { version = "0.11.23", default-features = false, features = ["builder",
 # 2.7.3（2026-11-10 公開）は 7 日たっていないので 2.7.2 に固定する
 tauri-plugin-opener = "=2.7.2"
 # 証憑のハッシュと、画像を API に送るときの base64
+ring = "0.17.14"
 sha2 = "0.10.9"
 base64 = "0.22.1"
 

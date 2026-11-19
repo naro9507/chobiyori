@@ -189,10 +189,12 @@ const deadline: DeadlineNotice = {
 }
 let notices: DeadlineNotice[]
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
+let calendarConnections: Set<string>
 
 beforeEach(() => {
 	notices = [deadline]
 	calendarResult = "saved"
+	calendarConnections = new Set()
 	useSettingsStore.setState({
 		locale: "ja",
 		theme: "light",
@@ -201,7 +203,7 @@ beforeEach(() => {
 	})
 	useYearStore.setState({ selected: null })
 	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	mocks.callCommand.mockImplementation(async (command: string, args) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -227,11 +229,18 @@ beforeEach(() => {
 					{ key: "submitted", group: "income", doneAt: null },
 					{ key: "consumption_corner", group: "consumption", doneAt: null },
 				]
-			case "set_filing_check":
+			case "set_filing_check": {
+				const submitted = args?.done === true
+				notices = notices.map((notice) => ({ ...notice, submitted }))
 				return [
-					{ key: "submitted", group: "income", doneAt: "2027-03-01T00:00:00Z" },
+					{
+						key: "submitted",
+						group: "income",
+						doneAt: submitted ? "2027-03-01T00:00:00Z" : null,
+					},
 					{ key: "consumption_corner", group: "consumption", doneAt: null },
 				]
+			}
 			case "invoice_registration":
 				return {
 					registrationNo: null,
@@ -256,6 +265,18 @@ beforeEach(() => {
 				}
 			case "filing_deadlines":
 				return notices
+			case "filing_calendar_connection":
+				return calendarConnections.has(args?.provider ?? "")
+					? "connected"
+					: "disconnected"
+			case "connect_filing_calendar":
+				calendarConnections.add(args?.provider ?? "")
+				return null
+			case "disconnect_filing_calendar":
+				calendarConnections.delete(args?.provider ?? "")
+				return null
+			case "sync_filing_calendar":
+				return null
 			case "export_filing_calendar":
 				return calendarResult
 			case "sync_filing_notifications":
@@ -487,6 +508,65 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
+	})
+
+	it("連携したカレンダーだけを同期する", async () => {
+		const user = userEvent.setup()
+		renderAt("/settings")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		const outlook = within(
+			await screen.findByRole("group", { name: "Outlook" })
+		)
+		await user.click(await google.findByRole("button", { name: "連携する" }))
+		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			outlook.getByRole("button", { name: "連携する" })
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "google",
+			today: today(),
+			locale: "ja",
+		})
+		expect(mocks.callCommand).not.toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "outlook",
+			today: today(),
+			locale: "ja",
+		})
+		await user.click(await outlook.findByRole("button", { name: "連携する" }))
+		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "outlook",
+			today: today(),
+			locale: "ja",
+		})
+		await user.click(google.getByRole("button", { name: "連携を解除" }))
+		expect(
+			await google.findByRole("button", { name: "連携する" })
+		).toBeInTheDocument()
+		expect(
+			outlook.getByRole("button", { name: "連携を解除" })
+		).toBeInTheDocument()
+	})
+
+	it("提出済みへの変更とその取り消しを再同期する", async () => {
+		calendarConnections.add("outlook")
+		const user = userEvent.setup()
+		renderAt("/closing")
+		await user.click(await screen.findByRole("tab", { name: "確定申告" }))
+		const submitted = await screen.findByRole("checkbox", {
+			name: "申告書を出した",
+		})
+		const syncCount = () =>
+			mocks.callCommand.mock.calls.filter(
+				([command]) => command === "sync_filing_calendar"
+			).length
+		await waitFor(() => expect(syncCount()).toBe(1))
+		await user.click(submitted)
+		await waitFor(() => expect(syncCount()).toBe(2))
+		await user.click(submitted)
+		await waitFor(() => expect(syncCount()).toBe(3))
 	})
 
 	it("通知をオフにしていてもカレンダーに書き出せ、期限がなければ案内する", async () => {

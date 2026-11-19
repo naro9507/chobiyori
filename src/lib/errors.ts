@@ -48,6 +48,12 @@ export type ErrorCode =
 	| "mailNotConfigured"
 	| "mailAuth"
 	| "mailFailed"
+	| "calendarAuth"
+	| "calendarCancelled"
+	| "calendarFailed"
+	| "deviceAuthFailed"
+	| "loginFailed"
+	| "loginMismatch"
 
 export function isAppError(error: unknown): error is AppError {
 	return (
