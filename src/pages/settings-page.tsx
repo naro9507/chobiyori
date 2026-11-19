@@ -15,6 +15,7 @@ import { PasswordCard } from "@/features/security/password-card"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
 import { FeatureSettingsPanel } from "@/features/setup/feature-settings"
+import { FilingTypeCard } from "@/features/setup/filing-type-card"
 import { useFiscalYear } from "@/features/setup/fiscal-years"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
@@ -47,6 +48,10 @@ export function SettingsPage() {
 			>
 				<SettingsGroup value="business" title={t("businessGroup")}>
 					<BusinessProfileCard />
+					<FilingTypeCard
+						key={`filing-type-${fiscalYear}`}
+						fiscalYear={fiscalYear}
+					/>
 					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
 					<FilingReminderSettings />
 				</SettingsGroup>

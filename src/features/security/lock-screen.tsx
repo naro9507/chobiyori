@@ -1,5 +1,6 @@
 import { KeyRound, Loader2 } from "lucide-react"
 import { type FormEvent, useState } from "react"
+import { LanguageSwitch } from "@/components/layout/language-switch"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -79,7 +80,10 @@ export function LockScreen({ status }: { status: BookStatus }) {
 	const recoveryError = fieldError(open.error, "recoveryCode")
 
 	return (
-		<main className="flex min-h-full items-center justify-center bg-background px-4 py-10">
+		<main className="flex min-h-full flex-col items-center justify-center gap-4 bg-background px-4 py-10">
+			<div className="flex w-full max-w-md justify-end">
+				<LanguageSwitch />
+			</div>
 			<Card className="w-full max-w-md">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">

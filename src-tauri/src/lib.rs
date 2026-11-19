@@ -76,6 +76,7 @@ pub fn run() {
             commands::setup::get_business_profile,
             commands::setup::update_business_profile,
             commands::setup::list_fiscal_years,
+            commands::setup::set_filing_type,
             commands::master::list_purposes,
             commands::master::create_purpose,
             commands::master::update_purpose,

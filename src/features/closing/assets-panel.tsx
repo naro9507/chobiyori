@@ -253,6 +253,7 @@ export function AssetsPanel({ fiscalYear }: { fiscalYear: number | null }) {
 				</Button>
 			</div>
 			<p className="text-muted-foreground text-xs">{t("depreciationNote")}</p>
+			<p className="text-muted-foreground text-xs">{t("assetPurchaseNote")}</p>
 		</div>
 	)
 }
@@ -273,7 +274,7 @@ function AssetForm({
 	const examples = useUsefulLifeExamples().data ?? []
 	const save = useSaveFixedAsset()
 	const accounts = masters.accounts.filter(
-		(a) => a.category === "asset" && (a.isActive || a.id === asset?.accountId)
+		(a) => a.id === asset?.accountId || (a.isActive && isDepreciableAccount(a))
 	)
 	// 取得した年より後から帳簿をつけ始めた資産は、年の初めの帳簿価額を入れる
 	const laterStart =
@@ -521,5 +522,34 @@ function AssetForm({
 				</Button>
 			</div>
 		</form>
+	)
+}
+
+/** 償却しない資産（現金・預金・債権・棚卸資産・土地・事業主貸など）の決算書の行。 */
+const nonDepreciableLines = new Set([
+	"bs.cash",
+	"bs.checking",
+	"bs.time_deposits",
+	"bs.other_deposits",
+	"bs.notes_receivable",
+	"bs.accounts_receivable",
+	"bs.securities",
+	"bs.inventory",
+	"bs.prepayments",
+	"bs.loans_receivable",
+	"bs.land",
+	"bs.owner_drawings",
+])
+
+/** 固定資産の科目として選べるか。口座や、償却しない資産の科目は出さない。 */
+function isDepreciableAccount(a: {
+	category: string
+	isPaymentAccount: boolean
+	statementLine: string | null
+}) {
+	return (
+		a.category === "asset" &&
+		!a.isPaymentAccount &&
+		!nonDepreciableLines.has(a.statementLine ?? "")
 	)
 }

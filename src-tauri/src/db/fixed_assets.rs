@@ -115,20 +115,40 @@ fn filing_type(conn: &Connection, year: i64) -> AppResult<Option<FilingType>> {
         .optional()?)
 }
 
+/// 償却しない資産の決算書の行。固定資産の科目にはしない。
+const NON_DEPRECIABLE_LINES: &[&str] = &[
+    "bs.cash",
+    "bs.checking",
+    "bs.time_deposits",
+    "bs.other_deposits",
+    "bs.notes_receivable",
+    "bs.accounts_receivable",
+    "bs.securities",
+    "bs.inventory",
+    "bs.prepayments",
+    "bs.loans_receivable",
+    "bs.land",
+    "bs.owner_drawings",
+];
+
 /// 入力を確かめて、保存する値にする。
 fn validate(conn: &Connection, input: &FixedAssetInput) -> AppResult<(FixedAssetInput, Asset)> {
     let name = master::required(&input.name, NAME_MAX, "name")?;
     let memo = master::optional(&input.memo, MEMO_MAX, "memo")?;
-    let category: Option<AccountCategory> = conn
+    let account: Option<(AccountCategory, bool, Option<String>)> = conn
         .query_row(
-            "SELECT category FROM accounts WHERE id = ?1",
+            "SELECT category, is_payment_account, statement_line FROM accounts WHERE id = ?1",
             [input.account_id],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .optional()?;
-    match category {
+    match account {
         None => return Err(AppError::field(ErrorCode::NotFound, "accountId")),
-        Some(AccountCategory::Asset) => {}
+        // 口座や、現金・債権・土地など償却しない資産の科目には登録しない
+        Some((AccountCategory::Asset, false, line))
+            if !line
+                .as_deref()
+                .is_some_and(|l| NON_DEPRECIABLE_LINES.contains(&l)) => {}
         Some(_) => return Err(AppError::field(ErrorCode::InvalidFormat, "accountId")),
     }
     let acquired = year_month(&input.acquired_on, "acquiredOn")?;
@@ -426,6 +446,17 @@ pub(crate) mod tests {
             disposed_on: None,
             memo: String::new(),
         }
+    }
+
+    #[test]
+    fn rejects_accounts_that_are_not_depreciated() {
+        let db = set_up_db();
+        let conn = db.conn();
+        for code in ["101", "106", "116", "199"] {
+            let err = create(&conn, &pc(account(&conn, code))).unwrap_err();
+            assert_eq!(err.code, ErrorCode::InvalidFormat, "{code}");
+        }
+        assert!(create(&conn, &pc(account(&conn, "113"))).is_ok());
     }
 
     #[test]

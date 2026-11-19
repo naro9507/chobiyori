@@ -129,6 +129,7 @@ export type StatementIssueCode =
 	| "ownerOpening"
 	| "whiteFiling"
 	| "whiteDeductionExceedsIncome"
+	| "negativeBalance"
 
 export type StatementAmounts = {
 	fiscalYear: number

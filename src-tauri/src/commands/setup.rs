@@ -2,6 +2,7 @@
 
 use crate::db::setup::{self, BusinessProfile, FiscalYear, SetupInput, SetupStatus};
 use crate::db::Database;
+use crate::domain::master::FilingType;
 use crate::error::AppResult;
 use tauri::State;
 
@@ -33,6 +34,16 @@ pub async fn update_business_profile(
 #[tauri::command]
 pub async fn list_fiscal_years(db: State<'_, Database>) -> AppResult<Vec<FiscalYear>> {
     setup::fiscal_years(&db.conn())
+}
+
+/// 年度の申告区分（青色・白色）を変える。
+#[tauri::command]
+pub async fn set_filing_type(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    filing_type: FilingType,
+) -> AppResult<Vec<FiscalYear>> {
+    setup::set_filing_type(&db, fiscal_year, filing_type)
 }
 
 #[tauri::command]
