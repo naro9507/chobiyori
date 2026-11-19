@@ -266,6 +266,12 @@ pub fn restore(db: &Database, source: &Path, password: Option<&str>, dir: &Path)
             let _ = std::fs::remove_file(&incoming);
             return Err(AppError::new(ErrorCode::BackupInvalid));
         }
+        // Imported device enrollments cannot authorize this installation.
+        copy.execute(
+            "DELETE FROM settings WHERE key=?1",
+            [super::vault::DEVICE_BINDING],
+        )?;
+        copy.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
     }
     // 2. いまの帳簿を残す
     create(db, dir, BackupKind::BeforeRestore)?;
@@ -374,6 +380,12 @@ mod tests {
         let backups = dir.path().join("backups");
         let db = books(dir.path());
         add(&db, 1000);
+        db.conn()
+            .execute(
+                "INSERT INTO settings VALUES (?1,'old')",
+                [vault::DEVICE_BINDING],
+            )
+            .unwrap();
         let name = create(&db, &backups, BackupKind::Manual).unwrap();
         let file = backups.join(&name);
         assert_eq!(vault::state(&file).unwrap(), vault::BookState::Encrypted);
@@ -393,6 +405,16 @@ mod tests {
         assert_eq!(count(&db), 3);
         restore(&db, &file, None, &backups).unwrap();
         assert_eq!(count(&db), 1);
+        assert_eq!(
+            db.conn()
+                .query_row(
+                    "SELECT count(*) FROM settings WHERE key=?1",
+                    [vault::DEVICE_BINDING],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
         // 復元の前の帳簿は残っている
         let files = list(&backups).unwrap();
         let before = files

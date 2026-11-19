@@ -20,7 +20,7 @@ pub struct Keyring;
 pub const SMTP_PASSWORD: &str = "smtp-password";
 
 /// OS の資格情報ストアの、名前 `0` の項目。
-pub struct KeyringItem(pub &'static str);
+pub struct KeyringItem<'a>(pub &'a str);
 
 fn entry() -> AppResult<keyring::Entry> {
     entry_for(GEMINI_KEY)
@@ -30,7 +30,24 @@ fn entry_for(name: &str) -> AppResult<keyring::Entry> {
     keyring::Entry::new(SERVICE, name).map_err(|_| AppError::new(ErrorCode::SecretStore))
 }
 
-impl SecretStore for KeyringItem {
+impl KeyringItem<'_> {
+    // OAuth の更新トークンは長いため、Windows の資格情報に UTF-8 バイト列で置く。
+    pub fn get_bytes(&self) -> AppResult<Option<Vec<u8>>> {
+        match entry_for(self.0)?.get_secret() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(AppError::new(ErrorCode::SecretStore)),
+        }
+    }
+
+    pub fn set_bytes(&self, value: &[u8]) -> AppResult<()> {
+        entry_for(self.0)?
+            .set_secret(value)
+            .map_err(|_| AppError::new(ErrorCode::SecretStore))
+    }
+}
+
+impl SecretStore for KeyringItem<'_> {
     fn get(&self) -> AppResult<Option<String>> {
         match entry_for(self.0)?.get_password() {
             Ok(value) => Ok(Some(value)),

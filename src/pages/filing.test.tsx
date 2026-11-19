@@ -200,6 +200,7 @@ const deadline: DeadlineNotice = {
 let notices: DeadlineNotice[]
 let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
+let calendarConnections: Set<string>
 let registration: InvoiceRegistration
 let taxStatus: ConsumptionReport["taxStatus"]
 
@@ -207,6 +208,7 @@ beforeEach(() => {
 	notices = [deadline]
 	scheduleResult = "ready"
 	calendarResult = "saved"
+	calendarConnections = new Set()
 	registration = {
 		registrationNo: null,
 		registeredOn: null,
@@ -255,11 +257,18 @@ beforeEach(() => {
 					{ key: "submitted", group: "income", doneAt: null },
 					{ key: "consumption_corner", group: "consumption", doneAt: null },
 				]
-			case "set_filing_check":
+			case "set_filing_check": {
+				const submitted = args?.done === true
+				notices = notices.map((notice) => ({ ...notice, submitted }))
 				return [
-					{ key: "submitted", group: "income", doneAt: "2027-03-01T00:00:00Z" },
+					{
+						key: "submitted",
+						group: "income",
+						doneAt: submitted ? "2027-03-01T00:00:00Z" : null,
+					},
 					{ key: "consumption_corner", group: "consumption", doneAt: null },
 				]
+			}
 			case "invoice_registration":
 				return registration
 			case "get_business_profile":
@@ -283,6 +292,18 @@ beforeEach(() => {
 			}
 			case "filing_deadlines":
 				return notices
+			case "filing_calendar_connection":
+				return calendarConnections.has(args?.provider ?? "")
+					? "connected"
+					: "disconnected"
+			case "connect_filing_calendar":
+				calendarConnections.add(args?.provider ?? "")
+				return null
+			case "disconnect_filing_calendar":
+				calendarConnections.delete(args?.provider ?? "")
+				return null
+			case "sync_filing_calendar":
+				return null
 			case "export_filing_calendar":
 				return calendarResult
 			case "sync_filing_notifications":
@@ -569,6 +590,65 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
+	})
+
+	it("連携したカレンダーだけを同期する", async () => {
+		const user = userEvent.setup()
+		renderAt("/settings?view=business")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		const outlook = within(
+			await screen.findByRole("group", { name: "Outlook" })
+		)
+		await user.click(await google.findByRole("button", { name: "連携する" }))
+		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			outlook.getByRole("button", { name: "連携する" })
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "google",
+			today: today(),
+			locale: "ja",
+		})
+		expect(mocks.callCommand).not.toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "outlook",
+			today: today(),
+			locale: "ja",
+		})
+		await user.click(await outlook.findByRole("button", { name: "連携する" }))
+		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+			provider: "outlook",
+			today: today(),
+			locale: "ja",
+		})
+		await user.click(google.getByRole("button", { name: "連携を解除" }))
+		expect(
+			await google.findByRole("button", { name: "連携する" })
+		).toBeInTheDocument()
+		expect(
+			outlook.getByRole("button", { name: "連携を解除" })
+		).toBeInTheDocument()
+	})
+
+	it("提出済みへの変更とその取り消しを再同期する", async () => {
+		calendarConnections.add("outlook")
+		const user = userEvent.setup()
+		renderAt("/closing")
+		await user.click(await screen.findByRole("tab", { name: "確定申告" }))
+		const submitted = await screen.findByRole("checkbox", {
+			name: "申告書を出した",
+		})
+		const syncCount = () =>
+			mocks.callCommand.mock.calls.filter(
+				([command]) => command === "sync_filing_calendar"
+			).length
+		await waitFor(() => expect(syncCount()).toBe(1))
+		await user.click(submitted)
+		await waitFor(() => expect(syncCount()).toBe(2))
+		await user.click(submitted)
+		await waitFor(() => expect(syncCount()).toBe(3))
 	})
 
 	it("OSで通知が拒否されたときは許可の案内が出て、再試行で予約できる", async () => {
