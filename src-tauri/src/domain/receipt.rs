@@ -116,7 +116,33 @@ fn amount_of(value: Option<&Value>) -> Option<i64> {
     if text.is_empty() {
         return None;
     }
-    parse_amount(&text).map(i64::abs).filter(|a| *a > 0)
+    // 領収書の書き方（「金33,000円也」「¥33,000-」「¥33,000－」）。
+    // 後ろの「-」は、明細の CSV では負の数のことがあるので、レシートのときだけここで外す
+    let text = text.trim_start_matches('金');
+    let text = text.trim_end_matches(['也', '-', '－', '―', '‐', ' ', '　']);
+    parse_amount(text).map(i64::abs).filter(|a| *a > 0)
+}
+
+/// レシートの日付を読む。明細と同じ読み方に加えて、レシートに多い西暦の下 2 桁
+/// （「26/11/02」「26.11.02」）を 2000 年代として読む。
+fn receipt_date(text: &str) -> Option<String> {
+    if let Some(date) = parse_date(text) {
+        return Some(date);
+    }
+    let text: String = text.chars().map(super::statement::to_half_width).collect();
+    let first = text.split_whitespace().next()?;
+    let parts: Vec<&str> = first.split(['/', '.', '-']).collect();
+    match parts[..] {
+        [y, m, d]
+            if y.len() == 2
+                && [y, m, d]
+                    .iter()
+                    .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())) =>
+        {
+            parse_date(&format!("20{y}/{m}/{d}"))
+        }
+        _ => None,
+    }
 }
 
 /// 登録番号を「T + 13 桁」にそろえる。形が違えば None。
@@ -163,7 +189,7 @@ pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
         date: if date_text.is_empty() {
             None
         } else {
-            parse_date(&date_text)
+            receipt_date(&date_text)
         },
         total: amount_of(object.get("total")),
         merchant: text_of(object.get("merchant")).chars().take(100).collect(),
@@ -313,6 +339,38 @@ mod tests {
         );
         assert!(parse_reading("こんにちは").is_none());
         assert!(parse_reading("[1, 2]").is_none());
+    }
+
+    #[test]
+    fn reads_receipt_style_dates_and_amounts() {
+        let read = |date: &str, total: &str| {
+            let text = serde_json::json!({
+                "date": date, "total": total, "merchant": "店", "payment": "cash"
+            });
+            let (r, _) = parse_reading(&text.to_string()).unwrap();
+            (r.date, r.total)
+        };
+        // 桁をそろえる空白・曜日・時刻
+        assert_eq!(
+            read("2026年11月 3日(火) 12:34", "¥1,512"),
+            (Some("2026-11-03".into()), Some(1512))
+        );
+        // 西暦の下 2 桁
+        assert_eq!(
+            read("26/11/02 07:41", "450"),
+            (Some("2026-11-02".into()), Some(450))
+        );
+        assert_eq!(
+            read("２６．１１．０２", "450").0.as_deref(),
+            Some("2026-11-02")
+        );
+        // 領収書の金額の書き方
+        assert_eq!(read("2026/9/1", "¥33,000-").1, Some(33000));
+        assert_eq!(read("2026/9/1", "金33,000円也").1, Some(33000));
+        assert_eq!(read("2026/9/1", "￥３３，０００－").1, Some(33000));
+        // 読めないものは読めないまま
+        assert_eq!(read("26/13/02", "").0, None);
+        assert_eq!(read("11/02", "-").1, None);
     }
 
     #[test]

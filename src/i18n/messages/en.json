@@ -412,6 +412,8 @@
 		"badApiKey": "The API key is wrong or no longer works. Check the key in Google AI Studio and register it again.",
 		"offline": "Could not reach the reading service. Once you are online, press Read. The receipts are still waiting.",
 		"rateLimited": "The reading limit was reached. Wait a while and try again.",
+		"modelNotFound": "The model in Settings was not found. The name may be wrong, or the model may have been retired. Check the model name under \"Receipt reading\" in Settings. The receipts are still waiting.",
+		"quotaExhausted": "Today's reading limit was reached, or the model in Settings is not available on the free tier. Press Read again tomorrow, or change the model under \"Receipt reading\" in Settings. The receipts are still waiting.",
 		"readFailed": "The receipt could not be read. Type the details while looking at the image.",
 		"consentRequired": "Before sending receipt images, read where they go and agree under \"Receipt reading\" in Settings.",
 		"openingNotConfirmed": "Confirm the opening balances first.",
