@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { type RefObject, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -117,7 +117,17 @@ export function AccountLoginSettings() {
 	)
 }
 
-export function DeviceUnlock({ status }: { status: LoginStatus }) {
+/**
+ * 端末の本人確認で帳簿を開くボタン。`autoStarted` が false なら、表示したときに
+ * 1 回だけ自動で本人確認を始める（Windows Hello・Touch ID の画面が出る）。
+ */
+export function DeviceUnlock({
+	status,
+	autoStarted,
+}: {
+	status: LoginStatus
+	autoStarted: RefObject<boolean>
+}) {
 	const t = useTranslations("security")
 
 	const locale = useSettingsStore((s) => s.locale)
@@ -129,6 +139,12 @@ export function DeviceUnlock({ status }: { status: LoginStatus }) {
 		onSuccess: () => client.invalidateQueries(),
 	})
 	const provider = status.linked
+	const start = open.mutate
+	useEffect(() => {
+		if (!provider || autoStarted.current) return
+		autoStarted.current = true
+		start(false)
+	}, [provider, autoStarted, start])
 	if (!provider) return null
 	return (
 		<div className="mb-5 flex flex-col gap-2">

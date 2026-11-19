@@ -5,7 +5,7 @@ mod device;
 use super::filing_calendar_sync::{http_client, oauth::OAuth, Provider};
 use super::security::{ensure_not_open, open_books, BookFiles};
 use crate::{
-    db::{vault, Database},
+    db::{unlock_guard, vault, Database},
     error::{AppError, AppResult, ErrorCode},
     export::labels::Locale,
     receipt::secret::{KeyringItem, SecretStore},
@@ -56,6 +56,10 @@ fn failed() -> AppError {
 }
 fn mismatch() -> AppError {
     AppError::new(ErrorCode::LoginMismatch)
+}
+/// 端末に残した設定が、いまの帳簿と合わない（パスワードの変更や復元のあと）。
+fn expired() -> AppError {
+    AppError::new(ErrorCode::LoginExpired)
 }
 
 fn record() -> AppResult<Option<Record>> {
@@ -166,7 +170,7 @@ pub async fn open_with_login(
     let _guard = state.0.lock().await;
     ensure_not_open(&app)?;
     if vault::state(&files.path)? != vault::BookState::Encrypted {
-        return Err(mismatch());
+        return Err(expired());
     }
     let record = record()?.ok_or_else(failed)?;
     let account = if online {
@@ -181,7 +185,13 @@ pub async fn open_with_login(
     authorize(&credential, record.provider, account.as_deref())?;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
-    let db = vault::unlock(&files.path, &credential.password)?;
+    let db = vault::unlock(&files.path, &credential.password).map_err(|error| {
+        if error.code == ErrorCode::WrongPassword {
+            expired()
+        } else {
+            error
+        }
+    })?;
     let binding: Option<String> = db
         .conn()
         .query_row(
@@ -191,8 +201,10 @@ pub async fn open_with_login(
         )
         .optional()?;
     if binding.as_deref() != Some(&credential.binding) {
-        return Err(mismatch());
+        return Err(expired());
     }
+    // 本人確認できたので、パスワードの入力回数の制限も数え直す
+    unlock_guard::reset(&unlock_guard::path_for(&files.path));
     open_books(&app, db);
     Ok(())
 }

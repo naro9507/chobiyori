@@ -8,6 +8,7 @@ use crate::db::audit::{self, AuditEntry};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
 use crate::db::recovery;
+use crate::db::unlock_guard::{self, Attempts};
 use crate::db::vault::{self, BookState};
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
@@ -34,6 +35,9 @@ pub struct BookStatus {
     pub state: BookState,
     /// パスワードで開けたあとか
     pub unlocked: bool,
+    /// パスワード・復旧コードの入力の制限
+    #[serde(flatten)]
+    pub attempts: Attempts,
 }
 
 #[tauri::command]
@@ -41,6 +45,7 @@ pub async fn book_status(app: AppHandle, files: State<'_, BookFiles>) -> AppResu
     Ok(BookStatus {
         state: vault::state(&files.path)?,
         unlocked: app.try_state::<Database>().is_some(),
+        attempts: unlock_guard::status(&unlock_guard::path_for(&files.path)),
     })
 }
 
@@ -80,7 +85,12 @@ pub async fn unlock_books(
 ) -> AppResult<()> {
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
-    let db = vault::unlock(&files.path, &password)?;
+    let db = unlock_guard::guard(
+        &unlock_guard::path_for(&files.path),
+        "password",
+        ErrorCode::WrongPassword,
+        || vault::unlock(&files.path, &password),
+    )?;
     open_books(&app, db);
     Ok(())
 }
@@ -141,7 +151,12 @@ pub async fn reset_books_password(
     let _guard = login.0.lock().await;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
-    let db = recovery::reset(&files.path, &recovery_code, &new)?;
+    let db = unlock_guard::guard(
+        &unlock_guard::path_for(&files.path),
+        "recoveryCode",
+        ErrorCode::InvalidRecoveryCode,
+        || recovery::reset(&files.path, &recovery_code, &new),
+    )?;
     super::account_login::discard_device_record();
     // 履歴の書き込みに失敗しても、再設定したパスワードで帳簿を開けるようにする。
     if let Err(error) = audit::event(&db.conn(), "books", "change_password", None, None) {

@@ -56,6 +56,8 @@ export type ErrorCode =
 	| "deviceAuthFailed"
 	| "loginFailed"
 	| "loginMismatch"
+	| "loginExpired"
+	| "tooManyAttempts"
 
 export function isAppError(error: unknown): error is AppError {
 	return (

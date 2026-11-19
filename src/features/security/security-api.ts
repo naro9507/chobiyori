@@ -6,6 +6,10 @@ export type BookStatus = {
 	/** notCreated: 初めての起動 / plain: 前の版の暗号化していない帳簿 / encrypted: パスワードで開く */
 	state: "notCreated" | "plain" | "encrypted"
 	unlocked: boolean
+	/** パスワード・復旧コードを受け付けるまでの秒数。制限していなければ 0 */
+	retryAfter: number
+	/** 待たずに試せる残りの回数 */
+	attemptsLeft: number
 }
 
 const statusKey = ["book-status"]
@@ -37,6 +41,8 @@ export function useOpenBooks() {
 			return callCommand<void>(command, args)
 		},
 		onSuccess: () => queryClient.invalidateQueries(),
+		// 間違えた回数と待ち時間を読み直す
+		onError: () => queryClient.invalidateQueries({ queryKey: statusKey }),
 	})
 }
 
