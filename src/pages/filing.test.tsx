@@ -602,7 +602,7 @@ describe("インボイスの登録と期限", () => {
 			await screen.findByRole("group", { name: "Outlook" })
 		)
 		await user.click(await google.findByRole("button", { name: "連携する" }))
-		expect(await google.findByText("連携しています。")).toBeInTheDocument()
+		expect(await google.findByText("連携済み")).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
@@ -617,18 +617,18 @@ describe("インボイスの登録と期限", () => {
 			locale: "ja",
 		})
 		await user.click(await outlook.findByRole("button", { name: "連携する" }))
-		expect(await outlook.findByText("連携しています。")).toBeInTheDocument()
+		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
 		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
 			today: today(),
 			locale: "ja",
 		})
-		await user.click(google.getByRole("button", { name: "連携をやめる" }))
+		await user.click(google.getByRole("button", { name: "連携を解除" }))
 		expect(
 			await google.findByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
 		expect(
-			outlook.getByRole("button", { name: "連携をやめる" })
+			outlook.getByRole("button", { name: "連携を解除" })
 		).toBeInTheDocument()
 	})
 

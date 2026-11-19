@@ -130,17 +130,17 @@ describe("起動時のパスワード", () => {
 		const user = userEvent.setup()
 		renderApp()
 		expect(await screen.findByRole("alert")).toHaveTextContent(
-			"指紋・顔・PIN での本人確認ができませんでした"
+			"Windows Hello / Touch ID で認証できませんでした"
 		)
 		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
 			online: false,
 			locale: "ja",
 		})
 		await user.click(
-			screen.getByRole("button", { name: "Google にログインして開く" })
+			screen.getByRole("button", { name: "Google でログインして開く" })
 		)
 		expect(await screen.findByRole("alert")).toHaveTextContent(
-			"設定したときとは別のアカウント"
+			"設定時と別のアカウントです"
 		)
 		// 復旧コードの画面から戻っても、自動ではもう始めない
 		await user.click(
@@ -149,7 +149,9 @@ describe("起動時のパスワード", () => {
 		await user.click(
 			screen.getByRole("button", { name: "パスワードの入力に戻る" })
 		)
-		await screen.findByRole("button", { name: "指紋・顔・PIN で開く" })
+		await screen.findByRole("button", {
+			name: "Windows Hello / Touch ID で開く",
+		})
 		const automatic = mocks.callCommand.mock.calls.filter(
 			([command, args]) => command === "open_with_login" && !args?.online
 		)
@@ -181,9 +183,7 @@ describe("起動時のパスワード", () => {
 		const user = userEvent.setup()
 		renderApp()
 		expect(
-			await screen.findByText(
-				"あと 2 回間違えると、しばらく入力できなくなります。"
-			)
+			await screen.findByText("あと 2 回間違えるとロックされます。")
 		).toBeInTheDocument()
 		await user.type(screen.getByLabelText("パスワード"), "wrong one")
 		await user.click(screen.getByRole("button", { name: "開く" }))
@@ -191,7 +191,7 @@ describe("起動時のパスワード", () => {
 		await user.type(screen.getByLabelText("パスワード"), "wrong two")
 		await user.click(screen.getByRole("button", { name: "開く" }))
 		expect(await screen.findByRole("status")).toHaveTextContent(
-			"あと 1 分 30 秒 で、もう一度入れられます"
+			"ロック中です（残り 1 分 30 秒）"
 		)
 		expect(screen.getByRole("button", { name: "開く" })).toBeDisabled()
 		expect(screen.queryByText(/パスワードが違います/)).not.toBeInTheDocument()
