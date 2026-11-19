@@ -97,6 +97,9 @@ export function HistoryCard() {
 		if (entry.entity === "filing_type") {
 			return t("filingTypeChanged", { year: entry.fiscalYear ?? "" })
 		}
+		if (entry.entity === "tax_status") {
+			return t("taxStatusChanged", { year: entry.fiscalYear ?? "" })
+		}
 		if (entry.entity === "invoice_registration") {
 			return t("invoiceRegistrationSaved")
 		}

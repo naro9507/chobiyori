@@ -243,6 +243,46 @@ pub fn create(conn: &Connection, input: &FixedAssetInput) -> AppResult<FixedAsse
     get(conn, conn.last_insert_rowid())
 }
 
+/// 固定資産を登録し、`payment_account_id` があれば、買ったときの支払い（資産 / 支払った口座）も
+/// 取引として記録する。取得した年の帳簿があるときだけ使える。
+pub fn create_with_purchase(
+    db: &Database,
+    input: &FixedAssetInput,
+    payment_account_id: Option<i64>,
+) -> AppResult<FixedAsset> {
+    db.transaction(|tx| {
+        let asset = create(tx, input)?;
+        let Some(payment) = payment_account_id else {
+            return Ok(asset);
+        };
+        let (year, _) = year_month(&asset.acquired_on, "acquiredOn")?;
+        if asset.book_value_year != year {
+            // 帳簿をつけ始める前に買った資産は、期首残高に入れる
+            return Err(AppError::field(ErrorCode::OutOfRange, "paymentAccountId"));
+        }
+        transactions::insert_kind(
+            tx,
+            year,
+            &TransactionInput {
+                date: asset.acquired_on.clone(),
+                entry_mode: EntryMode::Compound,
+                memo: format!("固定資産の取得（{}）", asset.name),
+                lines: vec![
+                    LineInput::new(Side::Debit, asset.account_id, asset.cost),
+                    LineInput::new(Side::Credit, payment, asset.cost),
+                ],
+            },
+            TransactionKind::Normal,
+        )
+        .map_err(|e| match e.field {
+            Some("date") => AppError::field(e.code, "acquiredOn"),
+            Some(_) if e.line == Some(1) => AppError::field(e.code, "paymentAccountId"),
+            _ => e,
+        })?;
+        Ok(asset)
+    })
+}
+
 pub fn update(conn: &Connection, id: i64, input: &FixedAssetInput) -> AppResult<FixedAsset> {
     let current = get(conn, id)?;
     let (v, next) = validate(conn, input)?;
@@ -446,6 +486,36 @@ pub(crate) mod tests {
             disposed_on: None,
             memo: String::new(),
         }
+    }
+
+    #[test]
+    fn records_the_purchase_with_the_asset() {
+        let db = set_up_db();
+        let (tools, cash) = {
+            let conn = db.conn();
+            (account(&conn, "115"), account(&conn, "101"))
+        };
+        let asset = create_with_purchase(&db, &pc(tools), Some(cash)).unwrap();
+        let conn = db.conn();
+        let t = transactions::list(&conn, 2026, Some(4)).unwrap();
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].date, asset.acquired_on);
+        assert_eq!(
+            t[0].lines
+                .iter()
+                .map(|l| (l.side, l.account_id, l.amount))
+                .collect::<Vec<_>>(),
+            [(Side::Debit, tools, 240_000), (Side::Credit, cash, 240_000)]
+        );
+        drop(conn);
+        // 支払いを記録できなければ、資産も登録しない
+        let mut later = pc(tools);
+        later.acquired_on = "2025-04-10".into();
+        later.book_value_year = Some(2026);
+        later.book_value = Some(180_000);
+        let err = create_with_purchase(&db, &later, Some(cash)).unwrap_err();
+        assert_eq!(err.field, Some("paymentAccountId"));
+        assert_eq!(for_year(&db.conn(), 2026).unwrap().assets.len(), 1);
     }
 
     #[test]

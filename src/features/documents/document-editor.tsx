@@ -7,6 +7,7 @@ import { partnerKind, useMasterList } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError, lineFieldError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
+import { cn } from "@/lib/utils"
 import { DocumentPreview } from "./document-preview"
 import {
 	type DocumentInput,
@@ -16,6 +17,7 @@ import {
 	parseQuantity,
 	quantityText,
 	useDocumentAction,
+	useDocumentTaxMode,
 	usePreview,
 	useSaveDocument,
 } from "./documents-api"
@@ -138,8 +140,13 @@ export function DocumentEditor({
 				}
 	)
 	const input = toInput(form)
-	const previewInput = useDebounced(input)
-	const preview = usePreview(null, previewInput)
+	const debouncedInput = useDebounced(input)
+	// 品名を 1 つも入れていないうちは、紙面を作らない（入力前からエラーを出さない）
+	const started = debouncedInput.lines.some((l) => l.name.trim() !== "")
+	const preview = usePreview(null, started ? debouncedInput : null)
+	// 登録番号なしの様式（免税の年など）は消費税を足さないので、税率の欄を出さない
+	const taxMode = useDocumentTaxMode(form.issueDate).data
+	const withTax = taxMode !== "simple"
 	const error = save.error ?? action.error
 	const errorFor = (field: string) => {
 		const e = fieldError(error, field)
@@ -287,13 +294,20 @@ export function DocumentEditor({
 
 				<fieldset className="flex flex-col gap-2">
 					<legend className="mb-1 font-bold text-sm">{t("lines")}</legend>
-					<p className="text-muted-foreground text-xs">{t("linesHint")}</p>
+					<p className="text-muted-foreground text-xs">
+						{t(withTax ? "linesHint" : "linesHintNoTax")}
+					</p>
 					{form.lines.map((line, index) => (
 						<div
 							// biome-ignore lint/suspicious/noArrayIndexKey: 行は入力の順で並ぶ
 							key={index}
 							// 横にプレビューが並ぶと狭くなるので、品名は 1 行を使い、数量などは次の行に並べる
-							className="grid grid-cols-[5rem_4rem_minmax(6rem,1fr)_7rem_auto] items-start gap-2 border-b pb-3 last-of-type:border-b-0"
+							className={cn(
+								"grid items-start gap-2 border-b pb-3 last-of-type:border-b-0",
+								withTax
+									? "grid-cols-[5rem_4rem_minmax(6rem,1fr)_7rem_auto]"
+									: "grid-cols-[5rem_4rem_minmax(6rem,1fr)_auto]"
+							)}
 						>
 							<Field
 								label={t("itemName")}
@@ -323,7 +337,7 @@ export function DocumentEditor({
 								/>
 							</Field>
 							<Field
-								label={t("unitPrice")}
+								label={t(withTax ? "unitPrice" : "unitPriceNoTax")}
 								error={lineErrorFor(index, "unitPrice")}
 							>
 								<Input
@@ -335,20 +349,22 @@ export function DocumentEditor({
 									}
 								/>
 							</Field>
-							<Field label={t("taxRate")}>
-								<NativeSelect
-									value={line.taxRate}
-									onChange={(e) =>
-										setLine(index, {
-											taxRate: Number(e.target.value) as LineForm["taxRate"],
-										})
-									}
-								>
-									<option value={10}>10%</option>
-									<option value={8}>{t("reduced8")}</option>
-									<option value={0}>{t("noTax")}</option>
-								</NativeSelect>
-							</Field>
+							{withTax && (
+								<Field label={t("taxRate")}>
+									<NativeSelect
+										value={line.taxRate}
+										onChange={(e) =>
+											setLine(index, {
+												taxRate: Number(e.target.value) as LineForm["taxRate"],
+											})
+										}
+									>
+										<option value={10}>10%</option>
+										<option value={8}>{t("reduced8")}</option>
+										<option value={0}>{t("noTax")}</option>
+									</NativeSelect>
+								</Field>
+							)}
 							<Button
 								type="button"
 								variant="ghost"
@@ -420,7 +436,9 @@ export function DocumentEditor({
 
 			<section aria-label={t("preview")} className="flex flex-col gap-2">
 				<h3 className="font-bold text-sm">{t("preview")}</h3>
-				{preview.data ? (
+				{!started ? (
+					<p className="text-muted-foreground text-sm">{t("previewEmpty")}</p>
+				) : preview.data ? (
 					<DocumentPreview preview={preview.data} label={t("preview")} />
 				) : preview.error ? (
 					<p className="text-muted-foreground text-sm">

@@ -311,6 +311,14 @@ fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()>
             r.business_percent,
             (index as i64 + 1) * 10
         ])?;
+        // ルールの名前にある科目（家賃・光熱費など）の既定の按分ルールにする
+        let id = conn.last_insert_rowid();
+        for code in r.accounts {
+            conn.execute(
+                "UPDATE accounts SET default_allocation_rule_id = ?1 WHERE code = ?2",
+                params![id, code],
+            )?;
+        }
     }
     Ok(())
 }
@@ -454,6 +462,12 @@ pub(crate) mod tests {
             rules.iter().map(|r| r.business_percent).collect::<Vec<_>>(),
             [50, 50]
         );
+        // 家賃・光熱費・通信費には、名前の合うルールを既定で付ける
+        let rule_of = |code: &str| accounts[position(code)].default_allocation_rule_id;
+        assert_eq!(rule_of("616"), Some(rules[0].id));
+        assert_eq!(rule_of("603"), Some(rules[0].id));
+        assert_eq!(rule_of("605"), Some(rules[1].id));
+        assert_eq!(rule_of("610"), None);
         // 汎用は足さない
         drop(conn);
         let general = set_up_db();

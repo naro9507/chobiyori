@@ -81,9 +81,12 @@
 		"appGroup": "アプリ情報",
 		"languageChanged": "表示言語を変更しました。",
 		"themeChanged": "テーマを変更しました。",
-		"filingTypeTitle": "{year}年度の申告の区分",
-		"filingTypeDescription": "青色申告か白色申告かと、青色申告特別控除の額です。決算書の様式と控除額が変わります。青色申告の承認を受けていない年は白色申告を選んでください。",
-		"filingTypeClosed": "締めた年度は変えられません。"
+		"filingTypeTitle": "{year}年度の申告の区分と消費税",
+		"filingTypeDescription": "青色申告か白色申告か（決算書の様式と控除額が変わります）と、消費税の区分です。青色申告の承認を受けていない年は白色申告を選んでください。インボイスに登録した年より後は免税事業者にできません。",
+		"filingTypeClosed": "締めた年度は変えられません。",
+		"taxStatusHint": "売上が 1,000 万円を超えたなど、インボイスの登録とは別に課税事業者になったときもここで変えます。",
+		"taxStatusRetag": "課税にすると、この年度に「対象外」で記録した行に、科目の既定の税区分を付け直します。締めた月がある年度は変えられません。",
+		"taxStatusRetagged": "保存し、{count} 行の税区分を付け直しました。取引入力で確かめてください。"
 	},
 	"update": {
 		"sectionTitle": "アップデート",
@@ -120,7 +123,7 @@
 		"ownerName": "氏名",
 		"ownerNameRequired": "氏名を入れてください。",
 		"tradeName": "屋号",
-		"industry": "業種",
+		"industry": "事業の内容",
 		"industryHint": "任意。例: 英語教室、デザイン、小売",
 		"address": "住所",
 		"optional": "任意",
@@ -382,7 +385,9 @@
 		"noPaymentAccounts": "口座がありません。マスタ画面で、現金や預金の科目を「口座として使う」にしてください。",
 		"loading": "読み込んでいます",
 		"negativeBalanceHint": "残高がマイナスの口座があります。入力漏れや、支払元を選び間違えていないか確かめてください。",
-		"checkOpeningBalance": "期首残高を確認する"
+		"checkOpeningBalance": "期首残高を確認する",
+		"showUnusedAccounts": "使っていない口座も表示（{count} 件）",
+		"hideUnusedAccounts": "使っていない口座を隠す"
 	},
 	"errors": {
 		"required": "入力してください。",
@@ -1066,7 +1071,10 @@
 		"openTask_assets": "固定資産と減価償却を開く",
 		"openTask_inventory": "棚卸を開く",
 		"issue_negativeBalance": "年末の残高がマイナスの行があります（{value}）。固定資産や借入の記録漏れ（資産を買ったときの支払いを記録していないなど）や、科目の選び間違いがないか確かめてください。",
-		"assetPurchaseNote": "資産を買ったときの支払いは、ここではなく取引入力で「工具器具備品 / 普通預金」のように記録してください。ここでは、その年の減価償却費だけを記録します。"
+		"assetPurchaseNote": "資産を買ったときの支払いは、登録するときに「買ったときの支払い」を選ぶと一緒に記録できます。取引入力で「工具器具備品 / 普通預金」のように記録してもかまいません。",
+		"purchasePayment": "買ったときの支払い",
+		"purchasePaymentHint": "支払った口座を選ぶと、使い始めた日の「資産 / 口座」の取引も一緒に記録します。私用のお金で買ったときは事業主借を選びます。",
+		"purchaseNotRecorded": "記録しない（取引入力で記録した）"
 	},
 	"security": {
 		"createTitle": "帳簿のパスワードを決めてください",
@@ -1159,7 +1167,8 @@
 		"invoiceRegistrationSaved": "インボイスの登録番号と登録日を保存しました",
 		"whiteDeductionSaved": "事業専従者控除額を {amount} 円に保存しました",
 		"other": "そのほかの操作（{action}）",
-		"filingTypeChanged": "{year}年度の申告の区分を変えました"
+		"filingTypeChanged": "{year}年度の申告の区分を変えました",
+		"taxStatusChanged": "{year}年度の消費税の区分を変えました"
 	},
 	"locks": {
 		"description": "確かめ終わった月を締めると、その月の取引はどの画面からも足したり直したりできなくなります。月を締めると、その月より前もまとめて締まります。締めを外すと、その月より後もまとめて外れます。締めたことと外したことは、変更履歴に残ります。",
@@ -1278,7 +1287,10 @@
 		"postSale": "記帳する",
 		"paymentDate": "入金日",
 		"paymentAccount": "入金した口座",
-		"savePayment": "入金を記録する"
+		"savePayment": "入金を記録する",
+		"linesHintNoTax": "この発行日は登録番号なしの様式なので、消費税は足しません。単価は受け取る金額で入れてください。値引きは「-1000」のように入れます。数量は 1.5 のように小数も使えます。",
+		"unitPriceNoTax": "単価",
+		"previewEmpty": "品名を入れると、ここに紙面が出ます。"
 	},
 	"documentSettings": {
 		"title": "請求書などの書類",
@@ -1738,7 +1750,7 @@
 		"balance": "開始時点の残高（円）",
 		"opening": "期首残高と開業の案内",
 		"openingHint": "口座ごとに開始時点の残高を入力します。借入金などがあれば、その他の期首残高も入力できます。",
-		"firstYear": "開業 1 年目です",
+		"firstYear": "開業費について（開業 1 年目の方へ）",
 		"startupHint": "開業準備のために特別に支出した費用は、開業費として扱う場合があります。資産の購入代金や前払費用は分けて考えます。開業費は資産として記録し、必要経費にする年の償却額を仕訳で記録します（自動償却はしません）。任意償却では未償却残高の範囲で金額を選び、支出内容と償却の記録を残します。元入金は、期首の資産と負債の差額です。",
 		"features": "使う機能",
 		"featuresHint": "使わない機能はメニューから隠します。記録済みのデータは残り、設定からいつでも戻せます。",

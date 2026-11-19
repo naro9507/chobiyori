@@ -300,7 +300,13 @@ function AssetForm({
 		bookValue: laterStart && asset ? String(asset.bookValue) : "",
 		disposedOn: asset?.disposedOn ?? "",
 		memo: asset?.memo ?? "",
+		/** 買ったときの支払いを記録する口座。空なら記録しない */
+		paymentAccountId: "",
 	})
+	// 買ったときの支払いに使える口座と、私用のお金（事業主借）
+	const paymentAccounts = masters.accounts.filter(
+		(a) => a.isActive && (a.isPaymentAccount || a.code === "301")
+	)
 	const set = (patch: Partial<typeof form>) =>
 		setForm((prev) => ({ ...prev, ...patch }))
 	const error = (field: string) => {
@@ -327,7 +333,17 @@ function AssetForm({
 			disposedOn: form.disposedOn.trim() === "" ? null : form.disposedOn,
 			memo: form.memo,
 		}
-		save.mutate({ id: asset?.id, input }, { onSuccess: onDone })
+		save.mutate(
+			{
+				id: asset?.id,
+				input,
+				paymentAccountId:
+					!asset && !form.laterStart && form.paymentAccountId
+						? Number(form.paymentAccountId)
+						: null,
+			},
+			{ onSuccess: onDone }
+		)
 	}
 
 	return (
@@ -377,6 +393,25 @@ function AssetForm({
 						onChange={(e) => set({ cost: e.target.value })}
 					/>
 				</Field>
+				{!asset && !form.laterStart && (
+					<Field
+						label={t("purchasePayment")}
+						hint={t("purchasePaymentHint")}
+						error={error("paymentAccountId")}
+					>
+						<NativeSelect
+							value={form.paymentAccountId}
+							onChange={(e) => set({ paymentAccountId: e.target.value })}
+						>
+							<option value="">{t("purchaseNotRecorded")}</option>
+							{paymentAccounts.map((a) => (
+								<option key={a.id} value={a.id}>
+									{masters.accountLabel(a.id)}
+								</option>
+							))}
+						</NativeSelect>
+					</Field>
+				)}
 				<Field
 					term="depreciation"
 					label={t("method")}

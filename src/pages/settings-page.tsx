@@ -41,26 +41,11 @@ export function SettingsPage() {
 		<Page screen="settings">
 			<Accordion.Root
 				key={view}
-				type="single"
-				collapsible
-				defaultValue={view}
+				type="multiple"
+				// 表示の言語と配色をすぐ変えられるよう、初めは「表示」を開いておく
+				defaultValue={view ? [view] : ["appearance"]}
 				className="flex flex-col gap-3"
 			>
-				<SettingsGroup value="business" title={t("businessGroup")}>
-					<BusinessProfileCard />
-					<FilingTypeCard
-						key={`filing-type-${fiscalYear}`}
-						fiscalYear={fiscalYear}
-					/>
-					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
-					<FilingReminderSettings />
-				</SettingsGroup>
-				<SettingsGroup value="features" title={t("featuresGroup")}>
-					<FeatureSettingsPanel />
-					<ReceiptSettingsCard />
-					<DocumentSettingsCard />
-					<MailSettingsCard />
-				</SettingsGroup>
 				<SettingsGroup value="appearance" title={t("appearanceGroup")}>
 					<Card>
 						<CardHeader>
@@ -117,6 +102,21 @@ export function SettingsPage() {
 						{changed &&
 							t(changed === "language" ? "languageChanged" : "themeChanged")}
 					</p>
+				</SettingsGroup>
+				<SettingsGroup value="business" title={t("businessGroup")}>
+					<BusinessProfileCard />
+					<FilingTypeCard
+						key={`filing-type-${fiscalYear}`}
+						fiscalYear={fiscalYear}
+					/>
+					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
+					<FilingReminderSettings />
+				</SettingsGroup>
+				<SettingsGroup value="features" title={t("featuresGroup")}>
+					<FeatureSettingsPanel />
+					<ReceiptSettingsCard />
+					<DocumentSettingsCard />
+					<MailSettingsCard />
 				</SettingsGroup>
 				<SettingsGroup value="security" title={t("securityGroup")}>
 					<PasswordCard />

@@ -140,6 +140,9 @@ describe("マスタ", () => {
 
 		await user.click(screen.getByRole("button", { name: "追加" }))
 		const form = screen.getByRole("form", { name: "取引先を追加" })
+		// 初めての取引先は 1001 を入れておく（書き換えられる）
+		expect(within(form).getByLabelText("コード")).toHaveValue("1001")
+		await user.clear(within(form).getByLabelText("コード"))
 		await user.type(within(form).getByLabelText("コード"), "501")
 		await user.type(within(form).getByLabelText("名前（日本語）"), "文具店")
 		await user.click(within(form).getByLabelText("仕入先・支払先"))
@@ -158,6 +161,9 @@ describe("マスタ", () => {
 
 		await user.click(screen.getByRole("button", { name: "追加" }))
 		const again = screen.getByRole("form", { name: "取引先を追加" })
+		// 次の空いているコードを初めに入れておく
+		expect(within(again).getByLabelText("コード")).toHaveValue("502")
+		await user.clear(within(again).getByLabelText("コード"))
 		await user.type(within(again).getByLabelText("コード"), "501")
 		await user.type(within(again).getByLabelText("名前（日本語）"), "別の店")
 		await user.click(within(again).getByRole("button", { name: "保存" }))

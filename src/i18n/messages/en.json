@@ -81,9 +81,12 @@
 		"appGroup": "About the app",
 		"languageChanged": "Language changed.",
 		"themeChanged": "Theme changed.",
-		"filingTypeTitle": "Filing type for FY {year}",
-		"filingTypeDescription": "Whether you file a blue or white return, and the blue-return deduction. It changes the statement format and the deduction. Choose the white return for a year without blue-return approval.",
-		"filingTypeClosed": "A closed year can't be changed."
+		"filingTypeTitle": "Filing type and consumption tax for FY {year}",
+		"filingTypeDescription": "Whether you file a blue or white return (this changes the statement format and the deduction), and your consumption tax status. Choose the white return for a year without blue-return approval. You can't choose tax-exempt for years after you registered for invoices.",
+		"filingTypeClosed": "A closed year can't be changed.",
+		"taxStatusHint": "Change this here too if you became taxable for reasons other than invoice registration, such as sales over 10 million yen.",
+		"taxStatusRetag": "If you make the year taxable, lines recorded as Out of scope this year get their account's default tax category. You can't change a year that has closed months.",
+		"taxStatusRetagged": "Saved. The tax category of {count} lines was updated; check them on the Transactions screen."
 	},
 	"update": {
 		"sectionTitle": "Updates",
@@ -120,7 +123,7 @@
 		"ownerName": "Full name",
 		"ownerNameRequired": "Enter your name.",
 		"tradeName": "Trade name",
-		"industry": "Industry",
+		"industry": "Business description",
 		"industryHint": "Optional. e.g. English school, design, retail",
 		"address": "Address",
 		"optional": "Optional",
@@ -382,7 +385,9 @@
 		"noPaymentAccounts": "There are no money accounts. On the Master data screen, mark cash or bank accounts as \"Use as a money account\".",
 		"loading": "Loading",
 		"negativeBalanceHint": "An account has a negative balance. Check for missing entries or payments recorded against the wrong account.",
-		"checkOpeningBalance": "Check opening balances"
+		"checkOpeningBalance": "Check opening balances",
+		"showUnusedAccounts": "Show unused accounts too ({count})",
+		"hideUnusedAccounts": "Hide unused accounts"
 	},
 	"errors": {
 		"required": "Please fill this in.",
@@ -1066,7 +1071,10 @@
 		"openTask_assets": "Open fixed assets and depreciation",
 		"openTask_inventory": "Open inventory",
 		"issue_negativeBalance": "Some lines have a negative year-end balance ({value}). Check for missing entries for fixed assets or loans (such as the payment for an asset you bought) and for entries in the wrong account.",
-		"assetPurchaseNote": "Record the payment for an asset you bought on the Transactions screen (for example, Tools and equipment / Ordinary deposits), not here. This screen only records each year's depreciation."
+		"assetPurchaseNote": "To record the payment for an asset, choose \"Payment for the purchase\" when you register it, or record it on the Transactions screen (for example, Tools and equipment / Ordinary deposits).",
+		"purchasePayment": "Payment for the purchase",
+		"purchasePaymentHint": "Choose the account you paid from to also record the purchase (asset / account) on the date first used. If you paid with personal money, choose Owner's contributions.",
+		"purchaseNotRecorded": "Don't record (already recorded in Transactions)"
 	},
 	"security": {
 		"createTitle": "Choose a password for your books",
@@ -1159,7 +1167,8 @@
 		"invoiceRegistrationSaved": "Saved the invoice registration number and date",
 		"whiteDeductionSaved": "Saved the family worker deduction as {amount} yen",
 		"other": "Other action ({action})",
-		"filingTypeChanged": "Changed the filing type for FY {year}"
+		"filingTypeChanged": "Changed the filing type for FY {year}",
+		"taxStatusChanged": "Changed the consumption tax status for FY {year}"
 	},
 	"locks": {
 		"description": "Close a month once you've checked it, and its entries can't be added or changed from any screen. Closing a month also closes the months before it; reopening a month also reopens the months after it. Both are kept in the change history.",
@@ -1278,7 +1287,10 @@
 		"postSale": "Record",
 		"paymentDate": "Date paid",
 		"paymentAccount": "Account paid into",
-		"savePayment": "Record the payment"
+		"savePayment": "Record the payment",
+		"linesHintNoTax": "Documents with this issue date use the format without a registration number, so no consumption tax is added. Enter unit prices as the amounts you will receive. Enter discounts like \"-1000\". Quantities can have decimals such as 1.5.",
+		"unitPriceNoTax": "Unit price",
+		"previewEmpty": "Enter an item name to see the page here."
 	},
 	"documentSettings": {
 		"title": "Invoices and other documents",
@@ -1738,7 +1750,7 @@
 		"balance": "Opening balance (JPY)",
 		"opening": "Opening balances and starting a business",
 		"openingHint": "Enter each account’s starting balance. If you have loans or other balances, you can add them below.",
-		"firstYear": "This is my first business year",
+		"firstYear": "About start-up costs (for your first business year)",
 		"startupHint": "Special expenses for preparing to start a business may qualify as startup costs. Distinguish asset purchases and prepaid expenses. Record startup costs as an asset and post the amortization expense in the chosen year; amortization is not automatic. Discretionary amortization is limited to the unamortized balance. Keep spending and amortization records. Opening capital is opening assets minus liabilities.",
 		"features": "Features to use",
 		"featuresHint": "Unused features are hidden from menus. Saved records remain and you can re-enable features in Settings.",
