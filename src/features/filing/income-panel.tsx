@@ -1,4 +1,7 @@
 import { CircleAlert } from "lucide-react"
+import { useState } from "react"
+import { Field } from "@/components/ui/field"
+import { NativeSelect } from "@/components/ui/input"
 import { QueryMessage } from "@/features/closing/query-message"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
@@ -22,9 +25,14 @@ type ItemKey =
 export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("filing")
 	const locale = useSettingsStore((state) => state.locale)
+	const [paperYear, setPaperYear] = useState<number | null>(null)
 	const query = useIncomeGuide(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
 	const guide = query.data
+	const blue65 = guide.filingType === "blue65"
+	const paper = blue65 && paperYear === fiscalYear
+	const deduction = paper ? guide.deductionOnPaper : guide.deduction
+	const income = paper ? guide.incomeOnPaper : guide.income
 
 	const rowsOf = (section: GuideSection): ValueRow[] =>
 		section.items.map((item) => {
@@ -41,12 +49,15 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 				key: item.key,
 				no: item.no,
 				label,
-				value: item.value,
+				value:
+					item.key === "deduction" || item.key === "return_deduction"
+						? deduction
+						: item.key === "income" || item.key === "return_income"
+							? income
+							: item.value,
 				total: item.total,
 			}
 		})
-
-	const blue65 = guide.filingType === "blue65"
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -54,6 +65,25 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 				{t(guide.filingType === "white" ? "whiteIntro" : "incomeIntro")}
 			</p>
 			<AccountantNote />
+			{blue65 && (
+				<Field
+					label={t("deductionTransferMode")}
+					hint={t("deductionTransferHint")}
+					className="max-w-md"
+				>
+					<NativeSelect
+						value={paper ? "paper" : "configured"}
+						onChange={(e) =>
+							setPaperYear(e.target.value === "paper" ? fiscalYear : null)
+						}
+					>
+						<option value="configured">
+							{t("deductionTransferConfigured")}
+						</option>
+						<option value="paper">{t("deductionTransferPaper")}</option>
+					</NativeSelect>
+				</Field>
+			)}
 			{guide.issueCount > 0 && (
 				<p role="alert" className="flex items-start gap-2 text-sm text-warning">
 					<CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -74,19 +104,12 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 				{guide.filingType !== "white" && (
 					<>
 						<dt className="text-muted-foreground">{t("deduction")}</dt>
-						<dd className="num">{formatAmount(guide.deduction)}</dd>
+						<dd className="num">{formatAmount(deduction)}</dd>
 					</>
 				)}
 				<dt className="text-muted-foreground">{t("businessIncome")}</dt>
-				<dd className="num font-bold">{formatAmount(guide.income)}</dd>
+				<dd className="num font-bold">{formatAmount(income)}</dd>
 			</dl>
-			{blue65 && (
-				<p className="rounded-md border px-3 py-2 text-sm">
-					{t("deduction65Note", {
-						paper: formatAmount(guide.deductionOnPaper),
-					})}
-				</p>
-			)}
 			{guide.sections
 				.filter(
 					(s) =>

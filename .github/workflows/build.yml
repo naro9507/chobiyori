@@ -113,6 +113,27 @@ jobs:
           releaseDraft: true
           prerelease: false
 
+      - name: Mac 配布物のアプリ署名を検証する
+        if: runner.os == 'macOS'
+        shell: bash
+        working-directory: src-tauri/target/aarch64-apple-darwin/release/bundle
+        env:
+          BUILD_UPDATER: ${{ steps.signing.outputs.args == '' }}
+        run: |
+          verification_dir="$(mktemp -d)"
+          mount_point="$verification_dir/dmg"
+          mkdir "$mount_point"
+          trap 'rm -rf "$verification_dir"' EXIT
+
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_point" dmg/Chobiyori_*.dmg
+          trap 'hdiutil detach "$mount_point" && rm -rf "$verification_dir"' EXIT
+          codesign --verify --deep --strict --verbose=2 "$mount_point/Chobiyori.app"
+
+          if [ "$BUILD_UPDATER" = "true" ]; then
+            tar -xzf macos/Chobiyori.app.tar.gz -C "$verification_dir"
+            codesign --verify --deep --strict --verbose=2 "$verification_dir/Chobiyori.app"
+          fi
+
       - name: インストーラを成果物として保存
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

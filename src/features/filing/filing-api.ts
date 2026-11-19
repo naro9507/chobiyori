@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 import type { TaxCategory } from "@/features/master/master-api"
 import type { FilingType, TaxStatus } from "@/features/setup/setup"
 import { callCommand } from "@/lib/tauri"
@@ -14,7 +15,9 @@ export type InvoiceRegistration = {
 export type RegistrationInput = {
 	registrationNo: string
 	registeredOn: string
+	fiscalYear: number
 	taxStatus: Exclude<TaxStatus, "exempt">
+	wasExempt?: boolean
 	simplifiedCategory: number | null
 }
 
@@ -62,6 +65,7 @@ export type ConsumptionReport = {
 		base: number
 		nationalTax: number
 		special20: Payable | null
+		special30?: Payable | null
 		simplified: Payable
 		categories: CategoryTotal[]
 	}
@@ -99,6 +103,7 @@ export type IncomeGuide = {
 	incomeBeforeDeduction: number
 	deduction: number
 	deductionOnPaper: number
+	incomeOnPaper: number
 	income: number
 	issueCount: number
 }
@@ -237,22 +242,45 @@ export function useSetFilingCheck(fiscalYear: number | null) {
 	})
 }
 
-export function useFilingDeadlines(
-	enabled = true,
-	date = today(),
-	includeFuture = false
-) {
-	return useQuery({
-		queryKey: ["filing-deadlines", date, includeFuture],
+/** アプリを開いたままでも、端末の午前0時に申告期限を読み直す。 */
+export function useFilingDay() {
+	const [day, setDay] = useState(() => today())
+	useEffect(() => {
+		let timeout: ReturnType<typeof setTimeout>
+		const refresh = () => {
+			clearTimeout(timeout)
+			const now = new Date()
+			setDay(today(now))
+			const midnight = new Date(now)
+			midnight.setHours(24, 0, 0, 0)
+			timeout = setTimeout(refresh, midnight.getTime() - now.getTime())
+		}
+		refresh()
+		window.addEventListener("focus", refresh)
+		document.addEventListener("visibilitychange", refresh)
+		return () => {
+			clearTimeout(timeout)
+			window.removeEventListener("focus", refresh)
+			document.removeEventListener("visibilitychange", refresh)
+		}
+	}, [])
+	return day
+}
+
+export function useFilingDeadlines(enabled = true, includeFuture = false) {
+	const day = useFilingDay()
+	const { data, error, isSuccess, isError, refetch } = useQuery({
+		queryKey: ["filing-deadlines", day, includeFuture],
 		queryFn: () =>
 			callCommand<DeadlineNotice[]>("filing_deadlines", {
-				today: date,
+				today: day,
 				...(includeFuture ? { includeFuture } : {}),
 			}),
 		enabled,
 		retry: false,
 		retryOnMount: false,
 	})
+	return { data, error, isSuccess, isError, refetch, day }
 }
 
 export function usePartnerChecks() {

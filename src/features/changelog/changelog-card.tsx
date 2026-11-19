@@ -1,11 +1,5 @@
 import { Badge } from "@/components/ui/badge"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppInfo } from "@/features/app-info/app-info"
 import { useTranslations } from "@/i18n/use-translations"
 import { releases } from "./changelog"
@@ -19,8 +13,9 @@ export function ChangelogCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("changelogTitle")}</CardTitle>
-				<CardDescription>{t("changelogDescription")}</CardDescription>
+				<CardTitle help={t("changelogDescription")}>
+					{t("changelogTitle")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<ol className="flex flex-col divide-y">

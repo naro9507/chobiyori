@@ -38,7 +38,7 @@ pub fn sync(
         return Ok(ScheduleResult::Ready);
     }
     if notifier.Setting()? != NotificationSetting::Enabled {
-        return Ok(ScheduleResult::Unavailable);
+        return Ok(ScheduleResult::Denied);
     }
     for entry in entries {
         let xml = format!(

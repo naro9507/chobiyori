@@ -28,6 +28,7 @@ export function ConsumptionPanel({
 	fiscalYear: number | null
 }) {
 	const t = useTranslations("filing")
+	const tSetup = useTranslations("setup")
 	const query = useConsumptionTax(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
 	const report = query.data
@@ -43,7 +44,14 @@ export function ConsumptionPanel({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<p className="text-muted-foreground text-sm">{t("consumptionIntro")}</p>
+			<div className="flex flex-col gap-1">
+				{report.taxStatus !== "exempt" && (
+					<p className="font-medium text-sm">
+						{t("savedMethod", { method: tSetup(`tax_${report.taxStatus}`) })}
+					</p>
+				)}
+				<p className="text-muted-foreground text-sm">{t("consumptionIntro")}</p>
+			</div>
 			<AccountantNote />
 			{report.taxableFrom.endsWith("-01-01") ? null : (
 				<p className="rounded-md border px-3 py-2 text-sm">
@@ -113,15 +121,32 @@ function Methods({ report }: { report: ConsumptionReport }) {
 			<h3 className="font-bold text-sm">{t("methodsTitle")}</h3>
 			<div className="grid gap-4 md:grid-cols-2">
 				<div className="flex flex-col gap-2 rounded-lg border p-4">
-					<p className="font-bold text-sm">{t("special20")}</p>
-					<p className="text-muted-foreground text-xs">{t("special20Hint")}</p>
-					{report.tax.special20 ? (
-						<PayableList
-							payable={report.tax.special20}
-							label={t("special20")}
-						/>
+					{report.tax.special30 ? (
+						<>
+							<p className="font-bold text-sm">{t("special30")}</p>
+							<p className="text-muted-foreground text-xs">
+								{t("special30Hint")}
+							</p>
+							<PayableList
+								payable={report.tax.special30}
+								label={t("special30")}
+							/>
+						</>
 					) : (
-						<p className="text-sm">{t("special20NotPeriod")}</p>
+						<>
+							<p className="font-bold text-sm">{t("special20")}</p>
+							<p className="text-muted-foreground text-xs">
+								{t("special20Hint")}
+							</p>
+							{report.tax.special20 ? (
+								<PayableList
+									payable={report.tax.special20}
+									label={t("special20")}
+								/>
+							) : (
+								<p className="text-sm">{t("special20NotPeriod")}</p>
+							)}
+						</>
 					)}
 				</div>
 				<div className="flex flex-col gap-2 rounded-lg border p-4">

@@ -110,6 +110,7 @@ const receiptItem: InboxItem = {
 	transactionId: null,
 	suggestion: null,
 	possibleDuplicateId: 77,
+	similarStatement: false,
 }
 
 function renderPage(path = "/inbox") {
@@ -176,6 +177,8 @@ beforeEach(() => {
 				case "set_gemini_key":
 					settings = { ...settings, hasKey: true }
 					return null
+				case "reconciliation":
+					return { paired: 0, statementOnly: [], receiptOnly: [] }
 				case "list_receipts":
 					return receipts
 				case "read_next_receipt": {
@@ -205,7 +208,9 @@ describe("レシート", () => {
 	it("キーがない間は読み取らず、設定画面へ案内する", async () => {
 		const user = userEvent.setup()
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: /^レシート$/ }))
+		await user.click(
+			await screen.findByRole("link", { name: "レシートを追加" })
+		)
 		expect(
 			await screen.findByRole("button", { name: "読み取る（2 枚）" })
 		).toBeDisabled()
@@ -214,9 +219,18 @@ describe("レシート", () => {
 		).toHaveAttribute("href", expect.stringContaining("settings"))
 	})
 
+	it("未設定や利用できない支払口座を別の口座として表示しない", async () => {
+		settings = { ...settings, cashAccountId: null, cardAccountId: 99 }
+		renderPage("/settings?view=features")
+		expect(await screen.findByLabelText("現金で払ったとき")).toHaveValue("")
+		expect(screen.getByLabelText("カード・電子マネーで払ったとき")).toHaveValue(
+			"99"
+		)
+	})
+
 	it("設定画面でキーの取り方を案内し、同意とキーの登録をする。キーは画面に戻さない", async () => {
 		const user = userEvent.setup()
-		renderPage("/settings")
+		renderPage("/settings?view=features")
 		const card = await screen.findByRole("region", { name: "API キーの取り方" })
 		expect(
 			within(card).getByText("https://aistudio.google.com/")
@@ -269,7 +283,9 @@ describe("レシート", () => {
 			hasKey: true,
 		}
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: /^レシート$/ }))
+		await user.click(
+			await screen.findByRole("link", { name: "レシートを追加" })
+		)
 		await user.click(
 			await screen.findByRole("button", { name: "読み取る（2 枚）" })
 		)

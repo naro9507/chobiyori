@@ -53,7 +53,10 @@ fn csv_table(text: &str, delimiter: Delimiter) -> AppResult<Vec<Vec<String>>> {
         .delimiter(delimiter.byte())
         .from_reader(text.as_bytes());
     let mut table = Vec::new();
-    for record in reader.records().take(ROWS_MAX) {
+    for record in reader.records() {
+        if table.len() == ROWS_MAX {
+            return Err(AppError::new(ErrorCode::TooManyStatementRows));
+        }
         let record = record.map_err(|_| AppError::new(ErrorCode::FileRead))?;
         table.push(
             record
@@ -96,8 +99,11 @@ fn excel_table(bytes: &[u8]) -> AppResult<Vec<Vec<String>>> {
     let (top, left) = range
         .start()
         .map_or((0, 0), |(r, c)| (r as usize, c as usize));
+    if top + range.height() > ROWS_MAX {
+        return Err(AppError::new(ErrorCode::TooManyStatementRows));
+    }
     let mut table: Vec<Vec<String>> = vec![Vec::new(); top];
-    for row in range.rows().take(ROWS_MAX) {
+    for row in range.rows() {
         let mut cells = vec![String::new(); left];
         cells.extend(row.iter().map(|cell| match cell {
             Data::Empty => String::new(),

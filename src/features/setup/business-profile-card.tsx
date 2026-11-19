@@ -1,13 +1,7 @@
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
@@ -58,8 +52,9 @@ export function BusinessProfileCard() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{tSettings("business")}</CardTitle>
-				<CardDescription>{tSettings("businessDescription")}</CardDescription>
+				<CardTitle help={tSettings("businessDescription")}>
+					{tSettings("business")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form

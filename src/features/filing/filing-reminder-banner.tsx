@@ -5,17 +5,16 @@ import { Button } from "@/components/ui/button"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useTranslations } from "@/i18n/use-translations"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
-import { type DeadlineNotice, today, useFilingDeadlines } from "./filing-api"
+import { type DeadlineNotice, useFilingDeadlines } from "./filing-api"
 import { notifyFilingDeadline } from "./filing-desktop-notifications"
-import { deadlineKey } from "./filing-notification-plan"
+import { deadlineKey, filingReminderBody } from "./filing-notification-plan"
 
 // 一番短い期間を先に調べ、設定ごとに重ならないようにする。
 const reminderWindows = [...filingReminderDays].reverse()
 
 export function FilingReminderBanner() {
 	const selected = useSettingsStore((state) => state.filingReminders)
-	const day = today()
-	const { data } = useFilingDeadlines(selected.length > 0, day)
+	const { data, day } = useFilingDeadlines(selected.length > 0)
 
 	return data?.map((notice) => {
 		if (notice.submitted || notice.daysLeft < 0) return null
@@ -40,11 +39,7 @@ function Reminder({ notice, day }: { notice: DeadlineNotice; day: string }) {
 		notice.kind === "income" ? "deadlineIncome" : "deadlineConsumption",
 		{ year: notice.fiscalYear }
 	)
-	const body =
-		(notice.daysLeft === 0
-			? t("reminderDueToday", { date: notice.date })
-			: t("deadlineLeft", { date: notice.date, days: notice.daysLeft })) +
-		(notice.estimated ? ` ${t("deadlineEstimated")}` : "")
+	const body = filingReminderBody(notice, notice.daysLeft, t)
 	const key = deadlineKey(notice)
 
 	useEffect(() => {
@@ -70,7 +65,9 @@ function Reminder({ notice, day }: { notice: DeadlineNotice; day: string }) {
 					</Link>
 				</Button>
 				<Button asChild variant="ghost" size="sm">
-					<Link to="/settings">{t("reminderSettings")}</Link>
+					<Link to="/settings" search={{ view: "business" }}>
+						{t("reminderSettings")}
+					</Link>
 				</Button>
 				<Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
 					{t("reminderDismiss")}

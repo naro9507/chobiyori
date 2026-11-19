@@ -56,8 +56,14 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-const SELECT: &str =
-    "SELECT id, transaction_id, file_name, mime, size, sha256, added_at FROM attachments";
+const FIELDS: &str = "a.file_name, a.mime, a.size, a.sha256, a.added_at";
+
+const LINKS: &str = "
+    SELECT transaction_id, attachment_id FROM transaction_attachments
+    UNION
+    SELECT i.transaction_id, r.attachment_id
+    FROM receipts r JOIN inbox_items i ON i.id = r.inbox_item_id
+    WHERE i.transaction_id IS NOT NULL";
 
 fn from_row(row: &Row<'_>) -> rusqlite::Result<Attachment> {
     Ok(Attachment {
@@ -72,7 +78,14 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<Attachment> {
 }
 
 pub fn get(conn: &Connection, id: i64) -> AppResult<Attachment> {
-    Ok(conn.query_row(&format!("{SELECT} WHERE id = ?1"), [id], from_row)?)
+    Ok(conn.query_row(
+        &format!(
+            "SELECT a.id, (SELECT min(transaction_id) FROM ({LINKS}) WHERE attachment_id = a.id),
+                  {FIELDS} FROM attachments a WHERE a.id = ?1"
+        ),
+        [id],
+        from_row,
+    )?)
 }
 
 /// 証憑を入れる。同じ中身がすでにあれば、それを返す（2 つ目の値が true）。
@@ -105,18 +118,21 @@ pub fn add(conn: &Connection, file_name: &str, bytes: &[u8]) -> AppResult<(Attac
 
 /// 取引の証憑。
 pub fn list_for_transaction(conn: &Connection, transaction_id: i64) -> AppResult<Vec<Attachment>> {
-    let mut stmt = conn.prepare(&format!("{SELECT} WHERE transaction_id = ?1 ORDER BY id"))?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT a.id, l.transaction_id, {FIELDS} FROM attachments a
+         JOIN ({LINKS}) l ON l.attachment_id = a.id WHERE l.transaction_id = ?1 ORDER BY a.id"
+    ))?;
     let rows = stmt.query_map([transaction_id], from_row)?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
 /// 年度の取引ごとの証憑の数（帳簿の一覧で印を出すため）。
 pub fn counts(conn: &Connection, year: i64) -> AppResult<Vec<(i64, i64)>> {
-    let mut stmt = conn.prepare(
-        "SELECT a.transaction_id, count(*) FROM attachments a
-         JOIN transactions t ON t.id = a.transaction_id
-         WHERE t.fiscal_year = ?1 GROUP BY a.transaction_id",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT l.transaction_id, count(*) FROM ({LINKS}) l
+         JOIN transactions t ON t.id = l.transaction_id
+         WHERE t.fiscal_year = ?1 GROUP BY l.transaction_id"
+    ))?;
     let rows = stmt.query_map([year], |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
@@ -142,18 +158,47 @@ pub fn attach(conn: &Connection, id: i64, transaction_id: i64) -> AppResult<()> 
         return Err(AppError::field(ErrorCode::NotFound, "transactionId"));
     }
     conn.execute(
-        "UPDATE attachments SET transaction_id = ?2 WHERE id = ?1",
+        "INSERT INTO transaction_attachments (attachment_id, transaction_id)
+         VALUES (?1, ?2) ON CONFLICT DO NOTHING",
         params![id, transaction_id],
     )?;
     Ok(())
 }
 
-/// 証憑を消す。レシートとして取り込んだものは、受信箱から消す（ここでは消せない）。
-pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
-    let changed = conn.execute("DELETE FROM attachments WHERE id = ?1", [id])?;
+/// 取引への手動添付だけを外す。レシートの紐付けは受信箱で外す。
+pub fn detach(conn: &Connection, id: i64, transaction_id: i64) -> AppResult<()> {
+    let changed = conn.execute(
+        "DELETE FROM transaction_attachments WHERE attachment_id = ?1 AND transaction_id = ?2",
+        params![id, transaction_id],
+    )?;
     if changed == 0 {
-        return Err(AppError::new(ErrorCode::NotFound));
+        let receipt: bool = conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM receipts r JOIN inbox_items i ON i.id = r.inbox_item_id
+                            WHERE r.attachment_id = ?1 AND i.transaction_id = ?2)",
+            params![id, transaction_id],
+            |r| r.get(0),
+        )?;
+        return Err(AppError::new(if receipt {
+            ErrorCode::InUse
+        } else {
+            ErrorCode::NotFound
+        }));
     }
+    remove_unused(conn, id)
+}
+
+pub(crate) fn remove_unused(conn: &Connection, id: i64) -> AppResult<()> {
+    let settings = super::documents::settings(conn)?;
+    if settings.logo_attachment_id == Some(id) || settings.seal_attachment_id == Some(id) {
+        return Ok(());
+    }
+    conn.execute(
+        "DELETE FROM attachments WHERE id = ?1
+         AND NOT EXISTS (SELECT 1 FROM transaction_attachments WHERE attachment_id = ?1)
+         AND NOT EXISTS (SELECT 1 FROM receipts WHERE attachment_id = ?1)
+         AND NOT EXISTS (SELECT 1 FROM documents WHERE pdf_attachment_id = ?1)",
+        [id],
+    )?;
     Ok(())
 }
 

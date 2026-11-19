@@ -23,6 +23,16 @@ import { TransactionsPage } from "@/pages/transactions-page"
 import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
+type ScreenSearch = {
+	q?: string
+	article?: string
+	tab?: "opening"
+	view?: string
+	editTransaction?: number
+	editMonth?: number
+	editYear?: number
+}
+
 const useHelpSearch = () =>
 	useSearch({ strict: false }) as { q?: string; article?: string }
 
@@ -35,12 +45,24 @@ const screens: Partial<Record<ScreenId, () => ReactNode>> = {
 		const search = useHelpSearch()
 		return <HelpPage key={`${search.q ?? ""}-${search.article ?? ""}`} />
 	},
-	transactions: TransactionsPage,
+	transactions: () => {
+		const search = useSearch({ strict: false })
+		return (
+			<TransactionsPage
+				editTransaction={search.editTransaction}
+				editMonth={search.editMonth}
+				editYear={search.editYear}
+			/>
+		)
+	},
 	inbox: InboxPage,
 	ledgers: LedgersPage,
 	reports: ReportsPage,
 	receivables: ReceivablesPage,
-	closing: ClosingPage,
+	closing: () => {
+		const search = useSearch({ strict: false })
+		return <ClosingPage key={search.tab ?? "default"} initialTab={search.tab} />
+	},
 	documents: DocumentsPage,
 	master: MasterPage,
 	data: DataPage,
@@ -52,9 +74,23 @@ const screenRoutes = navItems.map((item) => {
 	return createRoute({
 		getParentRoute: () => rootRoute,
 		path: item.path,
-		validateSearch: (
-			search: Record<string, unknown>
-		): { q?: string; article?: string } => ({
+		validateSearch: (search: Record<string, unknown>): ScreenSearch => ({
+			tab: search.tab === "opening" ? "opening" : undefined,
+			editTransaction:
+				Number.isSafeInteger(search.editTransaction) &&
+				Number(search.editTransaction) > 0
+					? Number(search.editTransaction)
+					: undefined,
+			editMonth:
+				Number.isInteger(search.editMonth) &&
+				Number(search.editMonth) >= 1 &&
+				Number(search.editMonth) <= 12
+					? Number(search.editMonth)
+					: undefined,
+			editYear: Number.isSafeInteger(search.editYear)
+				? Number(search.editYear)
+				: undefined,
+			view: typeof search.view === "string" ? search.view : undefined,
 			q: typeof search.q === "string" ? search.q : undefined,
 			article: typeof search.article === "string" ? search.article : undefined,
 		}),

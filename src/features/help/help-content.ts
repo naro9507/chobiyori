@@ -44,6 +44,12 @@ export const helpArticles: readonly HelpArticle[] = [
 		})),
 	{ id: "start", section: "start", body: "startBody", path: "/settings" },
 	{ id: "sales", section: "tasks", body: "salesBody", path: "/transactions" },
+	{
+		id: "personalExpense",
+		section: "tasks",
+		body: "personalExpenseBody",
+		path: "/transactions",
+	},
 	{ id: "receipt", section: "tasks", body: "receiptBody", path: "/inbox" },
 	{ id: "closing", section: "tasks", body: "closingBody", path: "/closing" },
 	{

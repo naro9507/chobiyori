@@ -24,14 +24,27 @@ export function useBookStatus() {
 export function useOpenBooks() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: ({
-			command,
-			password,
-		}: {
-			command: "create_books" | "unlock_books" | "encrypt_books"
-			password: string
-		}) => callCommand<void>(command, { password }),
+		gcTime: 0,
+		mutationFn: (
+			input:
+				| {
+						command: "create_books" | "unlock_books" | "encrypt_books"
+						password: string
+				  }
+				| { command: "reset_books_password"; recoveryCode: string; new: string }
+		) => {
+			const { command, ...args } = input
+			return callCommand<void>(command, args)
+		},
 		onSuccess: () => queryClient.invalidateQueries(),
+	})
+}
+
+export function useIssueRecoveryCode() {
+	return useMutation({
+		gcTime: 0,
+		mutationFn: (current: string) =>
+			callCommand<string>("issue_recovery_code", { current }),
 	})
 }
 

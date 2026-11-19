@@ -143,34 +143,43 @@ export function ReceiptSettingsCard() {
 						</section>
 
 						<div className="flex flex-wrap gap-4">
-							<Field label={t("cashAccount")} className="w-56">
-								<NativeSelect
-									value={data.cashAccountId ?? ""}
-									onChange={(e) =>
-										saveSettings({ cashAccountId: Number(e.target.value) })
-									}
-								>
-									{paymentAccounts.map((a) => (
-										<option key={a.id} value={a.id}>
-											{masters.accountLabel(a.id)}
-										</option>
-									))}
-								</NativeSelect>
-							</Field>
-							<Field label={t("cardAccount")} className="w-56">
-								<NativeSelect
-									value={data.cardAccountId ?? ""}
-									onChange={(e) =>
-										saveSettings({ cardAccountId: Number(e.target.value) })
-									}
-								>
-									{paymentAccounts.map((a) => (
-										<option key={a.id} value={a.id}>
-											{masters.accountLabel(a.id)}
-										</option>
-									))}
-								</NativeSelect>
-							</Field>
+							{(
+								[
+									["cashAccountId", "cashAccount"],
+									["cardAccountId", "cardAccount"],
+								] as const
+							).map(([field, label]) => {
+								const id = data[field]
+								return (
+									<Field key={field} label={t(label)} className="w-56">
+										<NativeSelect
+											value={id ?? ""}
+											onChange={(e) =>
+												saveSettings({ [field]: Number(e.target.value) })
+											}
+										>
+											{id === null && (
+												<option value="" disabled>
+													{t("paymentAccountUnset")}
+												</option>
+											)}
+											{id !== null &&
+												!paymentAccounts.some((a) => a.id === id) && (
+													<option value={id} disabled>
+														{t("paymentAccountUnavailable", {
+															account: masters.accountLabel(id) || String(id),
+														})}
+													</option>
+												)}
+											{paymentAccounts.map((a) => (
+												<option key={a.id} value={a.id}>
+													{masters.accountLabel(a.id)}
+												</option>
+											))}
+										</NativeSelect>
+									</Field>
+								)
+							})}
 							<ModelField
 								model={data.model}
 								onSave={(model) => saveSettings({ model })}

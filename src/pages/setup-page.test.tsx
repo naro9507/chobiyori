@@ -43,6 +43,8 @@ beforeEach(() => {
 				return { completed: true, fiscalYear: args.input.fiscalYear }
 			case "app_info":
 				return { name: "chobiyori", version: "0.1.0" }
+			case "open_invoice_site":
+				return null
 			default:
 				throw new Error(`想定外のコマンド: ${command}`)
 		}
@@ -71,25 +73,44 @@ describe("初期設定ウィザード", () => {
 		)
 	})
 
-	it("6 つの手順を終えると設定を保存し、ホームを出す", async () => {
+	it("4 つの手順を終えると設定を保存し、ホームを出す", async () => {
 		const user = userEvent.setup()
 		renderApp()
 
 		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
 		await user.type(screen.getByLabelText("屋号"), "テスト教室")
+		await user.click(
+			screen.getByRole("button", { name: "国税庁の公表サイトで番号を確認" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_invoice_site")
+		expect(screen.getByLabelText("インボイスの登録番号")).toHaveValue("")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
+		await user.click(screen.getByText("自分の消費税区分を確認する方法"))
+		expect(screen.getByText(/消費税簡易課税制度選択届出書/)).toBeVisible()
 		await user.click(screen.getByRole("radio", { name: "白色申告" }))
 		await user.click(
-			screen.getByRole("radio", { name: "課税事業者（2 割特例）" })
+			screen.getByRole("radio", { name: "課税事業者（本則課税）" })
 		)
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
 		const year = screen.getByLabelText("年度（西暦）")
 		await user.clear(year)
 		await user.type(year, "2025")
-		for (let i = 0; i < 3; i++)
-			await user.click(screen.getByRole("button", { name: "次へ" }))
+		await user.click(screen.getByRole("button", { name: "次へ" }))
+		await user.type(screen.getByLabelText("開始時点の残高（円）"), "5000")
+		await user.click(
+			screen.getByText("借入金など、その他の期首残高を入力する", {
+				selector: "summary",
+			})
+		)
+		await user.click(
+			screen.getByRole("button", { name: "その他の期首残高を追加" })
+		)
+		await user.type(
+			screen.getByLabelText("残高（円）", { exact: true }),
+			"1200"
+		)
 		await user.click(screen.getByRole("button", { name: "はじめる" }))
 
 		expect(
@@ -106,10 +127,10 @@ describe("初期設定ウィザード", () => {
 				},
 				fiscalYear: 2025,
 				filingType: "white",
-				taxStatus: "special20",
+				taxStatus: "standard",
 				template: "general",
-				accounts: [{ name: "現金", kind: "cash", balance: 0 }],
-				openingBalances: [],
+				accounts: [{ name: "現金", kind: "cash", balance: 5000 }],
+				openingBalances: [{ accountCode: "106", amount: 1200 }],
 				features: {
 					inventory: true,
 					receivables: true,
@@ -128,8 +149,7 @@ describe("初期設定ウィザード", () => {
 		await user.type(screen.getByLabelText("インボイスの登録番号"), "T1")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "次へ" }))
-		for (let i = 0; i < 3; i++)
-			await user.click(screen.getByRole("button", { name: "次へ" }))
+		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "はじめる" }))
 
 		expect(

@@ -1,6 +1,7 @@
 import { Loader2, Pencil, Trash2 } from "lucide-react"
-import { type KeyboardEvent, useId, useRef, useState } from "react"
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Checkbox, Input } from "@/components/ui/input"
 import { TermHelp } from "@/features/help/term-help"
 import { useTranslations } from "@/i18n/use-translations"
@@ -32,18 +33,20 @@ export function JournalGrid({
 	month,
 	onMonthChange,
 	onEditCompound,
+	initialEditingId = null,
 }: {
 	fiscalYear: number | null
 	month: number
 	onMonthChange: (month: number) => void
 	onEditCompound: (transaction: Transaction) => void
+	initialEditingId?: number | null
 }) {
 	const t = useTranslations("journal")
 	const errorMessage = useJournalErrorMessage(fiscalYear)
 	const transactions = useTransactions(fiscalYear, month)
 	const masters = useJournalMasters()
 	const remove = useDeleteTransaction()
-	const [editingId, setEditingId] = useState<number | null>(null)
+	const [editingId, setEditingId] = useState<number | null>(initialEditingId)
 	const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null)
 	const [carryOver, setCarryOver] = useState(false)
 	const carryOverId = useId()
@@ -52,27 +55,29 @@ export function JournalGrid({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-muted-foreground text-sm">{t("gridDescription")}</p>
-			<div
-				role="tablist"
-				aria-label={t("monthsLabel")}
-				className="flex flex-wrap gap-1 rounded-lg border bg-card p-1"
-			>
-				{months.map((m) => (
-					<button
-						key={m}
-						type="button"
-						role="tab"
-						aria-selected={m === month}
-						onClick={() => {
-							setEditingId(null)
-							onMonthChange(m)
-						}}
-						className="num min-h-9 min-w-12 rounded-md px-2 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-selected:bg-accent aria-selected:text-accent-foreground"
-					>
-						{t("month", { month: m })}
-					</button>
-				))}
+			<div className="flex items-center gap-1">
+				<div
+					role="tablist"
+					aria-label={t("monthsLabel")}
+					className="flex flex-wrap gap-1 rounded-lg border bg-card p-1"
+				>
+					{months.map((m) => (
+						<button
+							key={m}
+							type="button"
+							role="tab"
+							aria-selected={m === month}
+							onClick={() => {
+								setEditingId(null)
+								onMonthChange(m)
+							}}
+							className="num min-h-9 min-w-12 rounded-md px-2 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-selected:bg-accent aria-selected:text-accent-foreground"
+						>
+							{t("month", { month: m })}
+						</button>
+					))}
+				</div>
+				<HelpTip topic={t("grid")}>{t("gridDescription")}</HelpTip>
 			</div>
 
 			{remove.error ? (
@@ -122,6 +127,7 @@ export function JournalGrid({
 									fiscalYear={fiscalYear}
 									month={month}
 									transaction={transaction}
+									focusOnMount={transaction.id === initialEditingId}
 									onDone={() => setEditingId(null)}
 								/>
 							) : (
@@ -275,12 +281,14 @@ function GridEditor({
 	fiscalYear,
 	month,
 	transaction,
+	focusOnMount = false,
 	carryOver = false,
 	onDone,
 }: {
 	fiscalYear: number | null
 	month: number
 	transaction?: Transaction
+	focusOnMount?: boolean
 	carryOver?: boolean
 	onDone?: () => void
 }) {
@@ -289,6 +297,9 @@ function GridEditor({
 	const save = useSaveTransaction(fiscalYear)
 	const masters = useJournalMasters(keepOf(transaction))
 	const rowRef = useRef<HTMLTableRowElement>(null)
+	useEffect(() => {
+		if (focusOnMount) rowRef.current?.querySelector("input")?.focus()
+	}, [focusOnMount])
 	const [localError, setLocalError] = useState<AppError | null>(null)
 
 	const initial = (): GridForm =>

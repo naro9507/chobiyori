@@ -2,6 +2,7 @@ import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Checkbox, Input, LabeledCheckbox } from "@/components/ui/input"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -9,6 +10,7 @@ import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount } from "@/lib/amount"
 import { isAppError } from "@/lib/errors"
 import {
+	type CheckItemKey,
 	useCarryForward,
 	useChecklist,
 	useInventory,
@@ -89,45 +91,87 @@ export function InventoryPanel({ fiscalYear }: { fiscalYear: number | null }) {
 }
 
 /** 決算整理のチェックリスト。帳簿から分かる項目は自動で印が付く。 */
-export function ChecklistPanel({ fiscalYear }: { fiscalYear: number | null }) {
+export function ChecklistPanel({
+	fiscalYear,
+	inventoryEnabled,
+	onOpenTask,
+}: {
+	fiscalYear: number | null
+	inventoryEnabled: boolean
+	onOpenTask: (tab: "opening" | "assets" | "inventory") => void
+}) {
 	const t = useTranslations("closing")
 	const errorMessage = useJournalErrorMessage(fiscalYear)
 	const query = useChecklist(fiscalYear)
 	const setCheck = useSetCheck(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
-	const done = query.data.filter((i) => i.done).length
+	const items = query.data.filter(
+		(item) => inventoryEnabled || item.item !== "inventory"
+	)
+	const done = items.filter((item) => item.done).length
+	const next = items.find((item) => !item.done)
+	const destinations: Partial<
+		Record<CheckItemKey, "opening" | "assets" | "inventory">
+	> = {
+		opening: "opening",
+		depreciation: "assets",
+		inventory: "inventory",
+	}
 
 	return (
 		<div className="flex flex-col gap-4">
 			<p className="text-muted-foreground text-sm">
-				{t("checklistHint", { done, total: query.data.length })}
+				{t("checklistHint", { done, total: items.length })}
 			</p>
+			{next && (
+				<p className="font-medium text-sm">
+					{t("nextTask", { task: t(`check_${next.item}`) })}
+				</p>
+			)}
 			<ul className="flex flex-col divide-y rounded-lg border">
-				{query.data.map((item) => (
-					<li key={item.item} className="flex items-start gap-3 px-4 py-3">
-						<Checkbox
-							id={`check-${item.item}`}
-							className="mt-0.5"
-							checked={item.done}
-							disabled={item.auto || setCheck.isPending}
-							onChange={(e) =>
-								setCheck.mutate({ item: item.item, done: e.target.checked })
-							}
-						/>
-						<label
-							htmlFor={`check-${item.item}`}
-							className="flex flex-col gap-0.5"
-						>
-							<span className="font-medium text-sm">
-								{t(`check_${item.item}`)}
-							</span>
-							<span className="text-muted-foreground text-xs">
-								{t(`checkHint_${item.item}`)}
-								{item.auto && ` ${t("checkAuto")}`}
-							</span>
-						</label>
-					</li>
-				))}
+				{items.map((item) => {
+					const destination = destinations[item.item]
+					return (
+						<li key={item.item} className="flex items-start gap-3 px-4 py-3">
+							<Checkbox
+								id={`check-${item.item}`}
+								className="mt-0.5"
+								checked={item.done}
+								disabled={item.auto || setCheck.isPending}
+								onChange={(e) =>
+									setCheck.mutate({ item: item.item, done: e.target.checked })
+								}
+							/>
+							<div className="flex flex-wrap items-center gap-x-1">
+								<label
+									htmlFor={`check-${item.item}`}
+									className="font-medium text-sm"
+								>
+									{t(`check_${item.item}`)}
+								</label>
+								<HelpTip topic={t(`check_${item.item}`)}>
+									{t(`checkHint_${item.item}`)}
+								</HelpTip>
+								{item.auto && (
+									<span className="text-muted-foreground text-xs">
+										{t("checkAuto")}
+									</span>
+								)}
+							</div>
+							{!item.done && destination && (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="ml-auto"
+									onClick={() => onOpenTask(destination)}
+								>
+									{t(`openTask_${destination}`)}
+								</Button>
+							)}
+						</li>
+					)
+				})}
 			</ul>
 			{setCheck.error && (
 				<p role="alert" className="text-destructive text-sm">

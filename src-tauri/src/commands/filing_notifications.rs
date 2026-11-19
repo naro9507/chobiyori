@@ -22,6 +22,8 @@ pub struct FilingNotification {
 pub enum ScheduleResult {
     #[cfg(any(windows, target_os = "macos"))]
     Ready,
+    #[cfg(any(windows, target_os = "macos"))]
+    Denied,
     Unavailable,
 }
 

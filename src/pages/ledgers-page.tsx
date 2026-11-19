@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { Loader2, Paperclip } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { type ReactNode, useState } from "react"
@@ -5,6 +6,7 @@ import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
+import { HelpTip } from "@/components/ui/help-tip"
 import { NativeSelect } from "@/components/ui/input"
 import { useAttachmentCounts } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
@@ -145,26 +147,28 @@ export function LedgersPage() {
 				onValueChange={(value) => setBook(value as Book)}
 				className="flex flex-col gap-4"
 			>
-				<Tabs.List
-					aria-label={t("tabsLabel")}
-					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
-				>
-					{orderedBooks
-						.filter((value) => value !== "partners" || features.receivables)
-						.map((value) => (
-							<Tabs.Trigger
-								key={value}
-								value={value}
-								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-							>
-								{t(value)}
-							</Tabs.Trigger>
-						))}
-				</Tabs.List>
+				<div className="flex items-center gap-1">
+					<Tabs.List
+						aria-label={t("tabsLabel")}
+						className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
+					>
+						{orderedBooks
+							.filter((value) => value !== "partners" || features.receivables)
+							.map((value) => (
+								<Tabs.Trigger
+									key={value}
+									value={value}
+									className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+								>
+									{t(value)}
+								</Tabs.Trigger>
+							))}
+					</Tabs.List>
+					<HelpTip topic={t(book)}>{t(`${book}Hint`)}</HelpTip>
+				</div>
 
 				<Card>
 					<CardContent className="flex flex-col gap-4">
-						<p className="text-muted-foreground text-sm">{t(`${book}Hint`)}</p>
 						<div className="flex flex-wrap items-end justify-between gap-4">
 							<div className="flex flex-wrap items-end gap-4">
 								{monthSelect(t("fromMonth"), fromMonth, (m) => {
@@ -331,6 +335,7 @@ function journalRows(
 
 function JournalView({ period }: { period: Period }) {
 	const t = useTranslations("ledgers")
+	const journal = useTranslations("journal")
 	const masters = useJournalMasters()
 	const query = useJournalBook(period)
 	const counts = useAttachmentCounts(period.fiscalYear).data
@@ -369,6 +374,25 @@ function JournalView({ period }: { period: Period }) {
 			numeric: true,
 		},
 		{ id: "memo", header: t("memo"), cell: (r) => r.memo },
+		{
+			id: "edit",
+			header: journal("actions"),
+			cell: (r) =>
+				r.date ? (
+					<Link
+						to="/transactions"
+						search={{
+							editTransaction: r.transactionId,
+							editMonth: Number(r.date.slice(5, 7)),
+							editYear: period.fiscalYear ?? undefined,
+						}}
+						aria-label={journal("editRow", { date: r.date })}
+						className="whitespace-nowrap text-primary underline underline-offset-4"
+					>
+						{journal("edit")}
+					</Link>
+				) : null,
+		},
 		{
 			id: "attachments",
 			header: t("attachments"),
@@ -421,6 +445,7 @@ function JournalView({ period }: { period: Period }) {
 								<td className="num px-3 py-2.5 text-right">
 									{formatAmount(book.totalCredit)}
 								</td>
+								<td />
 								<td />
 								<td />
 							</tr>

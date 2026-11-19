@@ -159,10 +159,21 @@ function MailForm({
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
 		const portNumber = Number(port)
-		save.mutate({
-			type: "save",
-			input: { ...form, port: Number.isInteger(portNumber) ? portNumber : 0 },
-		})
+		save.mutate(
+			{
+				type: "save",
+				input: { ...form, port: Number.isInteger(portNumber) ? portNumber : 0 },
+			},
+			{
+				onSuccess: (status) => {
+					const saved = status?.settings
+					if (!saved) return
+					setForm(saved)
+					setPort(String(saved.port))
+					setPreset(presetOf(saved))
+				},
+			}
+		)
 	}
 
 	const submitPassword = (e: FormEvent) => {

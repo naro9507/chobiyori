@@ -179,6 +179,8 @@ pub async fn open_with_login(
         .map_err(|_| device::failed())??;
     let credential: Credential = serde_json::from_slice(&bytes).map_err(|_| failed())?;
     authorize(&credential, record.provider, account.as_deref())?;
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
+    ensure_not_open(&app)?;
     let db = vault::unlock(&files.path, &credential.password)?;
     let binding: Option<String> = db
         .conn()
@@ -191,7 +193,6 @@ pub async fn open_with_login(
     if binding.as_deref() != Some(&credential.binding) {
         return Err(mismatch());
     }
-    ensure_not_open(&app)?;
     open_books(&app, db);
     Ok(())
 }

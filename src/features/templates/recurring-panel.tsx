@@ -298,8 +298,9 @@ function TemplateList({
 			<CardHeader>
 				<div className="flex flex-wrap items-start justify-between gap-3">
 					<div className="flex flex-col gap-1">
-						<CardTitle>{t("templatesTitle")}</CardTitle>
-						<CardDescription>{t("templatesDescription")}</CardDescription>
+						<CardTitle help={t("templatesDescription")}>
+							{t("templatesTitle")}
+						</CardTitle>
 					</div>
 					<Button size="sm" variant="outline" onClick={onAdd}>
 						<Plus aria-hidden="true" />
@@ -541,8 +542,7 @@ function TemplateForm({
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-				<CardDescription>{t("formDescription")}</CardDescription>
+				<CardTitle help={t("formDescription")}>{title}</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form

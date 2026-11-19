@@ -100,13 +100,23 @@ export function ReviewPanel() {
 			id: "merchant",
 			header: t("merchant"),
 			cell: (item) => (
-				<button
-					type="button"
-					className="text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
-					onClick={() => setSelectedId(item.id)}
-				>
-					{item.merchant || t("noMerchant")}
-				</button>
+				<div>
+					<button
+						type="button"
+						className="text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+						onClick={() => setSelectedId(item.id)}
+					>
+						{item.merchant || t("noMerchant")}
+					</button>
+					{item.source === "statement" && item.fileRow > 0 && (
+						<p className="break-all text-muted-foreground text-xs">
+							{t("sourceRow", { file: item.fileName, row: item.fileRow })}
+						</p>
+					)}
+					{item.similarStatement && (
+						<p className="text-warning text-xs">{t("similarStatement")}</p>
+					)}
+				</div>
 			),
 		},
 		{

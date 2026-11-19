@@ -1,6 +1,7 @@
 import { cloneElement, type ReactElement, useId } from "react"
 import { type GlossaryTerm, TermHelp } from "@/features/help/term-help"
 import { cn } from "@/lib/utils"
+import { HelpTip } from "./help-tip"
 
 /**
  * ラベル・入力欄・補足・エラーをひとまとめにする。
@@ -10,6 +11,7 @@ export function Field({
 	label,
 	term,
 	hint,
+	help,
 	error,
 	className,
 	children,
@@ -17,6 +19,7 @@ export function Field({
 	label: string
 	term?: GlossaryTerm
 	hint?: string
+	help?: string
 	error?: string
 	className?: string
 	children: ReactElement<Record<string, unknown>>
@@ -34,6 +37,7 @@ export function Field({
 					{label}
 				</label>
 				{term && <TermHelp term={term} />}
+				{help && <HelpTip topic={label}>{help}</HelpTip>}
 			</div>
 			{cloneElement(children, {
 				id,

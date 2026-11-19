@@ -244,6 +244,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
         }
         if !input.accounts.is_empty() || !input.opening_balances.is_empty() {
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) SELECT ?1, id, ?2 FROM accounts WHERE code = '302'", params![year, asset_total - liability_total])?;
+            tx.execute("UPDATE fiscal_years SET opening_confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE year = ?1", [year])?;
         }
         save_features(tx, &input.features)?;
         tx.execute("INSERT INTO settings (key, value) VALUES ('industry_template', ?1)", [input.template.as_str()])?;
@@ -343,12 +344,12 @@ pub fn update_profile(conn: &Connection, input: &BusinessProfile) -> AppResult<B
 
 pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
     let mut stmt = conn.prepare(
-        "SELECT year, filing_type, tax_status, status = 'closed' FROM fiscal_years ORDER BY year DESC",
+        "SELECT year, filing_type, tax_status, status = 'closed', invoice_tax_start FROM fiscal_years ORDER BY year DESC",
     )?;
-    let registered_on = crate::db::filing::registered_on(conn)?;
     let rows = stmt.query_map([], |row| {
         let year: i64 = row.get(0)?;
         let tax_status: TaxStatus = row.get(2)?;
+        let start: Option<String> = row.get(4)?;
         Ok(FiscalYear {
             year,
             filing_type: row.get(1)?,
@@ -357,7 +358,7 @@ pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
             taxable_from: crate::domain::filing::taxable_from(
                 year,
                 tax_status == TaxStatus::Exempt,
-                registered_on.as_deref(),
+                start.as_deref(),
             ),
         })
     })?;

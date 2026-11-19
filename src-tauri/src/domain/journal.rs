@@ -46,8 +46,12 @@ string_enum! {
     pub enum SimpleKind {
         /// 収入: 口座 / 収益など
         Income => "income",
+        /// 未入金売上: 売掛金 / 売上
+        UnpaidIncome => "unpaid_income",
         /// 支出: 経費など / 口座
         Expense => "expense",
+        /// 私用のお金で立て替えた経費: 経費など / 事業主借
+        PersonalExpense => "personal_expense",
         /// 口座間の振替: 入れた口座 / 出した口座
         Transfer => "transfer",
         /// 事業のお金を私用に使った（引き出した）: 事業主貸 / 口座
@@ -156,8 +160,9 @@ pub fn simple_to_transaction(
     };
     let payment = input.payment_account_id;
     let (debit, credit) = match input.kind {
-        SimpleKind::Income => (payment, account()?),
+        SimpleKind::Income | SimpleKind::UnpaidIncome => (payment, account()?),
         SimpleKind::Expense => (account()?, payment),
+        SimpleKind::PersonalExpense => (account()?, owner.contributions),
         SimpleKind::Transfer => (account()?, payment),
         SimpleKind::OwnerDraw => (owner.drawings, payment),
         SimpleKind::OwnerContribution => (payment, owner.contributions),
@@ -183,7 +188,10 @@ pub fn simple_to_transaction(
 /// かんたん入力で、借方・貸方の科目がどの入力欄から来たか。
 fn simple_field(kind: SimpleKind, side: Side) -> &'static str {
     match (kind, side) {
-        (SimpleKind::Income | SimpleKind::OwnerContribution, Side::Debit)
+        (
+            SimpleKind::Income | SimpleKind::UnpaidIncome | SimpleKind::OwnerContribution,
+            Side::Debit,
+        )
         | (SimpleKind::Expense | SimpleKind::Transfer | SimpleKind::OwnerDraw, Side::Credit) => {
             "paymentAccountId"
         }
@@ -304,14 +312,14 @@ pub struct ValidTransaction {
 ///
 /// - 日付は年度 `fiscal_year` の中
 /// - 金額は 1 円以上の整数
-/// - 借方と貸方がそれぞれ 1 行以上あり、同じ科目が借方と貸方の両方にない
+/// - 借方と貸方がそれぞれ 1 行以上あり、同じ科目は税率の異なる売上・値引きの複合仕訳に限って両側に置ける
 /// - 有効なマスタだけ（`allowed_inactive` にある科目・取引先は、無効でも使ってよい。
 ///   変更前の取引がすでに使っていたもの）
 /// - 借方合計 = 貸方合計
 pub fn validate(
     input: &TransactionInput,
     fiscal_year: i64,
-    masters: &impl MasterLookup,
+    masters: &(impl MasterLookup + ?Sized),
     allowed_inactive: &AllowedInactive,
 ) -> AppResult<ValidTransaction> {
     match parse_date(input.date.trim()) {
@@ -379,10 +387,21 @@ pub fn validate(
     if !has(Side::Debit) || !has(Side::Credit) {
         return Err(AppError::field(ErrorCode::Required, "lines"));
     }
+    // 請求書の税率別の売上と値引きを、複合仕訳の同じ科目で表せる。
+    let taxable_sales = |l: &LineInput| {
+        matches!(
+            l.tax_category,
+            Some(TaxCategory::TaxableSales8 | TaxCategory::TaxableSales10)
+        )
+    };
     for (index, line) in lines.iter().enumerate() {
-        let opposite = lines
-            .iter()
-            .any(|other| other.side != line.side && other.account_id == line.account_id);
+        let opposite = lines.iter().any(|other| {
+            other.side != line.side
+                && other.account_id == line.account_id
+                && (lines.len() == 2
+                    || other.tax_category == line.tax_category
+                    || !(taxable_sales(line) || taxable_sales(other)))
+        });
         if opposite && line.side == Side::Credit {
             return Err(AppError::line(ErrorCode::SameAccount, index, "accountId"));
         }

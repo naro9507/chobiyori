@@ -1,11 +1,12 @@
 import { Loader2 } from "lucide-react"
-import type { ReactNode } from "react"
+import { type ReactNode, useEffect } from "react"
 import { AppShell } from "@/components/layout/app-shell"
 import { LockScreen } from "@/features/security/lock-screen"
 import { useBookStatus } from "@/features/security/security-api"
 import { useSetupStatus } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { SetupPage } from "@/pages/setup-page"
+import { useSimpleEntryDrafts } from "@/stores/simple-entry-draft-store"
 
 function Loading() {
 	const t = useTranslations("app")
@@ -37,5 +38,10 @@ function Books(): ReactNode {
 	const { data, isPending } = useSetupStatus()
 	if (isPending) return <Loading />
 	if (data && !data.completed) return <SetupPage />
+	return <OpenedBooks />
+}
+
+function OpenedBooks() {
+	useEffect(() => () => useSimpleEntryDrafts.setState({ forms: {} }), [])
 	return <AppShell />
 }

@@ -43,6 +43,7 @@ pub fn run() {
             app.manage(commands::security::BookFiles {
                 path: dir.join(DATABASE_FILE),
                 default_backup_dir: dir.join(BACKUP_DIR),
+                access: Default::default(),
             });
             Ok(())
         })
@@ -59,6 +60,8 @@ pub fn run() {
             commands::account_login::open_with_login,
             commands::security::encrypt_books,
             commands::security::change_password,
+            commands::security::issue_recovery_code,
+            commands::security::reset_books_password,
             commands::security::backup_settings,
             commands::security::backup_now,
             commands::security::choose_backup_dir,

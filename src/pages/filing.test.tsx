@@ -1,5 +1,12 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import {
+	act,
+	render,
+	renderHook,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -8,8 +15,10 @@ import type {
 	ConsumptionReport,
 	DeadlineNotice,
 	IncomeGuide,
+	InvoiceRegistration,
+	RegistrationInput,
 } from "@/features/filing/filing-api"
-import { today } from "@/features/filing/filing-api"
+import { today, useFilingDay } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
@@ -87,6 +96,7 @@ const guide: IncomeGuide = {
 	incomeBeforeDeduction: 2_200_000,
 	deduction: 650_000,
 	deductionOnPaper: 550_000,
+	incomeOnPaper: 1_650_000,
 	income: 1_550_000,
 	issueCount: 0,
 }
@@ -170,7 +180,7 @@ function renderAt(path: string) {
 	const router = createAppRouter(
 		createMemoryHistory({ initialEntries: [path] })
 	)
-	render(
+	return render(
 		<AppProviders>
 			<RouterProvider router={router} />
 		</AppProviders>
@@ -188,13 +198,24 @@ const deadline: DeadlineNotice = {
 	total: 7,
 }
 let notices: DeadlineNotice[]
+let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
 let calendarConnections: Set<string>
+let registration: InvoiceRegistration
+let taxStatus: ConsumptionReport["taxStatus"]
 
 beforeEach(() => {
 	notices = [deadline]
+	scheduleResult = "ready"
 	calendarResult = "saved"
 	calendarConnections = new Set()
+	registration = {
+		registrationNo: null,
+		registeredOn: null,
+		simplifiedCategory: 5,
+		checkDigitOk: null,
+	}
+	taxStatus = "special20"
 	useSettingsStore.setState({
 		locale: "ja",
 		theme: "light",
@@ -212,9 +233,16 @@ beforeEach(() => {
 					{
 						year: 2026,
 						filingType: "blue65",
-						taxStatus: "special20",
+						taxStatus,
 						closed: false,
 						taxableFrom: "2026-10-01",
+					},
+					{
+						year: 2025,
+						filingType: "blue65",
+						taxStatus: "standard",
+						closed: false,
+						taxableFrom: "2025-01-01",
 					},
 				]
 			case "list_accounts":
@@ -223,7 +251,7 @@ beforeEach(() => {
 			case "income_tax_guide":
 				return guide
 			case "consumption_tax_report":
-				return consumption
+				return { ...consumption, taxStatus }
 			case "filing_checklist":
 				return [
 					{ key: "submitted", group: "income", doneAt: null },
@@ -242,12 +270,7 @@ beforeEach(() => {
 				]
 			}
 			case "invoice_registration":
-				return {
-					registrationNo: null,
-					registeredOn: null,
-					simplifiedCategory: 5,
-					checkDigitOk: null,
-				}
+				return registration
 			case "get_business_profile":
 				return {
 					tradeName: "テスト教室",
@@ -256,13 +279,17 @@ beforeEach(() => {
 					industry: "",
 					invoiceRegistrationNo: null,
 				}
-			case "save_invoice_registration":
-				return {
-					registrationNo: "T7000012050002",
-					registeredOn: "2026-10-01",
-					simplifiedCategory: 5,
+			case "save_invoice_registration": {
+				const input: RegistrationInput = args.input
+				taxStatus = input.taxStatus
+				registration = {
+					registrationNo: input.registrationNo,
+					registeredOn: input.registeredOn,
+					simplifiedCategory: input.simplifiedCategory,
 					checkDigitOk: true,
 				}
+				return registration
+			}
 			case "filing_deadlines":
 				return notices
 			case "filing_calendar_connection":
@@ -280,7 +307,7 @@ beforeEach(() => {
 			case "export_filing_calendar":
 				return calendarResult
 			case "sync_filing_notifications":
-				return "ready"
+				return scheduleResult
 			case "plugin:notification|notify":
 				return undefined
 			default:
@@ -308,9 +335,18 @@ describe("確定申告の補助", () => {
 			screen.getByRole("button", { name: "「売上（収入）金額」をコピー" })
 		).toBeInTheDocument()
 		expect(screen.getByText("3月の売上")).toBeInTheDocument()
-		expect(
-			screen.getByText(/紙で出すときは控除が 550,000 円/)
-		).toBeInTheDocument()
+		await user.selectOptions(
+			screen.getByLabelText("転記に使う青色申告特別控除"),
+			"paper"
+		)
+		const returnTable = screen.getByRole("table", { name: "申告書" })
+		expect(returnTable).toHaveTextContent("1,650,000")
+		expect(returnTable).not.toHaveTextContent("1,550,000")
+		await user.selectOptions(
+			screen.getByLabelText("転記に使う青色申告特別控除"),
+			"configured"
+		)
+		expect(returnTable).toHaveTextContent("1,550,000")
 		expect(
 			screen.getAllByText(/国税庁の様式・手引きで確かめてください/).length
 		).toBeGreaterThan(0)
@@ -325,8 +361,14 @@ describe("確定申告の補助", () => {
 
 	it("消費税は 2 割特例・簡易課税・本則課税の目安を並べ、年の途中の登録を知らせる", async () => {
 		const user = userEvent.setup()
+		taxStatus = "standard"
 		renderAt("/closing")
 		await user.click(await screen.findByRole("tab", { name: "消費税" }))
+		expect(
+			await screen.findByText(
+				"この年度の設定は「課税事業者（本則課税）」です。"
+			)
+		).toBeVisible()
 		expect(
 			await screen.findByText("2026-10-01 からの取引だけで計算しています。", {
 				exact: false,
@@ -351,9 +393,10 @@ describe("確定申告の補助", () => {
 })
 
 describe("インボイスの登録と期限", () => {
-	it("申請書に書く内容を出し、登録番号と登録日を保存する", async () => {
+	it("登録番号と登録日を保存し、年度の申告方法を変更できる", async () => {
 		const user = userEvent.setup()
-		renderAt("/settings")
+		taxStatus = "exempt"
+		const { unmount } = renderAt("/settings?view=business")
 		const table = await screen.findByRole("table", {
 			name: "登録申請書に書く内容",
 		})
@@ -367,6 +410,11 @@ describe("インボイスの登録と期限", () => {
 			within(card as HTMLElement).getByLabelText("登録日"),
 			"2026-10-01"
 		)
+		const newMethod = within(card as HTMLElement).getByLabelText(
+			"消費税の計算のしかた"
+		)
+		expect(newMethod).toHaveValue("")
+		await user.selectOptions(newMethod, "standard")
 		await user.click(
 			within(card as HTMLElement).getByRole("button", { name: "保存する" })
 		)
@@ -376,10 +424,36 @@ describe("インボイスの登録と期限", () => {
 				input: {
 					registrationNo: "T7000012050002",
 					registeredOn: "2026-10-01",
-					taxStatus: "special20",
+					fiscalYear: 2026,
+					taxStatus: "standard",
 					simplifiedCategory: 5,
 				},
 			}
+		)
+		await within(card as HTMLElement).findByText("設定を保存しました。")
+		expect(newMethod).toHaveValue("standard")
+		unmount()
+		renderAt("/settings?view=business")
+		const method = await screen.findByDisplayValue("本則課税")
+		expect(method).toHaveAccessibleName("消費税の計算のしかた")
+		const savedCard = within(method.closest("[data-slot=card]") as HTMLElement)
+		await user.selectOptions(method, "simplified")
+		await user.click(savedCard.getByRole("button", { name: "保存する" }))
+		expect(await savedCard.findByText("設定を保存しました。")).toBeVisible()
+		expect(method).toHaveValue("simplified")
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"save_invoice_registration",
+			expect.objectContaining({
+				input: expect.objectContaining({ taxStatus: "simplified" }),
+			})
+		)
+		await user.selectOptions(screen.getByLabelText("見る年度"), "2025")
+		expect(await screen.findByDisplayValue("本則課税")).toHaveAccessibleName(
+			"消費税の計算のしかた"
+		)
+		await user.selectOptions(screen.getByLabelText("見る年度"), "2026")
+		expect(await screen.findByDisplayValue("簡易課税")).toHaveAccessibleName(
+			"消費税の計算のしかた"
 		)
 	})
 
@@ -395,17 +469,18 @@ describe("インボイスの登録と期限", () => {
 
 	it("設定した期間の未提出だけを通知し、設定を端末に保存する", async () => {
 		notices = [
-			{ ...deadline, daysLeft: 7 },
-			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 7 },
+			{ ...deadline, daysLeft: 5 },
+			{ ...deadline, fiscalYear: 2025, submitted: true, daysLeft: 5 },
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const reminder = await screen.findByRole("region", {
 			name: "申告期限のリマインダー",
 		})
 		expect(reminder).toHaveTextContent("2026年分の確定申告")
+		expect(reminder).toHaveTextContent("申告期限まであと5日（2027-03-15）")
 		const sevenDays = screen.getByRole("checkbox", {
-			name: "7日前（残り7〜2日）",
+			name: "期限の7日前",
 		})
 		await user.click(sevenDays)
 		expect(
@@ -434,9 +509,17 @@ describe("インボイスの登録と期限", () => {
 			{ ...deadline, fiscalYear: 2024, daysLeft: 31 },
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		await screen.findByRole("region", { name: "申告期限のリマインダー" })
 		const checkbox = screen.getByRole("checkbox", { name: "デスクトップ通知" })
+		expect(checkbox).toHaveAccessibleDescription(/午前9時に通知を予約/)
+		const help = screen.getByRole("button", { name: "デスクトップ通知の説明" })
+		expect(screen.queryByText(/閉じていても届きます/)).not.toBeInTheDocument()
+		await user.hover(help)
+		expect(await screen.findByRole("tooltip")).toHaveTextContent(
+			"閉じていても届きます"
+		)
+		await user.keyboard("{Escape}")
 		const calls = () =>
 			mocks.callCommand.mock.calls.filter(
 				([name]) => name === "plugin:notification|notify"
@@ -449,7 +532,7 @@ describe("インボイスの登録と期限", () => {
 		expect(calls()[0][1]).toEqual({
 			options: {
 				title: "2026年分の確定申告",
-				body: "期限は 2027-03-15、あと 20 日です。",
+				body: "申告期限まであと20日（2027-03-15）",
 			},
 		})
 		const saved = JSON.parse(localStorage.getItem("dcs-settings") ?? "{}")
@@ -476,7 +559,7 @@ describe("インボイスの登録と期限", () => {
 			},
 		]
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const desktop = await screen.findByRole("checkbox", {
 			name: "デスクトップ通知",
 		})
@@ -498,13 +581,12 @@ describe("インボイスの登録と期限", () => {
 			scheduled.setDate(scheduled.getDate() - days)
 			expect(reserved[index].at).toBe(scheduled.getTime())
 		}
+		expect(reserved[2].body).toBe(`申告期限は明日（${today(due)}）です。`)
 		expect(mocks.callCommand).toHaveBeenCalledWith("filing_deadlines", {
 			today: today(),
 			includeFuture: true,
 		})
-		await user.click(
-			screen.getByRole("checkbox", { name: "7日前（残り7〜2日）" })
-		)
+		await user.click(screen.getByRole("checkbox", { name: "期限の7日前" }))
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
@@ -512,7 +594,7 @@ describe("インボイスの登録と期限", () => {
 
 	it("連携したカレンダーだけを同期する", async () => {
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const google = within(
 			await screen.findByRole("group", { name: "Google カレンダー" })
 		)
@@ -569,13 +651,33 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(syncCount()).toBe(3))
 	})
 
+	it("OSで通知が拒否されたときは許可の案内が出て、再試行で予約できる", async () => {
+		const due = new Date()
+		due.setDate(due.getDate() + 90)
+		notices = [{ ...deadline, date: today(due), daysLeft: 90 }]
+		scheduleResult = "denied"
+		const user = userEvent.setup()
+		renderAt("/settings")
+		await user.click(
+			await screen.findByRole("checkbox", { name: "デスクトップ通知" })
+		)
+		expect(
+			await screen.findByText(/OS で帳日和の通知が許可されていません/)
+		).toBeInTheDocument()
+		scheduleResult = "ready"
+		await user.click(screen.getByRole("button", { name: "通知予約を再試行" }))
+		expect(
+			await screen.findByText(/通知を 3 件予約しました/)
+		).toBeInTheDocument()
+	})
+
 	it("通知をオフにしていてもカレンダーに書き出せ、期限がなければ案内する", async () => {
 		useSettingsStore.setState({
 			filingReminders: [],
 			filingDesktopNotifications: false,
 		})
 		const user = userEvent.setup()
-		renderAt("/settings")
+		renderAt("/settings?view=business")
 		const button = await screen.findByRole("button", {
 			name: "カレンダーに書き出す",
 		})
@@ -605,4 +707,18 @@ describe("インボイスの登録と期限", () => {
 			).not.toBeInTheDocument()
 		})
 	})
+})
+
+it("画面を開いたまま午前0時を過ぎると申告期限の照会日が変わる", async () => {
+	vi.useFakeTimers()
+	try {
+		vi.setSystemTime(new Date(2027, 2, 7, 23, 59, 59, 500))
+		const { result, unmount } = renderHook(() => useFilingDay())
+		expect(result.current).toBe("2027-03-07")
+		await act(() => vi.advanceTimersByTimeAsync(500))
+		expect(result.current).toBe("2027-03-08")
+		unmount()
+	} finally {
+		vi.useRealTimers()
+	}
 })

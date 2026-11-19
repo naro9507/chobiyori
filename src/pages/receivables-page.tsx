@@ -659,8 +659,7 @@ function YearTab() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("yearTitle")}</CardTitle>
-				<CardDescription>{t("yearHint")}</CardDescription>
+				<CardTitle help={t("yearHint")}>{t("yearTitle")}</CardTitle>
 			</CardHeader>
 			<CardContent>
 				{query.error ? (
@@ -758,8 +757,7 @@ function PlansTab() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("plansTitle")}</CardTitle>
-				<CardDescription>{t("plansHint")}</CardDescription>
+				<CardTitle help={t("plansHint")}>{t("plansTitle")}</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{plans.error ? (

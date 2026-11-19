@@ -87,7 +87,7 @@ pub fn state(path: &Path) -> AppResult<BookState> {
 
 /// 鍵を付けて、読めるかを確かめる。読めなければパスワード違い。
 fn open_checked(path: &Path, password: &Password) -> AppResult<Connection> {
-    let conn = Connection::open(path)?;
+    let conn = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
     conn.pragma_update(None, "key", password.as_str())?;
     conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
         r.get::<_, i64>(0)
@@ -102,7 +102,9 @@ pub fn create(path: &Path, password: &str) -> AppResult<Database> {
         return Err(AppError::new(ErrorCode::AlreadySetUp));
     }
     let password = validate_new(password)?;
-    Database::open(path, Some(password.as_str()))
+    let db = Database::open(path, Some(password.as_str()))?;
+    super::recovery::discard(path);
+    Ok(db)
 }
 
 /// 暗号化した帳簿を開く。パスワードが違えば `WrongPassword`。
@@ -210,6 +212,7 @@ pub fn encrypt_existing(path: &Path, password: &str) -> AppResult<Database> {
     }
     match Database::open(path, Some(password.as_str())) {
         Ok(db) => {
+            super::recovery::discard(path);
             let _ = std::fs::remove_file(&old);
             for side in side_files(&old) {
                 let _ = std::fs::remove_file(side);
@@ -224,21 +227,35 @@ pub fn encrypt_existing(path: &Path, password: &str) -> AppResult<Database> {
     }
 }
 
-/// パスワードを変える。いまのパスワードが合っていなければ変えない。
-pub fn change_password(db: &Database, current: &str, new: &str) -> AppResult<()> {
+pub(super) fn check_current(db: &Database, current: &str) -> AppResult<Password> {
     let Some(key) = db.key() else {
         return Err(AppError::new(ErrorCode::BooksLocked));
     };
     if key.as_str() != current {
         return Err(AppError::field(ErrorCode::WrongPassword, "currentPassword"));
     }
-    let new = validate_new(new).map_err(|e| AppError::field(e.code, "newPassword"))?;
+    Ok(key)
+}
+
+/// パスワードを変える。いまのパスワードが合っていなければ変えない。
+pub fn change_password(db: &Database, current: &str, new: &str) -> AppResult<()> {
     let conn = db.conn();
-    // Reusing an earlier password must never reactivate an earlier enrollment.
-    conn.execute("DELETE FROM settings WHERE key=?1", [DEVICE_BINDING])?;
-    conn.pragma_update(None, "rekey", new.as_str())?;
-    drop(conn);
-    db.set_key(Some(new));
+    let current = check_current(db, current)?;
+    let new = validate_new(new).map_err(|e| AppError::field(e.code, "newPassword"))?;
+    if current != new {
+        conn.execute("DELETE FROM settings WHERE key=?1", [DEVICE_BINDING])?;
+        let path = db
+            .path()
+            .ok_or_else(|| AppError::new(ErrorCode::BooksLocked))?;
+        // 復旧コードを破棄する前に、新しい鍵での書き込みをディスクに同期する。
+        conn.pragma_update(None, "synchronous", "FULL")?;
+        let rekey = conn.pragma_update(None, "rekey", new.as_str());
+        let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+        rekey?;
+        drop(open_checked(path, &new)?);
+        db.set_key(Some(new));
+        super::recovery::discard(path);
+    }
     Ok(())
 }
 

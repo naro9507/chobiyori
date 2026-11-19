@@ -1,13 +1,7 @@
 import { ImagePlus, X } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, Textarea } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
@@ -26,8 +20,7 @@ export function DocumentSettingsCard() {
 	return (
 		<Card id="document-settings">
 			<CardHeader>
-				<CardTitle>{t("title")}</CardTitle>
-				<CardDescription>{t("description")}</CardDescription>
+				<CardTitle help={t("description")}>{t("title")}</CardTitle>
 			</CardHeader>
 			<CardContent>
 				{settings.data && <SettingsForm initial={settings.data} />}
@@ -51,10 +44,18 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
 		const days = Number(dueDays)
-		save.mutate({
-			type: "save",
-			input: { ...form, dueDays: Number.isInteger(days) ? days : -1 },
-		})
+		save.mutate(
+			{
+				type: "save",
+				input: { ...form, dueDays: Number.isInteger(days) ? days : -1 },
+			},
+			{
+				onSuccess: (saved) => {
+					setForm(saved)
+					setDueDays(String(saved.dueDays))
+				},
+			}
+		)
 	}
 	const image = (role: "logo" | "seal") => {
 		const id = role === "logo" ? form.logoAttachmentId : form.sealAttachmentId

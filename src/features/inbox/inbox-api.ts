@@ -104,7 +104,13 @@ export type HeaderDiff = {
 }
 
 export type StatementImport =
-	| { kind: "imported"; added: number; duplicates: number }
+	| {
+			kind: "imported"
+			added: number
+			duplicates: number
+			ignoredCount: number
+			ignored: RowNote[]
+	  }
 	| { kind: "mismatch"; diff: HeaderDiff }
 	| { kind: "problems"; errors: RowNote[]; errorCount: number }
 
@@ -148,6 +154,7 @@ export type InboxItem = {
 		result: RuleResult
 	} | null
 	possibleDuplicateId: number | null
+	similarStatement: boolean
 }
 
 export type ConfirmInput = {
@@ -236,10 +243,11 @@ export function useOpenStatement() {
 /** 開いた明細を、形式で試し読みする。 */
 export function useStatementPreview(
 	opened: OpenedStatement | null,
-	definition: FormatDefinition | null
+	definition: FormatDefinition | null,
+	revision: number
 ) {
 	return useQuery({
-		queryKey: ["statement-preview", opened?.fileName, definition],
+		queryKey: ["statement-preview", revision, opened?.fileName, definition],
 		queryFn: () =>
 			callCommand<StatementPreview>("preview_statement", { definition }),
 		enabled: opened !== null && definition !== null,
@@ -594,10 +602,11 @@ export function useAttachFiles() {
 	})
 }
 
-export function useDeleteAttachment() {
+export function useDeleteAttachment(transactionId: number) {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (id: number) => callCommand<void>("delete_attachment", { id }),
+		mutationFn: (id: number) =>
+			callCommand<void>("delete_attachment", { id, transactionId }),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: ["attachments"] }),
 	})

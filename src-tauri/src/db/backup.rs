@@ -99,9 +99,9 @@ fn timestamp(conn: &Connection) -> AppResult<String> {
 /// バックアップを作る。作ったファイルの名前を返す。
 pub fn create(db: &Database, dir: &Path, kind: BackupKind) -> AppResult<String> {
     std::fs::create_dir_all(dir).map_err(|_| AppError::new(ErrorCode::FileWrite))?;
-    let key = db.key();
     let name = {
         let conn = db.conn();
+        let key = db.key();
         let mut name = format!("books-{}-{}.{EXTENSION}", kind.prefix(), timestamp(&conn)?);
         // 同じ秒に 2 回作ったときは番号を付ける
         let mut n = 2;
@@ -279,18 +279,26 @@ pub fn restore(db: &Database, source: &Path, password: Option<&str>, dir: &Path)
     // 3. 入れ替える。接続を閉じている間は、ほかの処理を待たせる
     let old = path.with_extension("db.replaced");
     let mut guard = db.conn();
-    let current = std::mem::replace(&mut *guard, Connection::open_in_memory()?);
-    let _ = current.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
-    drop(current);
+    let checkpoint: i64 =
+        guard.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))?;
+    if checkpoint != 0 {
+        let _ = std::fs::remove_file(&incoming);
+        return Err(AppError::new(ErrorCode::FileWrite));
+    }
+    *guard = Connection::open_in_memory()?;
     for side in side_files(&path) {
         let _ = std::fs::remove_file(side);
     }
-    std::fs::rename(&path, &old).map_err(|_| AppError::new(ErrorCode::FileWrite))?;
     let reopen = |file: &Path| -> AppResult<Connection> {
         let conn = connect(file, key.as_ref().map(Password::as_str))?;
         migrate(&conn)?;
         Ok(conn)
     };
+    if std::fs::rename(&path, &old).is_err() {
+        *guard = reopen(&path)?;
+        let _ = std::fs::remove_file(&incoming);
+        return Err(AppError::new(ErrorCode::FileWrite));
+    }
     let swapped = std::fs::rename(&incoming, &path)
         .map_err(|_| AppError::new(ErrorCode::FileWrite))
         .and_then(|()| reopen(&path));

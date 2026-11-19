@@ -16,7 +16,7 @@ pub mod statement_file;
 
 use crate::db::accounts::{self, Account};
 use crate::db::partners::{self, Partner};
-use crate::db::transactions::{self, Transaction};
+use crate::db::transactions::{self, DbMasters, Transaction};
 use crate::db::Database;
 use crate::domain::journal::{
     self, AllowedInactive, EntryMode, LineInput, MasterLookup, Side, TransactionInput,
@@ -98,6 +98,8 @@ string_enum! {
         MissingSide => "missingSide",
         /// メモが長すぎる・明細行が多すぎる
         TooLong => "tooLong",
+        InconsistentDate => "inconsistentDate",
+        MonthLocked => "monthLocked",
     }
 }
 
@@ -265,18 +267,30 @@ impl MasterLookup for Masters {
     }
 }
 
-/// 重複の判定に使う、取引の中身。取引先とメモは比べない。
-fn signature(date: &str, lines: impl Iterator<Item = (Side, i64, i64)>) -> String {
-    let mut lines: Vec<(Side, i64, i64)> = lines.collect();
-    lines.sort_by_key(|&(side, account, amount)| (side.as_str(), account, amount));
-    let mut text = date.to_string();
-    for (side, account, amount) in lines {
-        text.push_str(&format!("|{}:{account}:{amount}", side.as_str()));
-    }
-    text
+// 重複判定は取引先・補助科目・税区分・摘要も含む。明細の並び順は問わない。
+type SignatureLine = (
+    &'static str,
+    i64,
+    i64,
+    Option<i64>,
+    Option<i64>,
+    &'static str,
+    bool,
+    String,
+);
+type Signature = (String, String, Vec<SignatureLine>);
+
+fn signature(date: &str, memo: &str, lines: impl Iterator<Item = SignatureLine>) -> Signature {
+    let mut lines: Vec<_> = lines.collect();
+    lines.sort_unstable();
+    (date.to_string(), memo.to_string(), lines)
 }
 
-fn existing_signatures(conn: &Connection, year: i64) -> AppResult<HashMap<String, usize>> {
+fn existing_signatures(
+    conn: &Connection,
+    year: i64,
+    masters: &DbMasters,
+) -> AppResult<HashMap<Signature, usize>> {
     let mut counts = HashMap::new();
     let all: Vec<Transaction> = transactions::list_between(
         conn,
@@ -287,7 +301,26 @@ fn existing_signatures(conn: &Connection, year: i64) -> AppResult<HashMap<String
     for t in all {
         let key = signature(
             &t.date,
-            t.lines.iter().map(|l| (l.side, l.account_id, l.amount)),
+            &t.memo,
+            t.lines.iter().map(|l| {
+                let tax = l.tax_category.unwrap_or_else(|| {
+                    journal::resolve_tax(
+                        None,
+                        masters.account_tax(l.account_id),
+                        masters.tax_exempt(&t.date),
+                    )
+                });
+                (
+                    l.side.as_str(),
+                    l.account_id,
+                    l.amount,
+                    l.partner_id,
+                    l.sub_account_id,
+                    tax.as_str(),
+                    l.is_qualified_invoice,
+                    l.memo.clone(),
+                )
+            }),
         );
         *counts.entry(key).or_insert(0) += 1;
     }
@@ -397,10 +430,22 @@ fn plan(
         }
     }
 
-    let mut existing = match fiscal_year {
-        Some(y) if !creates_fiscal_year => existing_signatures(conn, y)?,
+    let current = fiscal_year.filter(|_| !creates_fiscal_year);
+    let db_masters = current
+        .map(|year| DbMasters::load(conn, year))
+        .transpose()?;
+    let mut existing = match (current, &db_masters) {
+        (Some(y), Some(masters)) => existing_signatures(conn, y, masters)?,
         _ => HashMap::new(),
     };
+    let locked_months = current
+        .map(|year| crate::db::locks::status(conn, year))
+        .transpose()?
+        .map(|status| status.locked_months)
+        .unwrap_or_default();
+    let validator: &dyn MasterLookup = db_masters
+        .as_ref()
+        .map_or(&masters as &dyn MasterLookup, |m| m);
     let mapping: HashMap<i64, i64> = mapping.iter().map(|m| (m.number, m.account_id)).collect();
     let mut new_partners = Vec::new();
     let mut partner_cache = HashMap::new();
@@ -500,17 +545,50 @@ fn plan(
             lines,
         };
         let Some(year) = fiscal_year else { continue };
-        if let Err(error) = journal::validate(&input, year, &masters, &AllowedInactive::default()) {
-            issues.push(issue_of(&error, draft));
-            continue;
-        }
+        let valid = match journal::validate(&input, year, validator, &AllowedInactive::default()) {
+            Ok(valid) => valid,
+            Err(error) => {
+                issues.push(issue_of(&error, draft));
+                continue;
+            }
+        };
         let key = signature(
-            input.date.trim(),
-            input.lines.iter().map(|l| (l.side, l.account_id, l.amount)),
+            &valid.date,
+            &valid.memo,
+            valid
+                .lines
+                .iter()
+                .zip(&partner_plans)
+                .map(|(line, partner)| {
+                    let partner = match partner {
+                        Some(PartnerPlan::Existing(id)) => Some(*id),
+                        Some(PartnerPlan::New(index)) => Some(-1 - *index as i64),
+                        None => None,
+                    };
+                    (
+                        line.side.as_str(),
+                        line.account_id,
+                        line.amount,
+                        partner,
+                        line.sub_account_id,
+                        line.tax_category.map_or("", |tax| tax.as_str()),
+                        line.is_qualified_invoice,
+                        line.memo.clone(),
+                    )
+                }),
         );
         if let Some(count) = existing.get_mut(&key).filter(|c| **c > 0) {
             *count -= 1;
             duplicates += 1;
+            continue;
+        }
+        if journal::parse_date(&valid.date)
+            .is_some_and(|(_, month, _)| locked_months.contains(&month))
+        {
+            issues.push(
+                Issue::new(draft.sheet.as_deref(), draft.row, IssueCode::MonthLocked)
+                    .with(valid.date),
+            );
             continue;
         }
         ready.push(Ready {
@@ -727,23 +805,33 @@ mod tests {
     }
 
     #[test]
-    fn signature_ignores_line_order() {
+    fn signature_ignores_line_order_but_keeps_the_memo() {
+        let line = |side: Side, account| {
+            (
+                side.as_str(),
+                account,
+                100,
+                None,
+                None,
+                "",
+                false,
+                String::new(),
+            )
+        };
+        let debit = line(Side::Debit, 1);
+        let credit = line(Side::Credit, 2);
         let a = signature(
             "2026-01-01",
-            [(Side::Debit, 1, 100), (Side::Credit, 2, 100)].into_iter(),
+            "A",
+            [debit.clone(), credit.clone()].into_iter(),
         );
         let b = signature(
             "2026-01-01",
-            [(Side::Credit, 2, 100), (Side::Debit, 1, 100)].into_iter(),
+            "A",
+            [credit.clone(), debit.clone()].into_iter(),
         );
         assert_eq!(a, b);
-        assert_ne!(
-            a,
-            signature(
-                "2026-01-02",
-                [(Side::Debit, 1, 100), (Side::Credit, 2, 100)].into_iter()
-            )
-        );
+        assert_ne!(a, signature("2026-01-01", "B", [debit, credit].into_iter()));
     }
 
     #[test]

@@ -28,8 +28,7 @@ function useCalendarSync(provider: Provider, background = false) {
 		retry: false,
 	})
 	const connected = connection.data === "connected"
-	const date = today()
-	const deadlines = useFilingDeadlines(connected, date, true)
+	const deadlines = useFilingDeadlines(connected, true)
 	const plan = deadlines.data
 		?.filter((notice) => !notice.submitted && notice.daysLeft >= 0)
 		.map(({ kind, fiscalYear, date, estimated }) => [
@@ -39,7 +38,7 @@ function useCalendarSync(provider: Provider, background = false) {
 			estimated,
 		])
 	const sync = useQuery({
-		queryKey: [...syncKey(provider), locale, date, plan],
+		queryKey: [...syncKey(provider), locale, deadlines.day, plan],
 		queryFn: () =>
 			callCommand<null>("sync_filing_calendar", {
 				provider,

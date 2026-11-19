@@ -152,12 +152,13 @@ pub fn parse(bytes: &[u8]) -> AppResult<Parsed> {
             )
         };
 
+        let date = normalize_date(get(Role::Date));
         let key = get(Role::TransactionNo).to_string();
         let index = *groups.entry(key).or_insert_with(|| {
             parsed.drafts.push(Draft {
                 sheet: None,
                 row,
-                date: normalize_date(get(Role::Date)),
+                date: date.clone(),
                 memo: get(Role::TransactionMemo).to_string(),
                 lines: Vec::new(),
             });
@@ -168,6 +169,11 @@ pub fn parse(bytes: &[u8]) -> AppResult<Parsed> {
             continue;
         }
         let issue = |code| Issue::new(None, row, code);
+        if date != parsed.drafts[index].date {
+            parsed.issues.push(issue(IssueCode::InconsistentDate));
+            invalid[index] = true;
+            continue;
+        }
         let Some(side) = parse_side(get(Role::Side)) else {
             parsed.issues.push(issue(IssueCode::InvalidSide));
             invalid[index] = true;

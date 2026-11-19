@@ -7,6 +7,7 @@ use super::files;
 use crate::db::audit::{self, AuditEntry};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
+use crate::db::recovery;
 use crate::db::vault::{self, BookState};
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
@@ -19,6 +20,8 @@ use tauri::{AppHandle, Manager, State};
 pub struct BookFiles {
     pub path: PathBuf,
     pub default_backup_dir: PathBuf,
+    /// 起動・パスワード変更・復旧コードの発行・帳簿の入れ替えを直列に行う。
+    pub access: Mutex<()>,
 }
 
 /// 復元に選んだファイル。場所は画面に渡さず、ここで覚えておく。
@@ -61,6 +64,7 @@ pub async fn create_books(
     files: State<'_, BookFiles>,
     password: String,
 ) -> AppResult<()> {
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
     let db = vault::create(&files.path, &password)?;
     open_books(&app, db);
@@ -74,6 +78,7 @@ pub async fn unlock_books(
     files: State<'_, BookFiles>,
     password: String,
 ) -> AppResult<()> {
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
     let db = vault::unlock(&files.path, &password)?;
     open_books(&app, db);
@@ -88,6 +93,7 @@ pub async fn encrypt_books(
     files: State<'_, BookFiles>,
     password: String,
 ) -> AppResult<()> {
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
     let db = vault::encrypt_existing(&files.path, &password)?;
     let dir = backup::dir(&db.conn(), &files.default_backup_dir)?;
@@ -101,13 +107,48 @@ pub async fn encrypt_books(
 pub async fn change_password(
     db: State<'_, Database>,
     login: State<'_, super::account_login::LoginState>,
+    files: State<'_, BookFiles>,
     current: String,
     new: String,
 ) -> AppResult<()> {
     let _guard = login.0.lock().await;
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     vault::change_password(&db, &current, &new)?;
-    super::account_login::discard_device_record();
+    if current != new {
+        super::account_login::discard_device_record();
+    }
     audit::event(&db.conn(), "books", "change_password", None, None)
+}
+
+#[tauri::command]
+pub async fn issue_recovery_code(
+    db: State<'_, Database>,
+    files: State<'_, BookFiles>,
+    current: String,
+) -> AppResult<String> {
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
+    recovery::issue(&db, &current)
+}
+
+#[tauri::command]
+pub async fn reset_books_password(
+    login: State<'_, super::account_login::LoginState>,
+    app: AppHandle,
+    files: State<'_, BookFiles>,
+    recovery_code: String,
+    new: String,
+) -> AppResult<()> {
+    let _guard = login.0.lock().await;
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
+    ensure_not_open(&app)?;
+    let db = recovery::reset(&files.path, &recovery_code, &new)?;
+    super::account_login::discard_device_record();
+    // 履歴の書き込みに失敗しても、再設定したパスワードで帳簿を開けるようにする。
+    if let Err(error) = audit::event(&db.conn(), "books", "change_password", None, None) {
+        eprintln!("パスワード再設定の履歴を保存できませんでした: {error}");
+    }
+    app.manage(db);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -230,9 +271,10 @@ pub async fn restore_backup(
     state: State<'_, RestoreState>,
     password: Option<String>,
 ) -> AppResult<()> {
+    let _guard = login.0.lock().await;
+    let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     let path = chosen(&state)?;
     let dir = backup_dir(&db, &files)?;
-    let _guard = login.0.lock().await;
     backup::restore(&db, &path, password.as_deref(), &dir)?;
     super::account_login::discard_device_record();
     *state.0.lock().unwrap_or_else(|p| p.into_inner()) = None;

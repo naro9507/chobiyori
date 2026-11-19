@@ -1,11 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslations } from "@/i18n/use-translations"
 import { useFilingDeadlines } from "./filing-api"
 
@@ -19,8 +13,9 @@ export function DeadlineNotices() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("deadlinesTitle")}</CardTitle>
-				<CardDescription>{t("deadlinesDescription")}</CardDescription>
+				<CardTitle help={t("deadlinesDescription")}>
+					{t("deadlinesTitle")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				<ul className="flex flex-col gap-2">

@@ -102,6 +102,7 @@ function item(
 							ignore: false,
 						},
 					},
+		similarStatement: false,
 		possibleDuplicateId: id === 2 ? 77 : null,
 	}
 }
@@ -140,6 +141,8 @@ let importResult: StatementImport = {
 	kind: "imported",
 	added: 1,
 	duplicates: 0,
+	ignoredCount: 0,
+	ignored: [],
 }
 
 function renderPage() {
@@ -169,7 +172,13 @@ afterAll(() => {
 })
 
 beforeEach(() => {
-	importResult = { kind: "imported", added: 1, duplicates: 0 }
+	importResult = {
+		kind: "imported",
+		added: 1,
+		duplicates: 0,
+		ignoredCount: 0,
+		ignored: [],
+	}
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(async (command: string) => {
@@ -192,6 +201,8 @@ beforeEach(() => {
 			case "list_allocation_rules":
 			case "list_rules":
 				return []
+			case "reconciliation":
+				return { paired: 0, statementOnly: [], receiptOnly: [] }
 			case "list_inbox":
 				return [item(1, "文具店", 1080, 3), item(2, "カフェ", 900, null)]
 			case "confirm_inbox_item":
@@ -270,8 +281,17 @@ describe("取込受信箱", () => {
 
 	it("合う形式のない明細は、形式エディタで読み方と取込先を決めて取り込む", async () => {
 		const user = userEvent.setup()
+		importResult = {
+			kind: "imported",
+			added: 1,
+			duplicates: 0,
+			ignoredCount: 1,
+			ignored: preview.ignored,
+		}
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "明細を取り込む" }))
+		await user.click(
+			await screen.findByRole("link", { name: "銀行・カードの明細を取り込む" })
+		)
 		await user.click(
 			screen.getByRole("button", { name: "明細のファイルを選ぶ" })
 		)
@@ -280,8 +300,10 @@ describe("取込受信箱", () => {
 		).toBeInTheDocument()
 		expect(screen.getByLabelText("1 列目の役割")).toHaveValue("date")
 		expect(
-			await screen.findByText("すべての行を読めました")
+			await screen.findByText("取込から除いた行が 1 件あります。")
 		).toBeInTheDocument()
+		expect(screen.queryByText("すべての行を読めました")).not.toBeInTheDocument()
+		expect(screen.getByText(/3 行目.*日付が読めません/)).toBeInTheDocument()
 		const save = screen.getByRole("button", {
 			name: "形式を保存して受信箱に入れる",
 		})
@@ -310,6 +332,7 @@ describe("取込受信箱", () => {
 		expect(
 			await screen.findByText(/1 件を受信箱に入れました/)
 		).toBeInTheDocument()
+		expect(screen.getByText(/3 行目.*日付が読めません/)).toBeInTheDocument()
 	})
 
 	it("見出しが変わった明細は取り込まず、違いを見せる", async () => {
@@ -324,7 +347,9 @@ describe("取込受信箱", () => {
 			},
 		}
 		renderPage()
-		await user.click(await screen.findByRole("tab", { name: "明細を取り込む" }))
+		await user.click(
+			await screen.findByRole("link", { name: "銀行・カードの明細を取り込む" })
+		)
 		await user.click(
 			screen.getByRole("button", { name: "明細のファイルを選ぶ" })
 		)
