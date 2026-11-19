@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { CircleAlert, CircleCheck, FileUp, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -229,6 +230,11 @@ function ImportResultView({
 					})}
 				</p>
 				<IgnoredRows count={result.ignoredCount} notes={result.ignored} />
+				{result.added > 0 && (
+					<Button asChild size="sm" variant="outline">
+						<Link to="/inbox">{t("reviewImported")}</Link>
+					</Button>
+				)}
 			</div>
 		)
 	}

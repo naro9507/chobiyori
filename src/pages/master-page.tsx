@@ -1,3 +1,4 @@
+import { useSearch } from "@tanstack/react-router"
 import { Tabs } from "radix-ui"
 import { useId } from "react"
 import { Page } from "@/components/layout/page"
@@ -45,10 +46,15 @@ const tabs = [
 export function MasterPage() {
 	const features = useFeatures()
 	const t = useTranslations("master")
+	const { view } = useSearch({ strict: false })
 
 	return (
 		<Page screen="master">
-			<Tabs.Root defaultValue="accounts" className="flex flex-col gap-4">
+			<Tabs.Root
+				key={view}
+				defaultValue={view === "purposes" ? "purposes" : "accounts"}
+				className="flex flex-col gap-4"
+			>
 				<Tabs.List
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"

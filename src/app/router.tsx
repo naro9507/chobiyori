@@ -27,6 +27,7 @@ type ScreenSearch = {
 	q?: string
 	article?: string
 	tab?: "opening"
+	view?: string
 	editTransaction?: number
 	editMonth?: number
 	editYear?: number
@@ -89,6 +90,7 @@ const screenRoutes = navItems.map((item) => {
 			editYear: Number.isSafeInteger(search.editYear)
 				? Number(search.editYear)
 				: undefined,
+			view: typeof search.view === "string" ? search.view : undefined,
 			q: typeof search.q === "string" ? search.q : undefined,
 			article: typeof search.article === "string" ? search.article : undefined,
 		}),

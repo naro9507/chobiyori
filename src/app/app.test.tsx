@@ -60,6 +60,7 @@ describe("設定", () => {
 	it("言語を英語に切り替えると、メニューが英語になる", async () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
+		await user.click(await screen.findByRole("button", { name: "表示" }))
 
 		await user.click(await screen.findByRole("radio", { name: "English" }))
 
@@ -76,9 +77,11 @@ describe("設定", () => {
 	it("ダークを選ぶと、画面全体がダークになる", async () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
+		await user.click(await screen.findByRole("button", { name: "表示" }))
 
 		await user.click(await screen.findByRole("radio", { name: "ダーク" }))
 
 		expect(document.documentElement).toHaveClass("dark")
+		expect(screen.getByText("テーマを変更しました。")).toBeVisible()
 	})
 })

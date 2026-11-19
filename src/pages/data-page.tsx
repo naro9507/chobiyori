@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { CircleAlert, CircleCheck, FileUp, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
@@ -37,8 +38,8 @@ import { useErrorMessage } from "@/lib/use-error-message"
 export function DataPage() {
 	return (
 		<Page screen="data">
-			<BackupCard />
 			<ImportCard />
+			<BackupCard />
 			<ExportCard />
 			<HistoryCard />
 		</Page>
@@ -98,11 +99,18 @@ function ImportCard() {
 	}
 
 	return (
-		<Card>
+		<Card id="book-import">
 			<CardHeader>
 				<CardTitle help={t("importDescription")}>{t("importTitle")}</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
+				<Link
+					to="/inbox"
+					search={{ view: "statement" }}
+					className="w-fit text-primary text-sm underline"
+				>
+					{t("statementImport")}
+				</Link>
 				<div className="grid gap-3 sm:grid-cols-2">
 					{kinds.map((kind) => (
 						<div

@@ -36,12 +36,20 @@ export function FeatureChoices({
 			</legend>
 			{(Object.keys(defaultFeatures) as (keyof FeatureSettings)[]).map(
 				(key) => (
-					<LabeledCheckbox
-						key={key}
-						label={t(key)}
-						checked={value[key]}
-						onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
-					/>
+					<div key={key}>
+						<LabeledCheckbox
+							label={t(key)}
+							checked={value[key]}
+							onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+							aria-describedby={`${titleId}-${key}-screens`}
+						/>
+						<p
+							id={`${titleId}-${key}-screens`}
+							className="ml-7 text-muted-foreground text-sm"
+						>
+							{t(`screens_${key}`)}
+						</p>
+					</div>
 				)
 			)}
 		</fieldset>

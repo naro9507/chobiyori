@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
@@ -14,11 +15,17 @@ import {
 	useRecordDeposit,
 } from "@/features/deposits/deposits-api"
 import { TermHelp } from "@/features/help/term-help"
-import { type AccountCategory, displayName } from "@/features/master/master-api"
+import {
+	type AccountCategory,
+	displayName,
+	purposeKind,
+	useMasterList,
+} from "@/features/master/master-api"
 import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
 import { amountForCommand, formatAmount, parseAmount } from "@/lib/amount"
 import { fieldError, isAppError } from "@/lib/errors"
+import { callCommand } from "@/lib/tauri"
 import { useEntryIntent } from "@/stores/entry-intent-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
@@ -33,6 +40,7 @@ import {
 	type SimpleKind,
 	type Transaction,
 	useCreateSimpleTransaction,
+	useInvalidateBooks,
 } from "./journal-api"
 import { useJournalErrorMessage } from "./journal-errors"
 import { useJournalMasters } from "./use-master-items"
@@ -87,6 +95,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 			: today()
 	const [initialForm] = useState<Form>(() => ({
 		unpaid: false,
+		purposeId: "",
 		choice: draft?.kind ?? "expense",
 		ownerKind: "owner_draw",
 		date: initialDate,
@@ -112,6 +121,33 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	const intent = useEntryIntent((s) => s.draft)
 	const form =
 		draft && intent === draft ? initialForm : (storedForm ?? initialForm)
+	const purposes = useMasterList(purposeKind)
+	const activePurposes = purposes.data?.filter((item) => item.isActive)
+	const purpose = activePurposes?.find(
+		(item) => String(item.id) === form.purposeId
+	)
+	const purposeRule = purpose?.allocationRuleId
+		? masters.ruleById(purpose.allocationRuleId)
+		: null
+	const invalidateBooks = useInvalidateBooks()
+	const postPurpose = useMutation({
+		mutationFn: ({
+			id,
+			date,
+			amount,
+		}: {
+			id: number
+			date: string
+			amount: number
+		}) =>
+			callCommand<Transaction>("post_purpose", {
+				fiscalYear,
+				id,
+				date,
+				amount,
+			}),
+		onSuccess: invalidateBooks,
+	})
 	useEffect(() => {
 		if (draft && useEntryIntent.getState().draft === draft) {
 			rememberSimpleEntry(draftKey, initialForm)
@@ -131,6 +167,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	const setForm = (patch: Partial<Form>) => {
 		create.reset()
 		deposit.reset()
+		postPurpose.reset()
 		setSaved(null)
 		rememberSimpleEntry(draftKey, { ...form, ...patch })
 	}
@@ -174,13 +211,15 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					? t("amountInvalid")
 					: undefined,
 		accountId:
-			form.choice !== "owner" && !linked && !form.accountId
+			!form.purposeId && form.choice !== "owner" && !linked && !form.accountId
 				? t("contentRequired")
 				: undefined,
 		paymentAccountId:
-			!unpaid && !form.paymentAccountId ? t("paymentRequired") : undefined,
+			!form.purposeId && !unpaid && !form.paymentAccountId
+				? t("paymentRequired")
+				: undefined,
 	}
-	const error = create.error ?? deposit.error
+	const error = create.error ?? deposit.error ?? postPurpose.error
 	const errorFor = (field: string) => {
 		const e = fieldError(error, field)
 		return (
@@ -218,6 +257,9 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		event.preventDefault()
 		setValidation(true)
 		if (
+			fiscalYear === null ||
+			(form.purposeId &&
+				(!purpose?.defaultDebitAccountId || !purpose.defaultCreditAccountId)) ||
 			Object.values(invalid).some(Boolean) ||
 			useSimpleEntryDrafts.getState().saving.has(draftKey)
 		)
@@ -229,6 +271,15 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		const amount = amountForCommand(form.amount)
 		setSimpleEntrySaving(draftKey, true)
 		try {
+			if (purpose) {
+				const transaction = await postPurpose.mutateAsync({
+					id: purpose.id,
+					date: form.date,
+					amount,
+				})
+				complete(form, transaction, { memo: form.memo })
+				return
+			}
 			if (target) {
 				const transaction = await deposit.mutateAsync({
 					target,
@@ -327,59 +378,114 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					className="flex flex-col gap-5"
 				>
 					<fieldset disabled={saving} className="flex flex-col gap-5">
-						<fieldset className="flex flex-col gap-2">
-							<legend className="mb-1.5 font-medium text-sm">
-								{t("kind")}
-							</legend>
-							<RadioCards
-								value={form.choice}
-								onValueChange={(value) =>
-									setForm({
-										choice: value as KindChoice,
-										accountId: "",
-										unpaid: false,
-										paymentAccountId: personal ? "" : form.paymentAccountId,
-										depositKey: "",
-									})
-								}
-								className="sm:grid-cols-4"
-							>
-								{kindChoices.map((choice) => (
-									<RadioCardsItem key={choice} value={choice}>
-										{t(`kind_${choice}`)}
-									</RadioCardsItem>
-								))}
-							</RadioCards>
-						</fieldset>
-
-						{features.receivables && form.choice === "income" && (
-							<div className="space-y-2">
-								<LabeledCheckbox
-									label={t("unpaidIncome")}
-									checked={unpaid}
-									onChange={(e) =>
-										setForm({
-											unpaid: e.target.checked,
-											accountId: "",
-											depositKey: "",
-										})
-									}
-								/>
-								{unpaid && (
-									<p className="text-muted-foreground text-sm">
-										{t("unpaidIncomeHint")}{" "}
-										<Link
-											to="/documents"
-											onClick={() => useEntryIntent.getState().newInvoice()}
-											className="text-primary underline underline-offset-4"
-										>
-											{t("newInvoiceInstead")}
-										</Link>
-									</p>
+						{(Boolean(activePurposes?.length) || Boolean(form.purposeId)) && (
+							<Field label={tMaster("purposes")} hint={tMaster("purposeEntry")}>
+								<NativeSelect
+									disabled={saving}
+									value={form.purposeId}
+									onChange={(event) => {
+										setForm({ purposeId: event.target.value })
+									}}
+								>
+									<option value="">{t("purposeManual")}</option>
+									{form.purposeId && !purpose && (
+										<option value={form.purposeId} disabled>
+											{t("purposeUnavailable")}
+										</option>
+									)}
+									{activePurposes?.map((item) => (
+										<option key={item.id} value={item.id}>
+											{item.code} {displayName(item, locale)}
+										</option>
+									))}
+								</NativeSelect>
+							</Field>
+						)}
+						{purpose && (
+							<div className="flex flex-col gap-1 text-sm">
+								<p>
+									{masters.accountLabel(purpose.defaultDebitAccountId ?? 0) ||
+										"—"}{" "}
+									/{" "}
+									{masters.accountLabel(purpose.defaultCreditAccountId ?? 0) ||
+										"—"}
+								</p>
+								<p className="text-muted-foreground">
+									{[
+										masters.partnerLabel(purpose.defaultPartnerId),
+										purpose.defaultTaxCategory &&
+											tMaster(`tax_${purpose.defaultTaxCategory}`),
+										purposeRule &&
+											`${t("allocationTitle")} ${purposeRule.businessPercent}%`,
+									]
+										.filter(Boolean)
+										.join(" / ")}
+								</p>
+								{(!purpose.defaultDebitAccountId ||
+									!purpose.defaultCreditAccountId) && (
+									<p role="alert">{t("purposeIncomplete")}</p>
 								)}
 							</div>
 						)}
-						{paymentAccounts.length === 0 &&
+
+						{!form.purposeId && (
+							<fieldset className="flex flex-col gap-2">
+								<legend className="mb-1.5 font-medium text-sm">
+									{t("kind")}
+								</legend>
+								<RadioCards
+									value={form.choice}
+									onValueChange={(value) =>
+										setForm({
+											choice: value as KindChoice,
+											accountId: "",
+											unpaid: false,
+											paymentAccountId: personal ? "" : form.paymentAccountId,
+											depositKey: "",
+										})
+									}
+									className="sm:grid-cols-4"
+								>
+									{kindChoices.map((choice) => (
+										<RadioCardsItem key={choice} value={choice}>
+											{t(`kind_${choice}`)}
+										</RadioCardsItem>
+									))}
+								</RadioCards>
+							</fieldset>
+						)}
+
+						{!form.purposeId &&
+							features.receivables &&
+							form.choice === "income" && (
+								<div className="space-y-2">
+									<LabeledCheckbox
+										label={t("unpaidIncome")}
+										checked={unpaid}
+										onChange={(e) =>
+											setForm({
+												unpaid: e.target.checked,
+												accountId: "",
+												depositKey: "",
+											})
+										}
+									/>
+									{unpaid && (
+										<p className="text-muted-foreground text-sm">
+											{t("unpaidIncomeHint")}{" "}
+											<Link
+												to="/documents"
+												onClick={() => useEntryIntent.getState().newInvoice()}
+												className="text-primary underline underline-offset-4"
+											>
+												{t("newInvoiceInstead")}
+											</Link>
+										</p>
+									)}
+								</div>
+							)}
+						{!form.purposeId &&
+							paymentAccounts.length === 0 &&
 							masters.accounts.length > 0 &&
 							!unpaid &&
 							!personal && (
@@ -388,7 +494,8 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 								</p>
 							)}
 
-						{features.receivables &&
+						{!form.purposeId &&
+							features.receivables &&
 							form.choice === "income" &&
 							!unpaid &&
 							((targets.data?.invoices.length ?? 0) > 0 ||
@@ -407,7 +514,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							)}
 
 						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-							{form.choice === "owner" && (
+							{!form.purposeId && form.choice === "owner" && (
 								<Field
 									term={
 										form.ownerKind === "owner_draw" ? "draw" : "contribution"
@@ -452,7 +559,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									className="num text-right"
 								/>
 							</Field>
-							{form.choice !== "owner" && !linked && (
+							{!form.purposeId && form.choice !== "owner" && !linked && (
 								<Field
 									term="account"
 									label={
@@ -469,7 +576,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									</NativeSelect>
 								</Field>
 							)}
-							{!unpaid && (
+							{!form.purposeId && !unpaid && (
 								<Field
 									label={labels[form.choice].payment}
 									hint={personal ? t("personalPaymentHint") : undefined}
@@ -495,7 +602,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									</NativeSelect>
 								</Field>
 							)}
-							{!linked && (
+							{!form.purposeId && !linked && (
 								<Field
 									label={t("partner")}
 									hint={t("optional")}
@@ -514,19 +621,21 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									</NativeSelect>
 								</Field>
 							)}
-							<Field
-								label={t("memo")}
-								hint={t("memoHint")}
-								error={errorFor("memo")}
-							>
-								<Input
-									value={form.memo}
-									onChange={(e) => setForm({ memo: e.target.value })}
-								/>
-							</Field>
+							{!form.purposeId && (
+								<Field
+									label={t("memo")}
+									hint={t("memoHint")}
+									error={errorFor("memo")}
+								>
+									<Input
+										value={form.memo}
+										onChange={(e) => setForm({ memo: e.target.value })}
+									/>
+								</Field>
+							)}
 						</div>
 
-						{rulePercent !== null && (
+						{!form.purposeId && rulePercent !== null && (
 							<fieldset className="flex flex-col gap-3 rounded-lg border p-4">
 								<legend className="px-1 font-medium text-sm">
 									{t("allocationTitle")} <TermHelp term="allocation" />
@@ -559,7 +668,10 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						)}
 
 						{error &&
-						(!(isAppError(error) && error.field) || error.field === "kind") ? (
+						(form.purposeId
+							? !errorFor("date") && !errorFor("amount")
+							: !(isAppError(error) && error.field) ||
+								error.field === "kind") ? (
 							<p role="alert" className="text-destructive text-sm">
 								{errorMessage(error)}
 							</p>
@@ -571,7 +683,9 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							className="flex flex-wrap items-center gap-2 text-sm text-success"
 						>
 							<CircleCheck aria-hidden="true" className="size-4 shrink-0" />
-							{savedSummary(saved)}
+							{saved.lines.length > 0
+								? savedSummary(saved)
+								: tMaster("purposeRecorded")}
 							<Link
 								to="/transactions"
 								search={{
@@ -587,7 +701,18 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					)}
 
 					<div>
-						<Button type="submit" disabled={saving || fiscalYear === null}>
+						<Button
+							type="submit"
+							disabled={
+								saving ||
+								fiscalYear === null ||
+								Boolean(
+									form.purposeId &&
+										(!purpose?.defaultDebitAccountId ||
+											!purpose.defaultCreditAccountId)
+								)
+							}
+						>
 							{saving && (
 								<Loader2 aria-hidden="true" className="animate-spin" />
 							)}
@@ -595,6 +720,15 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						</Button>
 					</div>
 				</form>
+				{activePurposes?.length === 0 && (
+					<Link
+						to="/master"
+						search={{ view: "purposes" }}
+						className="mt-4 inline-block text-primary text-sm underline"
+					>
+						{t("purposeManage")}
+					</Link>
+				)}
 			</CardContent>
 		</Card>
 	)

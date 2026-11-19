@@ -1,6 +1,7 @@
 import { Tabs } from "radix-ui"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AssetsPanel } from "@/features/closing/assets-panel"
 import { OpeningPanel } from "@/features/closing/opening-panel"
@@ -47,11 +48,13 @@ export function ClosingPage({
 		useFiscalYears().data?.find((y) => y.year === fiscalYear)?.filingType ===
 		"white"
 	const [tab, setTab] = useState<Tab>(initialTab)
+	const activeTab =
+		tab === "inventory" && !features.inventory ? "checklist" : tab
 
 	return (
 		<Page screen="closing">
 			<Tabs.Root
-				value={tab === "inventory" && !features.inventory ? "checklist" : tab}
+				value={activeTab}
 				onValueChange={(value) => setTab(value as Tab)}
 				className="flex flex-col gap-4"
 			>
@@ -74,9 +77,23 @@ export function ClosingPage({
 						))}
 				</Tabs.List>
 				<Card>
-					<CardContent>
+					<CardContent className="flex flex-col gap-4">
+						{activeTab !== "checklist" && (
+							<Button
+								type="button"
+								variant="outline"
+								className="w-fit"
+								onClick={() => setTab("checklist")}
+							>
+								{t("backToChecklist")}
+							</Button>
+						)}
 						<Tabs.Content value="checklist" className="outline-none">
-							<ChecklistPanel fiscalYear={fiscalYear} />
+							<ChecklistPanel
+								fiscalYear={fiscalYear}
+								inventoryEnabled={features.inventory}
+								onOpenTask={setTab}
+							/>
 						</Tabs.Content>
 						<Tabs.Content value="opening" className="outline-none">
 							<OpeningPanel fiscalYear={fiscalYear} />

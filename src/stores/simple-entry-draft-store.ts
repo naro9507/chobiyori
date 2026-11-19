@@ -8,6 +8,7 @@ export type SimpleEntryFormState = {
 	choice: KindChoice
 	ownerKind: "owner_draw" | "owner_contribution"
 	unpaid: boolean
+	purposeId: string
 	date: string
 	amount: string
 	accountId: string

@@ -44,6 +44,7 @@ type Progress =
 
 /** レシートを取り込み、まとめて読み取る。読み取った結果は受信箱の候補になる（確定するまで記帳しない）。 */
 export function ReceiptsPanel() {
+	const inbox = useTranslations("inbox")
 	const t = useTranslations("receipts")
 	const errorMessage = useErrorMessage()
 	const settings = useReceiptSettings()
@@ -126,7 +127,11 @@ export function ReceiptsPanel() {
 				<div className="flex flex-col gap-2 rounded-lg border p-4 text-sm">
 					<p>{t("notReady")}</p>
 					<Button asChild size="sm" variant="outline" className="w-fit">
-						<Link to={settingsPath} hash="receipt-reading">
+						<Link
+							to={settingsPath}
+							search={{ view: "features" }}
+							hash="receipt-reading"
+						>
 							<Settings aria-hidden="true" />
 							{t("goToSettings")}
 						</Link>
@@ -139,6 +144,11 @@ export function ReceiptsPanel() {
 				{progress.kind === "waiting" && t("rateLimitWait", progress)}
 				{progress.kind === "finished" && t("readFinished", progress)}
 			</p>
+			{progress.kind === "finished" && (
+				<Button asChild size="sm" variant="outline" className="w-fit">
+					<Link to="/inbox">{inbox("reviewImported")}</Link>
+				</Button>
+			)}
 			{progress.kind === "stopped" && (
 				<p role="alert" className="text-destructive text-sm">
 					{t("readStopped", { done: progress.done })}{" "}
