@@ -74,7 +74,8 @@ export function AccountLoginSettings() {
 				)}
 				{google || microsoft || linked ? (
 					<>
-						<Field label={t("devicePassword")}>
+						<p className="text-muted-foreground text-sm">{t("deviceNote")}</p>
+						<Field label={t("devicePassword")} hint={t("devicePasswordHint")}>
 							<Input
 								type="password"
 								autoComplete="current-password"
