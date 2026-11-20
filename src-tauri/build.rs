@@ -8,7 +8,8 @@ fn main() {
             println!("cargo:rerun-if-changed={source}");
             cc::Build::new()
                 .cpp(true)
-                .flag("/std:c++17")
+                // C++/WinRT uses the standard coroutine header in C++20.
+                .std("c++20")
                 .flag("/EHsc")
                 .file(source)
                 .compile("device_login");

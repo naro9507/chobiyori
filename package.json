@@ -1,6 +1,6 @@
 {
   "name": "chobiyori",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "description": "個人事業主向けの確定申告用会計ソフト",
