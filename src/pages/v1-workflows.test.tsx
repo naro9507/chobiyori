@@ -137,6 +137,48 @@ describe("v1 の操作導線", () => {
 		expect(within(form).getByLabelText("何に使ったか")).toHaveValue("2")
 		expect(within(form).getByLabelText("どこから払ったか")).toHaveValue("1")
 	})
+	it("レシートの記事から取り込み操作を開き、矢印で元の記事に戻れる", async () => {
+		const user = userEvent.setup()
+		renderApp()
+		await user.click(
+			await screen.findByRole("link", { name: "レシートの取り込みへ" })
+		)
+		expect(
+			await screen.findByRole("button", { name: "画像を選ぶ" })
+		).toBeVisible()
+		const tip = screen.getByRole("complementary", { name: "この画面のヘルプ" })
+		expect(tip).toHaveTextContent(
+			"「画像を選ぶ」でレシートの写真を追加します。"
+		)
+		const back = within(tip).getByRole("link", { name: "元のヘルプ記事に戻る" })
+		expect(back).toHaveTextContent(/^$/)
+		await user.click(back)
+		expect(
+			await screen.findByRole("heading", { name: "レシートを読み込みたい" })
+		).toBeVisible()
+		expect(
+			screen.queryByRole("heading", { name: "売上を記録したい" })
+		).not.toBeInTheDocument()
+		await user.click(screen.getByRole("link", { name: "ヘルプの一覧に戻る" }))
+		expect(
+			await screen.findByRole("heading", { name: "売上を記録したい" })
+		).toBeVisible()
+	})
+	it("家事按分の記事からルールのタブを開き、案内だけを閉じられる", async () => {
+		const user = userEvent.setup()
+		renderApp()
+		await user.click(
+			await screen.findByRole("link", { name: "家事按分ルールを設定する" })
+		)
+		expect(
+			await screen.findByRole("tab", { name: "家事按分ルール", selected: true })
+		).toBeVisible()
+		await user.click(screen.getByRole("button", { name: "この案内を閉じる" }))
+		expect(
+			screen.queryByRole("complementary", { name: "この画面のヘルプ" })
+		).not.toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "追加" })).toBeVisible()
+	})
 	it("Ctrl+K で開き、矢印と Enter で画面移動し、Esc で元の操作に戻る", async () => {
 		const user = userEvent.setup()
 		const router = renderApp()

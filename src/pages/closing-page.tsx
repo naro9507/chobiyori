@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
@@ -83,10 +84,12 @@ export function ClosingPage({
 							<Button
 								type="button"
 								variant="outline"
-								className="w-fit"
+								size="icon"
+								aria-label={t("backToChecklist")}
+								title={t("backToChecklist")}
 								onClick={() => setTab("checklist")}
 							>
-								{t("backToChecklist")}
+								<ArrowLeft aria-hidden="true" />
 							</Button>
 						)}
 						<Tabs.Content value="checklist" className="outline-none">

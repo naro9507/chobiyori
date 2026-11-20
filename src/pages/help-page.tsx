@@ -1,4 +1,5 @@
 import { Link, useNavigate, useSearch } from "@tanstack/react-router"
+import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
@@ -45,15 +46,30 @@ export function HelpPage() {
 	)
 	return (
 		<Page screen="help">
-			<Input
-				aria-label={t("search")}
-				type="search"
-				value={query}
-				onChange={(e) => {
-					setSelectedArticle(null)
-					setQuery(e.target.value)
-				}}
-			/>
+			<div className="flex items-center gap-2">
+				{selectedArticle && (
+					<Button asChild variant="ghost" size="icon">
+						<Link
+							to="/help"
+							search={{}}
+							aria-label={t("backToHelp")}
+							title={t("backToHelp")}
+						>
+							<ArrowLeft aria-hidden="true" />
+						</Link>
+					</Button>
+				)}
+				<Input
+					aria-label={t("search")}
+					placeholder={t("search")}
+					type="search"
+					value={query}
+					onChange={(e) => {
+						setSelectedArticle(null)
+						setQuery(e.target.value)
+					}}
+				/>
+			</div>
 			<nav aria-label={t("context")} className="flex flex-wrap gap-4 text-sm">
 				{helpSections.map((s) => (
 					<a
@@ -103,9 +119,17 @@ export function HelpPage() {
 									{a.path && (
 										<Link
 											to={a.path}
-											className="text-primary text-sm underline"
+											search={{ article: a.id, view: a.view }}
+											onClick={() => {
+												if (a.path === "/transactions")
+													useTransactionsTab.getState().setTab("simple")
+											}}
+											className="inline-flex items-center gap-1 text-primary text-sm underline underline-offset-4"
 										>
-											{t("open")}
+											{a.action
+												? t(a.action)
+												: t("openScreen", { screen: t(a.id) })}
+											<ArrowRight aria-hidden="true" className="size-4" />
 										</Link>
 									)}
 									{a.example && (
@@ -120,7 +144,10 @@ export function HelpPage() {
 														memo: t(a.id),
 													})
 													useTransactionsTab.getState().setTab("simple")
-													void navigate({ to: "/transactions" })
+													void navigate({
+														to: "/transactions",
+														search: { article: a.id },
+													})
 												}}
 											>
 												{t("useExample")}

@@ -97,9 +97,14 @@ function DocumentsView({ newInvoice }: { newInvoice: boolean }) {
 function BackButton({ onBack }: { onBack: () => void }) {
 	const t = useTranslations("documents")
 	return (
-		<Button variant="ghost" size="sm" className="w-fit" onClick={onBack}>
+		<Button
+			variant="ghost"
+			size="icon"
+			aria-label={t("backToList")}
+			title={t("backToList")}
+			onClick={onBack}
+		>
 			<ArrowLeft aria-hidden="true" />
-			{t("backToList")}
 		</Button>
 	)
 }

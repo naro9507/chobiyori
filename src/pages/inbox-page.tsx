@@ -1,7 +1,8 @@
 import { Link, useSearch } from "@tanstack/react-router"
+import { ArrowLeft } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { Page } from "@/components/layout/page"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { FormatsPanel } from "@/features/inbox/formats-panel"
 import { useReconciliation } from "@/features/inbox/inbox-api"
@@ -34,9 +35,11 @@ export function InboxPage() {
 				<Link
 					id="tutorial-review"
 					to="/inbox"
-					className="w-fit text-primary text-sm underline"
+					className={buttonVariants({ variant: "ghost", size: "icon" })}
+					aria-label={t("backToReview")}
+					title={t("backToReview")}
 				>
-					{t("backToReview")}
+					<ArrowLeft aria-hidden="true" />
 				</Link>
 			)}
 			{!activeView && (

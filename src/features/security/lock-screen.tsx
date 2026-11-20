@@ -1,4 +1,4 @@
-import { KeyRound, Loader2 } from "lucide-react"
+import { ArrowLeft, KeyRound, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { LanguageSwitch } from "@/components/layout/language-switch"
 import { Button } from "@/components/ui/button"
@@ -232,9 +232,16 @@ export function LockScreen({ status }: { status: BookStatus }) {
 								type="button"
 								variant="ghost"
 								disabled={open.isPending}
+								size={recovering ? "icon" : "default"}
+								aria-label={recovering ? t("backToUnlock") : undefined}
+								title={recovering ? t("backToUnlock") : undefined}
 								onClick={toggleRecovery}
 							>
-								{t(recovering ? "backToUnlock" : "forgotPassword")}
+								{recovering ? (
+									<ArrowLeft aria-hidden="true" />
+								) : (
+									t("forgotPassword")
+								)}
 							</Button>
 						)}
 					</form>

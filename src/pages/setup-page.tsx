@@ -682,11 +682,13 @@ export function SetupPage() {
 					<Button
 						type="button"
 						variant="outline"
+						size="icon"
+						aria-label={t("back")}
+						title={t("back")}
 						onClick={() => setStep(steps[index - 1])}
 						disabled={index === 0 || complete.isPending}
 					>
 						<ArrowLeft aria-hidden="true" />
-						{t("back")}
 					</Button>
 					<Button type="submit" disabled={complete.isPending}>
 						{index < steps.length - 1 ? (
