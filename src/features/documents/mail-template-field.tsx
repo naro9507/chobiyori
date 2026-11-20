@@ -12,7 +12,7 @@ const variables = {
 	"{金額}": "varAmount",
 	"{期限}": "varDeadline",
 	"{差出人}": "varSender",
-	"{ご案内}": "varGuidance",
+	"{書類別の一文}": "varGuidance",
 } as const
 const tokenPattern = /(\{[^{}\n]+\})/gu
 
@@ -78,7 +78,7 @@ export function MailTemplateField({
 					)}
 				>
 					{value.split(tokenPattern).map((part, index) =>
-						Object.hasOwn(variables, part) ? (
+						Object.hasOwn(variables, part) || part === "{ご案内}" ? (
 							<mark
 								// biome-ignore lint/suspicious/noArrayIndexKey: Stateless highlights follow text positions.
 								key={index}

@@ -394,6 +394,26 @@ pub struct MailDraft {
     pub body: String,
 }
 
+fn mail_guidance(kind: DocumentKind) -> &'static str {
+    match kind {
+        DocumentKind::Invoice => "お手数をおかけいたしますが、ご請求内容をご確認のうえ、お支払いのお手続きをお願いいたします。",
+        DocumentKind::Estimate => "お見積もりの内容をご確認のうえ、ご検討いただけますと幸いです。",
+        DocumentKind::Delivery => "お手数ですが、納品内容をご確認くださいますようお願いいたします。",
+        DocumentKind::Receipt => "このたびはお支払いいただき、誠にありがとうございます。領収書をお手元にて保管いただけますと幸いです。",
+    }
+}
+
+#[tauri::command]
+pub fn document_mail_guidance() -> [(DocumentKind, &'static str); 4] {
+    [
+        DocumentKind::Invoice,
+        DocumentKind::Estimate,
+        DocumentKind::Delivery,
+        DocumentKind::Receipt,
+    ]
+    .map(|kind| (kind, mail_guidance(kind)))
+}
+
 fn mail_draft_of(conn: &Connection, d: &Document) -> AppResult<MailDraft> {
     let s = documents::settings(conn)?;
     let sender = {
@@ -410,19 +430,15 @@ fn mail_draft_of(conn: &Connection, d: &Document) -> AppResult<MailDraft> {
         }
         _ => String::new(),
     };
-    let guidance = match d.kind {
-        DocumentKind::Invoice => "お手数をおかけいたしますが、ご請求内容をご確認のうえ、お支払いのお手続きをお願いいたします。",
-        DocumentKind::Estimate => "お見積もりの内容をご確認のうえ、ご検討いただけますと幸いです。",
-        DocumentKind::Delivery => "お手数ですが、納品内容をご確認くださいますようお願いいたします。",
-        DocumentKind::Receipt => "このたびはお支払いいただき、誠にありがとうございます。領収書をお手元にて保管いただけますと幸いです。",
-    };
+    let guidance = mail_guidance(d.kind);
     let values = [
         ("書類", layout::kind_name(d.kind).to_string()),
         ("番号", d.number.clone().unwrap_or_default()),
         ("宛名", d.recipient_name.clone()),
         ("金額", yen(d.totals.total)),
         ("期限", due),
-        ("ご案内", guidance.to_string()),
+        ("書類別の一文", guidance.to_string()),
+        ("ご案内", guidance.to_string()), // 以前のひな形でも展開する
         ("差出人", sender),
     ];
     Ok(MailDraft {
@@ -510,6 +526,7 @@ pub async fn open_document_in_mail_app(
     db: State<'_, Database>,
     id: i64,
     draft: MailDraft,
+    target: Option<doc::MailTarget>,
 ) -> AppResult<Option<String>> {
     let (name, bytes) = {
         let conn = db.conn();
@@ -524,7 +541,9 @@ pub async fn open_document_in_mail_app(
         return Ok(None);
     };
     std::fs::write(&path, bytes).map_err(|_| AppError::new(ErrorCode::FileWrite))?;
-    let url = doc::mailto(&to, &draft.subject, &draft.body);
+    let url = target
+        .unwrap_or_default()
+        .compose_url(&to, &draft.subject, &draft.body);
     tauri_plugin_opener::open_url(url, None::<&str>)
         .map_err(|_| AppError::new(ErrorCode::MailFailed))?;
     let _ = tauri_plugin_opener::reveal_item_in_dir(&path);

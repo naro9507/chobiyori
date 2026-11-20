@@ -11,6 +11,7 @@ import { useErrorMessage } from "@/lib/use-error-message"
 import {
 	type DocumentSettings,
 	useDocumentSettings,
+	useMailGuidance,
 	useSaveDocumentSettings,
 } from "./documents-api"
 import { MailTemplateField } from "./mail-template-field"
@@ -48,6 +49,32 @@ function ImagePreview({ id, label }: { id: number; label: string }) {
 			src={`data:${attachment.mime};base64,${data}`}
 			className="h-20 w-32 rounded-md border bg-white object-contain p-1"
 		/>
+	)
+}
+
+function MailGuidanceExamples() {
+	const t = useTranslations("documentSettings")
+	const documents = useTranslations("documents")
+	const guidance = useMailGuidance()
+	const errorMessage = useErrorMessage()
+	return (
+		<details className="rounded-md border px-3 py-2 text-sm">
+			<summary className="cursor-pointer font-medium">
+				{t("guidanceExamples")}
+			</summary>
+			{guidance.isError && <p role="alert">{errorMessage(guidance.error)}</p>}
+			{guidance.isPending && <p role="status">{t("guidanceLoading")}</p>}
+			{guidance.data && (
+				<dl className="mt-2 grid gap-2 sm:grid-cols-[auto_1fr]">
+					{guidance.data.map(([kind, example]) => (
+						<div key={kind} className="contents">
+							<dt className="font-medium">{documents(`kind_${kind}`)}</dt>
+							<dd className="text-muted-foreground">{example}</dd>
+						</div>
+					))}
+				</dl>
+			)}
+		</details>
 	)
 }
 
@@ -204,6 +231,7 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 						error={errorFor(field)}
 					/>
 				))}
+				<MailGuidanceExamples />
 			</fieldset>
 			{save.error && !fieldError(save.error, "phone") && (
 				<p role="alert" className="text-destructive text-sm">
