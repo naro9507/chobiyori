@@ -48,28 +48,31 @@ export function MasterPage() {
 	const t = useTranslations("master")
 	const { view } = useSearch({ strict: false })
 
+	const availableTabs = tabs.filter(
+		(tab) => tab !== "allocationRules" || features.allocation
+	)
+	const initialTab = availableTabs.find((tab) => tab === view) ?? "accounts"
+
 	return (
 		<Page screen="master">
 			<Tabs.Root
-				key={view}
-				defaultValue={view === "purposes" ? "purposes" : "accounts"}
+				key={initialTab}
+				defaultValue={initialTab}
 				className="flex flex-col gap-4"
 			>
 				<Tabs.List
 					aria-label={t("tabsLabel")}
 					className="flex w-fit flex-wrap gap-1 rounded-lg border bg-card p-1"
 				>
-					{tabs
-						.filter((tab) => tab !== "allocationRules" || features.allocation)
-						.map((tab) => (
-							<Tabs.Trigger
-								key={tab}
-								value={tab}
-								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-							>
-								{t(tab)}
-							</Tabs.Trigger>
-						))}
+					{availableTabs.map((tab) => (
+						<Tabs.Trigger
+							key={tab}
+							value={tab}
+							className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+						>
+							{t(tab)}
+						</Tabs.Trigger>
+					))}
 				</Tabs.List>
 				<Tabs.Content value="purposes" className="outline-none">
 					<PurposesSection />

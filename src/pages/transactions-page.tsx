@@ -1,7 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router"
+import { ArrowLeft } from "lucide-react"
 import { Tabs } from "radix-ui"
 import { useState } from "react"
 import { Page } from "@/components/layout/page"
+import { buttonVariants } from "@/components/ui/button"
 import { QueryMessage } from "@/features/closing/query-message"
 import { CompoundEntry } from "@/features/journal/compound-entry"
 import {
@@ -158,9 +160,11 @@ function EditTransactionPage({
 				id="tutorial-entry"
 				to="/transactions"
 				search={{}}
-				className="w-fit text-primary text-sm underline underline-offset-4"
+				className={buttonVariants({ variant: "ghost", size: "icon" })}
+				aria-label={t("backToEntry")}
+				title={t("backToEntry")}
 			>
-				{t("backToEntry")}
+				<ArrowLeft aria-hidden="true" />
 			</Link>
 			{!query.data ? (
 				<QueryMessage query={query} fiscalYear={fiscalYear} />

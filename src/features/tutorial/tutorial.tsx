@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router"
 import {
+	ArrowLeft,
 	BookOpen,
 	CalendarDays,
 	ChartColumn,
@@ -226,24 +227,24 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 						</div>
 						<h2 className="font-semibold">{t(task)}</h2>
 					</div>
+					<ol className="grid gap-1 text-sm">
+						{(["Action1", "Action2", "Action3"] as const).map((action, i) => {
+							const Icon = actionIcons[task][i]
+							return (
+								<li key={action} className="flex items-start gap-2">
+									<Icon
+										aria-hidden="true"
+										className="mt-0.5 size-4 shrink-0 text-primary"
+									/>
+									{t(`${task}${action}`)}
+								</li>
+							)
+						})}
+					</ol>
 					<details key={task} className="text-sm">
 						<summary className="cursor-pointer text-muted-foreground">
 							{t("details")}
 						</summary>
-						<ol className="mt-2 grid gap-1">
-							{(["Action1", "Action2", "Action3"] as const).map((action, i) => {
-								const Icon = actionIcons[task][i]
-								return (
-									<li key={action} className="flex items-start gap-2">
-										<Icon
-											aria-hidden="true"
-											className="mt-0.5 size-4 shrink-0 text-primary"
-										/>
-										{t(`${task}${action}`)}
-									</li>
-								)
-							})}
-						</ol>
 						<p className="mt-2 leading-relaxed">{t(`${task}Body`)}</p>
 					</details>
 					<div className="flex flex-wrap gap-2">
@@ -265,10 +266,12 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 						{index > 0 && (
 							<Button
 								variant="outline"
-								size="sm"
+								size="icon"
+								aria-label={t("back")}
+								title={t("back")}
 								onClick={() => open(active, index - 1)}
 							>
-								{t("back")}
+								<ArrowLeft aria-hidden="true" />
 							</Button>
 						)}
 						<Button variant="ghost" size="sm" onClick={() => setActive(null)}>

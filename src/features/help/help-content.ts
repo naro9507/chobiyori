@@ -13,6 +13,7 @@ export const helpSections = [
 	"start",
 	"tasks",
 	"examples",
+	"screens",
 	"glossary",
 	"keyboard",
 ] as const
@@ -27,6 +28,9 @@ export type HelpArticle = {
 	body: HelpKey
 	reading?: HelpKey
 	path?: NavItem["path"]
+	view?: string
+	action?: HelpKey
+	step?: HelpKey
 	screen?: ScreenId
 	example?: HelpExample
 	templates?: readonly IndustryTemplate[]
@@ -37,25 +41,61 @@ export const helpArticles: readonly HelpArticle[] = [
 		.filter((item) => item.id !== "help")
 		.map((item) => ({
 			id: `screen_${item.id}` as HelpKey,
-			section: "tasks" as const,
+			section: "screens" as const,
 			body: `screen_${item.id}Body` as HelpKey,
 			path: item.path,
+			step: `screen_${item.id}Step` as HelpKey,
 			screen: item.id,
 		})),
-	{ id: "start", section: "start", body: "startBody", path: "/settings" },
-	{ id: "sales", section: "tasks", body: "salesBody", path: "/transactions" },
+	{
+		id: "start",
+		section: "start",
+		body: "startBody",
+		path: "/settings",
+		view: "business",
+		action: "openProfile",
+		step: "profileStep",
+	},
+	{
+		id: "sales",
+		section: "tasks",
+		body: "salesBody",
+		path: "/transactions",
+		action: "openSales",
+		step: "salesStep",
+	},
 	{
 		id: "personalExpense",
 		section: "tasks",
 		body: "personalExpenseBody",
+		action: "openPersonalExpense",
+		step: "personalExpenseStep",
 		path: "/transactions",
 	},
-	{ id: "receipt", section: "tasks", body: "receiptBody", path: "/inbox" },
-	{ id: "closing", section: "tasks", body: "closingBody", path: "/closing" },
+	{
+		id: "receipt",
+		section: "tasks",
+		body: "receiptBody",
+		path: "/inbox",
+		view: "receipts",
+		action: "openReceipts",
+		step: "receiptStep",
+	},
+	{
+		id: "closing",
+		section: "tasks",
+		body: "closingBody",
+		path: "/closing",
+		action: "openChecklist",
+		step: "screen_closingStep",
+	},
 	{
 		id: "sharedExpenses",
 		section: "tasks",
 		body: "sharedExpensesBody",
+		action: "openAllocation",
+		step: "allocationStep",
+		view: "allocationRules",
 		path: "/master",
 		feature: "allocation",
 	},
