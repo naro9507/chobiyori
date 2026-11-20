@@ -154,6 +154,8 @@ function ImportCard() {
 
 				{file && (
 					<section
+						id="tutorial-import-preview"
+						tabIndex={-1}
 						aria-label={t("previewTitle")}
 						className="flex flex-col gap-4 border-t pt-5"
 					>

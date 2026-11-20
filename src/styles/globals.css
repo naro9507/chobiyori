@@ -135,3 +135,8 @@
 		}
 	}
 }
+
+[data-tutorial-highlight] {
+	outline: 3px solid var(--primary);
+	outline-offset: 3px;
+}
