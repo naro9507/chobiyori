@@ -129,7 +129,7 @@ export function ReceiptsPanel() {
 					<Button asChild size="sm" variant="outline" className="w-fit">
 						<Link
 							to={settingsPath}
-							search={{ view: "features" }}
+							search={{ view: "receipts" }}
 							hash="receipt-reading"
 						>
 							<Settings aria-hidden="true" />

@@ -218,7 +218,9 @@ describe("v1 の操作導線", () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
 		await user.click(
-			await screen.findByRole("button", { name: "使う機能・連携" })
+			await screen.findByRole("button", {
+				name: "帳簿に表示するメニュー・入力項目",
+			})
 		)
 		await user.click(
 			await screen.findByRole("checkbox", { name: "売掛・買掛と請求書" })

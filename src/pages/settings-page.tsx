@@ -1,8 +1,10 @@
 import { useSearch } from "@tanstack/react-router"
 import { ChevronDown } from "lucide-react"
 import { Accordion } from "radix-ui"
-import { type ReactNode, useId, useState } from "react"
+import { type ReactNode, useId, useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import { Page } from "@/components/layout/page"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
@@ -30,10 +32,29 @@ function isTheme(value: string): value is Theme {
 }
 
 export function SettingsPage() {
+	const { view } = useSearch({ strict: false })
+	return <SettingsGroups key={view} view={view} />
+}
+
+function SettingsGroups({ view }: { view?: string }) {
+	// 以前の「使う機能・連携」へのリンクでは、そこにあった項目をすべて表示する。
+	const [open, setOpen] = useState<string[]>(() => {
+		if (view === "features") return ["menus", "receipts", "documents"]
+		return view ? [view] : []
+	})
+	const registrationInput = useRef<HTMLInputElement>(null)
+	function openRegistration() {
+		flushSync(() =>
+			setOpen((groups) =>
+				groups.includes("business") ? groups : [...groups, "business"]
+			)
+		)
+		registrationInput.current?.focus()
+	}
+
 	const t = useTranslations("settings")
 	const fiscalYear = useFiscalYear()
 	const { locale, theme, setLocale, setTheme } = useSettingsStore()
-	const { view } = useSearch({ strict: false })
 	const [changed, setChanged] = useState<"language" | "theme" | null>(null)
 	const languageId = useId()
 	const themeId = useId()
@@ -41,13 +62,12 @@ export function SettingsPage() {
 	return (
 		<Page screen="settings">
 			<Accordion.Root
-				key={view}
 				type="multiple"
-				// 表示の言語と配色をすぐ変えられるよう、初めは「表示」を開いておく
-				defaultValue={view ? [view] : ["appearance"]}
+				value={open}
+				onValueChange={setOpen}
 				className="flex flex-col gap-3"
 			>
-				<SettingsGroup value="appearance" title={t("appearanceGroup")}>
+				<SettingsGroup value="appearance">
 					<Card>
 						<CardHeader>
 							<CardTitle id={languageId} help={t("languageDescription")}>
@@ -104,27 +124,42 @@ export function SettingsPage() {
 							t(changed === "language" ? "languageChanged" : "themeChanged")}
 					</p>
 				</SettingsGroup>
-				<SettingsGroup value="business" title={t("businessGroup")}>
+				<SettingsGroup value="business">
 					<BusinessProfileCard />
 					<FilingTypeCard
 						key={`filing-type-${fiscalYear}`}
 						fiscalYear={fiscalYear}
 					/>
-					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
+					<InvoiceRegistrationCard
+						key={fiscalYear}
+						fiscalYear={fiscalYear}
+						registrationInput={registrationInput}
+					/>
 					<FilingReminderSettings />
 				</SettingsGroup>
-				<SettingsGroup value="features" title={t("featuresGroup")}>
-					<FeatureSettingsPanel />
-					<ReceiptSettingsCard />
+				<SettingsGroup value="documents">
+					<Button
+						variant="link"
+						className="w-fit max-w-full whitespace-normal text-left"
+						onClick={openRegistration}
+					>
+						{t("documentRegistration")}
+					</Button>
 					<DocumentSettingsCard />
 					<MailSettingsCard />
 				</SettingsGroup>
-				<SettingsGroup value="security" title={t("securityGroup")}>
+				<SettingsGroup value="menus">
+					<FeatureSettingsPanel />
+				</SettingsGroup>
+				<SettingsGroup value="receipts">
+					<ReceiptSettingsCard />
+				</SettingsGroup>
+				<SettingsGroup value="security">
 					<PasswordCard />
 					<RecoveryCard />
 					<AccountLoginSettings />
 				</SettingsGroup>
-				<SettingsGroup value="app" title={t("appGroup")}>
+				<SettingsGroup value="app">
 					<UpdateSettings />
 					<ChangelogCard />
 				</SettingsGroup>
@@ -134,22 +169,39 @@ export function SettingsPage() {
 }
 
 function SettingsGroup({
-	title,
 	value,
 	children,
 }: {
-	title: string
-	value: string
+	value:
+		| "appearance"
+		| "business"
+		| "documents"
+		| "menus"
+		| "receipts"
+		| "security"
+		| "app"
 	children: ReactNode
 }) {
+	const t = useTranslations("settings")
+	const summaryId = useId()
 	return (
 		<Accordion.Item value={value} className="rounded-lg border bg-card">
 			<Accordion.Header>
 				<Accordion.Trigger
+					aria-label={t(`${value}Group`)}
+					aria-describedby={summaryId}
 					id={value === "business" ? "tutorial-business" : undefined}
 					className="flex w-full items-center justify-between gap-4 rounded-lg px-5 py-4 text-left font-semibold outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180"
 				>
-					{title}
+					<span className="flex min-w-0 flex-col gap-1">
+						<span>{t(`${value}Group`)}</span>
+						<span
+							id={summaryId}
+							className="font-normal text-muted-foreground text-sm"
+						>
+							{t(`${value}Summary`)}
+						</span>
+					</span>
 					<ChevronDown aria-hidden="true" className="size-4 shrink-0" />
 				</Accordion.Trigger>
 			</Accordion.Header>
