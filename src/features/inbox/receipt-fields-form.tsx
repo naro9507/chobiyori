@@ -8,6 +8,7 @@ import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
+	type PointsAs,
 	type Receipt,
 	type ReceiptCheck,
 	useReceiptSettings,
@@ -45,6 +46,10 @@ export function ReceiptFieldsForm({
 		receipt.reducedAmount ? String(receipt.reducedAmount) : ""
 	)
 	const [invoiceNo, setInvoiceNo] = useState(receipt.invoiceNo ?? "")
+	const [points, setPoints] = useState(
+		receipt.points ? String(receipt.points) : ""
+	)
+	const [pointsAs, setPointsAs] = useState<PointsAs>(receipt.pointsAs)
 	const flagged = (check: ReceiptCheck) => receipt.checks.includes(check)
 	const hint = (check: ReceiptCheck) =>
 		flagged(check) ? t(`check_${check}`) : undefined
@@ -56,6 +61,7 @@ export function ReceiptFieldsForm({
 		if (field === "reducedAmount" && e.code === "outOfRange")
 			return t("reducedAmountInvalid")
 		if (field === "total" && e.code === "outOfRange") return t("totalInvalid")
+		if (field === "points" && e.code === "outOfRange") return t("pointsInvalid")
 		return errorMessage(e)
 	}
 
@@ -72,6 +78,8 @@ export function ReceiptFieldsForm({
 					paymentAccountId: accountId,
 					reducedAmount: Number(reduced) || 0,
 					invoiceNo: invoiceNo.trim() || null,
+					points: Number(points) || 0,
+					pointsAs,
 				},
 			},
 			{ onSuccess: onDone }
@@ -118,6 +126,24 @@ export function ReceiptFieldsForm({
 					}
 				/>
 			</Field>
+			<Field label={t("points")} hint={t("pointsHint")} error={error("points")}>
+				<Input
+					inputMode="numeric"
+					value={points}
+					onChange={(e) => setPoints(digits(e.target.value))}
+				/>
+			</Field>
+			{Number(points) > 0 && (
+				<Field label={t("pointsAs")} hint={t("pointsAsHint")}>
+					<NativeSelect
+						value={pointsAs}
+						onChange={(e) => setPointsAs(e.target.value as PointsAs)}
+					>
+						<option value="owner">{t("pointsAsOwner")}</option>
+						<option value="income">{t("pointsAsIncome")}</option>
+					</NativeSelect>
+				</Field>
+			)}
 			<Field
 				label={t("merchant")}
 				hint={hint("multipleReceipts") ?? hint("missingMerchant")}

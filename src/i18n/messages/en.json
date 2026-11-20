@@ -767,6 +767,8 @@
 		"receiptImage": "Receipt image",
 		"receiptChecks": "Some read values do not add up. Compare with the image and fix them with \"Fix read values\".",
 		"fixReading": "Fix read values",
+		"receiptPointsOwner": "{points} yen was paid with points or similar. The expense is recorded as {expense} yen, and the points part as owner's contribution. If the points were earned on business shopping, change it to miscellaneous income with \"Fix read values\".",
+		"receiptPointsIncome": "{points} yen was paid with points or similar. The expense is recorded as {expense} yen, and the points part as miscellaneous income.",
 		"linkToExisting": "Link to this transaction (don't make a new one)",
 		"unlink": "Unlink",
 		"pairedHint": "This transaction has both a receipt and a statement line.",
@@ -826,6 +828,13 @@
 		"merchant": "Shop",
 		"paidFrom": "Paid from",
 		"paidFromHint": "Cash, card payable and so on.",
+		"points": "Paid with points or gift cards",
+		"pointsHint": "The amount paid with points or gift cards, on top of the total. The expense is the total plus this amount.",
+		"pointsAs": "Where the points came from",
+		"pointsAsOwner": "Earned on personal shopping (owner's contribution)",
+		"pointsAsIncome": "Earned on business shopping (miscellaneous income)",
+		"pointsAsHint": "The account used for the part paid with points. If unsure, leave it as \"Earned on personal shopping\".",
+		"pointsInvalid": "The points amount is too large.",
 		"reducedAmount": "Of which, 8% (reduced rate)",
 		"reducedAmountHint": "If there is food and similar, enter that amount (tax included). The expense is split by tax rate when recorded.",
 		"invoiceNo": "Registration no",
@@ -855,7 +864,7 @@
 		"dateRequired": "Enter the date shown on the receipt.",
 		"dateInvalid": "Enter a valid date in year-month-day order, such as 2026-11-19.",
 		"totalInvalid": "Enter a total of at least 1 yen, including tax.",
-		"reducedAmountInvalid": "Enter a reduced-rate amount no greater than the total including tax."
+		"reducedAmountInvalid": "Enter a reduced-rate amount no greater than the total including tax plus the amount paid with points."
 	},
 	"receiptSettings": {
 		"title": "Receipt reading",

@@ -83,7 +83,8 @@
 			"8": 216,
 			"10": 1100
 		},
-		"checks": ["totalMismatch"]
+		"checks": [],
+		"points": 300
 	},
 	"09_rotated_blurry_photo.jpg": {
 		"date": "2026-10-28",

@@ -224,7 +224,7 @@ const cases = [
 			row("(8%対象 ¥216 内税 ¥16)"),
 			row("PayPay", "¥1,016"),
 		],
-		// ポイント値引きで 合計 ≠ 対象額の合計。totalMismatch が出るのが今の作り（論点）
+		// ポイントで 300 円払った。対象額はポイントを引く前なので「合計 + ポイント = 対象額の合計」
 		expected: {
 			date: "2026-11-10",
 			total: 1016,
@@ -232,7 +232,8 @@ const cases = [
 			invoiceNo: "T2222222222222",
 			payment: "eMoney",
 			taxParts: { 10: 1100, 8: 216 },
-			checks: ["totalMismatch"],
+			checks: [],
+			points: 300,
 		},
 	},
 	{

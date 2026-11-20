@@ -78,6 +78,8 @@ function receipt(extra: Partial<Receipt> = {}): Receipt {
 		checks: [],
 		error: null,
 		reducedAmount: 0,
+		points: 0,
+		pointsAs: "owner",
 		invoiceNo: null,
 		inboxItemId: null,
 		inboxStatus: null,
@@ -317,5 +319,57 @@ describe("レシート", () => {
 			id: 9,
 			transactionId: 77,
 		})
+	})
+
+	it("ポイントで払った分を含めて経費にし、ポイントの出どころを選べる", async () => {
+		const user = userEvent.setup()
+		receipts = [
+			receipt({
+				id: 2,
+				status: "read",
+				inboxItemId: 9,
+				inboxStatus: "pending",
+				points: 300,
+				reading: {
+					date: "2026-10-05",
+					total: 3240,
+					merchant: "テスト商店",
+					phone: "",
+					invoiceNo: null,
+					taxParts: [],
+					payment: "card",
+					otherReceipts: 0,
+					points: 300,
+				},
+			}),
+		]
+		renderPage()
+		const form = await screen.findByRole("form", { name: "候補を確定する" })
+		expect(
+			await within(form).findByText(
+				/経費は 3,540 円にし、ポイントの分は事業主借/
+			)
+		).toBeInTheDocument()
+		await user.click(
+			within(form).getByRole("button", { name: "読み取った値を直す" })
+		)
+		const fields = await screen.findByRole("form", { name: "レシートの内容" })
+		expect(
+			within(fields).getByLabelText("ポイント・商品券で払った額")
+		).toHaveValue("300")
+		await user.selectOptions(
+			within(fields).getByLabelText("ポイントの出どころ"),
+			"income"
+		)
+		await user.click(
+			within(fields).getByRole("button", { name: "確認待ちに入れる" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"save_receipt_fields",
+			expect.objectContaining({
+				id: 2,
+				fields: expect.objectContaining({ points: 300, pointsAs: "income" }),
+			})
+		)
 	})
 })

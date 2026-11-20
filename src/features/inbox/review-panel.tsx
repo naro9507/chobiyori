@@ -409,6 +409,19 @@ function ConfirmForm({
 					{receipt.checks.length > 0 && (
 						<p className="text-sm text-warning">{t("receiptChecks")}</p>
 					)}
+					{receipt.points > 0 && item.spend > 0 && (
+						<p className="text-sm">
+							{t(
+								receipt.pointsAs === "income"
+									? "receiptPointsIncome"
+									: "receiptPointsOwner",
+								{
+									points: formatAmount(receipt.points),
+									expense: formatAmount(item.spend + receipt.points),
+								}
+							)}
+						</p>
+					)}
 					<Button
 						type="button"
 						size="sm"

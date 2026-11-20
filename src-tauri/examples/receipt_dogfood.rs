@@ -79,9 +79,10 @@ fn main() {
         let found = checks(&reading, bad_invoice, &today);
         let reduced = reduced_amount(&reading);
         println!(
-            "  reading: date={:?} total={:?} merchant={:?} invoice={:?} payment={:?} taxParts={:?}",
+            "  reading: date={:?} total={:?} points={} merchant={:?} invoice={:?} payment={:?} taxParts={:?}",
             reading.date,
             reading.total,
+            reading.points,
             reading.merchant,
             reading.invoice_no,
             reading.payment.map(|p| p.as_str()),
@@ -164,6 +165,15 @@ fn main() {
                         .map(|p| (p.rate, p.amount))
                         .collect::<Vec<_>>()
                 ),
+            );
+        }
+        // ポイントで払った額（書いていなければ 0 が正解。ないポイントを作っていないか見る）
+        if want.get("total").is_some() {
+            let points = want["points"].as_i64().unwrap_or(0);
+            compare(
+                "points",
+                reading.points == points,
+                reading.points.to_string(),
             );
         }
         if let Some(c) = want["checks"].as_array() {

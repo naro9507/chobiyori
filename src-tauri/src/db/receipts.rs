@@ -5,7 +5,7 @@
 
 use super::attachments::{self, Attachment};
 use super::inbox::InboxStatus;
-use crate::domain::receipt::{self, Check, PaymentMethod, ReceiptReading};
+use crate::domain::receipt::{self, Check, PaymentMethod, PointsAs, ReceiptReading};
 use crate::domain::string_enum;
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::receipt::gemini::{valid_model, DEFAULT_MODEL};
@@ -37,6 +37,9 @@ pub struct Receipt {
     /// 読み取れなかった理由（コード）
     pub error: Option<String>,
     pub reduced_amount: i64,
+    /// ポイント・商品券などで払った額。経費は「候補の金額 + これ」になる
+    pub points: i64,
+    pub points_as: PointsAs,
     pub invoice_no: Option<String>,
     pub inbox_item_id: Option<i64>,
     /// 候補の状態（候補がまだなければ None）
@@ -178,7 +181,8 @@ pub fn save_settings(
 
 const SELECT: &str = "
     SELECT r.id, r.attachment_id, r.status, r.send_allowed, r.reading, r.checks, r.error,
-           r.reduced_amount, r.invoice_no, r.inbox_item_id, i.transaction_id, i.ignored
+           r.reduced_amount, r.invoice_no, r.inbox_item_id, i.transaction_id, i.ignored,
+           r.points, r.points_as
     FROM receipts r
     LEFT JOIN inbox_items i ON i.id = r.inbox_item_id";
 
@@ -199,6 +203,8 @@ fn read(conn: &Connection, filter: &str, params: impl rusqlite::Params) -> AppRe
                 r.get::<_, Option<i64>>(9)?,
                 r.get::<_, Option<i64>>(10)?,
                 r.get::<_, Option<bool>>(11)?,
+                r.get::<_, i64>(12)?,
+                r.get::<_, PointsAs>(13)?,
             ))
         })?
         .collect::<Result<_, _>>()?;
@@ -217,6 +223,8 @@ fn read(conn: &Connection, filter: &str, params: impl rusqlite::Params) -> AppRe
                 item,
                 transaction,
                 ignored,
+                points,
+                points_as,
             )| {
                 Ok(Receipt {
                     id,
@@ -227,6 +235,8 @@ fn read(conn: &Connection, filter: &str, params: impl rusqlite::Params) -> AppRe
                     checks: serde_json::from_str(&checks).unwrap_or_default(),
                     error,
                     reduced_amount: reduced,
+                    points,
+                    points_as,
                     invoice_no: invoice,
                     inbox_item_id: item,
                     inbox_status: item.map(|_| match (transaction, ignored) {
@@ -334,11 +344,21 @@ pub struct ReceiptFields {
     pub total: i64,
     pub merchant: String,
     pub payment_account_id: i64,
-    /// 軽減税率（8%）の対象額（税込）。0 なら分けない
+    /// 軽減税率（8%）の対象額（税込）。0 なら分けない。ポイントで払った分も含めた額のうちの額
     #[serde(default)]
     pub reduced_amount: i64,
     #[serde(default)]
     pub invoice_no: Option<String>,
+    /// ポイント・商品券などで払った額。`total` は払った額で、経費は `total + points`
+    #[serde(default)]
+    pub points: i64,
+    /// ポイントの分の貸方（事業主借か雑収入）
+    #[serde(default = "default_points_as")]
+    pub points_as: PointsAs,
+}
+
+fn default_points_as() -> PointsAs {
+    PointsAs::Owner
 }
 
 fn ensure_editable(receipt: &Receipt) -> AppResult<()> {
@@ -359,7 +379,10 @@ fn upsert_item(conn: &Connection, receipt: &Receipt, fields: &ReceiptFields) -> 
     if !(1..=crate::domain::journal::AMOUNT_MAX).contains(&fields.total) {
         return Err(AppError::field(ErrorCode::OutOfRange, "total"));
     }
-    if !(0..=fields.total).contains(&fields.reduced_amount) {
+    if !(0..=crate::domain::journal::AMOUNT_MAX - fields.total).contains(&fields.points) {
+        return Err(AppError::field(ErrorCode::OutOfRange, "points"));
+    }
+    if !(0..=fields.total + fields.points).contains(&fields.reduced_amount) {
         return Err(AppError::field(ErrorCode::OutOfRange, "reducedAmount"));
     }
     ensure_payment_account(conn, Some(fields.payment_account_id), "paymentAccountId")?;
@@ -377,8 +400,14 @@ fn upsert_item(conn: &Connection, receipt: &Receipt, fields: &ReceiptFields) -> 
         ),
     };
     conn.execute(
-        "UPDATE receipts SET reduced_amount = ?2, invoice_no = ?3 WHERE id = ?1",
-        params![receipt.id, fields.reduced_amount, invoice_no],
+        "UPDATE receipts SET reduced_amount = ?2, invoice_no = ?3, points = ?4, points_as = ?5 WHERE id = ?1",
+        params![
+            receipt.id,
+            fields.reduced_amount,
+            invoice_no,
+            fields.points,
+            fields.points_as
+        ],
     )?;
     if let Some(item) = receipt.inbox_item_id {
         conn.execute(
@@ -426,16 +455,19 @@ pub fn record_reading(conn: &Connection, id: i64, text: &str, today: &str) -> Ap
     };
     let checks = receipt::checks(&reading, bad_invoice, today);
     let reduced = receipt::reduced_amount(&reading);
+    let points = receipt::booked_points(&reading);
     conn.execute(
         "UPDATE receipts SET status = 'read', reading = ?2, checks = ?3, error = NULL,
-             reduced_amount = ?4, invoice_no = ?5, read_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+             reduced_amount = ?4, invoice_no = ?5, points = ?6,
+             read_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?1",
         params![
             id,
             serde_json::to_string(&reading).unwrap_or_default(),
             serde_json::to_string(&checks).unwrap_or_default(),
             reduced,
-            reading.invoice_no
+            reading.invoice_no,
+            points
         ],
     )?;
     let receipt = get(conn, id)?;
@@ -455,6 +487,8 @@ pub fn record_reading(conn: &Connection, id: i64, text: &str, today: &str) -> Ap
                 payment_account_id: account,
                 reduced_amount: reduced,
                 invoice_no: reading.invoice_no.clone(),
+                points,
+                points_as: receipt.points_as,
             },
         )?;
     } else {
@@ -613,6 +647,8 @@ pub(crate) mod tests {
                 payment_account_id: account(&conn, "101"),
                 reduced_amount: 550,
                 invoice_no: Some("bad".into()),
+                points: 0,
+                points_as: PointsAs::Owner,
             },
         )
         .unwrap_err();
@@ -627,6 +663,8 @@ pub(crate) mod tests {
                 payment_account_id: account(&conn, "101"),
                 reduced_amount: 550,
                 invoice_no: None,
+                points: 0,
+                points_as: PointsAs::Owner,
             },
         )
         .unwrap();

@@ -50,6 +50,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0010_recurring.sql"),
     include_str!("migrations/0011_payments.sql"),
     include_str!("migrations/0012_accounting_consistency.sql"),
+    include_str!("migrations/0013_receipt_points.sql"),
 ];
 
 pub struct Database {

@@ -404,6 +404,7 @@ Excel 帳簿と同じ手数で高速に入力できる。
 - 日付と合計が読めたら受信箱の候補にする。支払方法から貸方を決める（現金 → 設定の現金の口座、カード・電子マネー → 設定のカードの口座）。読めなかったもの・送らないことにしたものは、画像を見ながら手で入力する。
 - 接続できないときと回数の上限のときは読み取り待ちのまま残す。上限のときは 30 秒待って続ける（残りの回数はサービスから分からないので、残りの枚数を示す）。
 - 確定すると、軽減税率の対象額があれば経費の行を 8% と 10% に分け、登録番号があればインボイスの印を付ける。画像は証憑として取引に付く。帳簿（仕訳帳）から、どの取引にも証憑を付けられる。
+- ポイント・商品券で払った分（「ポイント利用 -300」など）も読む。税率ごとの対象額がポイントを引く前の額で書いてあれば（合計 + ポイント = 対象額の合計）、お店がポイントを支払いとして扱っているので、経費はポイントを含めた額にし、貸方を「払った口座（払った額）」と「ポイントの分」に分ける。ポイントの分は既定で事業主借（個人の買い物で貯めたポイント）とし、確認の画面で雑収入（事業で貯めたポイント、不課税）に変えられる。対象額がポイントを引いた後の額と合うとき（自社ポイントの値引きなど）は、払った額だけを経費にする。口座の行は払った額のままにし、カードの明細と金額で突き合わせられるようにする。この扱いは税理士に確かめる。
 - 突合: 受信箱の候補に、同じ口座・同じ金額・前後 3 日の取引があれば、「この取引に紐付ける」で新しい取引を作らずに紐付ける（レシートと明細、手で入力した取引）。紐付けは外せる。「明細に出ていないカード払いのレシート」と「レシートがない明細の行」を一覧で見られる（カード払いは、取込形式の取込先になっている口座で払ったもの）。
 
 **F9-2 カード明細 CSV 取込**
@@ -703,7 +704,7 @@ e-Tax の送信や、申告書・申請書そのものの作成はしない。�
 | `import_batches` | id, source（receipt/card_csv）, card_id, profile_id, file_name, file_hash, imported_at |
 | `import_items` | id, batch_id, row_hash, raw_json, date, amount, merchant_raw, merchant_normalized, suggested_json, confidence, status（pending/confirmed/excluded/duplicate）, transaction_id |
 | `attachments` | id, transaction_id, file_name, mime, size, sha256, data, added_at（証憑。中身は帳簿の DB に置き、帳簿と一緒に暗号化する） |
-| `receipts` | id, attachment_id, status（読み取り待ち / 読み取った / 読めなかった / 手で入力）, send_allowed, reading（読み取った内容の JSON）, checks（自己検算で合わなかった項目）, error, reduced_amount（軽減税率の対象額）, invoice_no, inbox_item_id, read_at |
+| `receipts` | id, attachment_id, status（読み取り待ち / 読み取った / 読めなかった / 手で入力）, send_allowed, reading（読み取った内容の JSON）, checks（自己検算で合わなかった項目）, error, reduced_amount（軽減税率の対象額）, points（ポイント・商品券で払った額）, points_as（ポイントの分の貸方: 事業主借 / 雑収入）, invoice_no, inbox_item_id, read_at |
 | `ocr_results` | attachment_id, engine, engine_version, text, fields_json（各項目の値・位置・確信度） |
 | `auto_rules` | id, match_type, pattern, amount_min, amount_max, source, result_json, hit_count, is_active |
 | `month_locks` | fiscal_year, month, locked_at |
