@@ -19,6 +19,7 @@ import {
 	Scan,
 	Search,
 	Settings,
+	X,
 } from "lucide-react"
 import { useEffect, useId, useRef } from "react"
 import { createPortal } from "react-dom"
@@ -67,6 +68,9 @@ type Track = keyof typeof tracks
 type Progress = {
 	active: Track | null
 	collapsed: boolean
+	/** ホームの入口を閉じたか。ヘルプの画面には残す。 */
+	hiddenFromHome: boolean
+	hideFromHome: () => void
 	toggleCollapsed: () => void
 	position: Record<Track, number>
 	setActive: (track: Track | null) => void
@@ -78,6 +82,8 @@ const useProgress = create<Progress>()(
 		(set) => ({
 			active: null,
 			collapsed: false,
+			hiddenFromHome: false,
+			hideFromHome: () => set({ hiddenFromHome: true }),
 			toggleCollapsed: () =>
 				set(({ collapsed }) => ({ collapsed: !collapsed })),
 			position: { basics: 0, migration: 0 },
@@ -93,8 +99,16 @@ const useProgress = create<Progress>()(
 )
 
 export function Tutorial({ screen }: { screen: ScreenId }) {
-	const { active, collapsed, toggleCollapsed, position, move, setActive } =
-		useProgress()
+	const {
+		active,
+		collapsed,
+		toggleCollapsed,
+		position,
+		move,
+		setActive,
+		hiddenFromHome,
+		hideFromHome,
+	} = useProgress()
 	const navigate = useNavigate()
 	const panelId = useId()
 	const marked = useRef<HTMLElement | null>(null)
@@ -129,11 +143,30 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 	}
 
 	if (!active) {
-		if (screen !== "home" && screen !== "help") return null
+		// どちらかを終えたら、ホームには出さない（ヘルプからもう一度始められる）。
+		const finished = (Object.keys(tracks) as Track[]).some(
+			(track) => position[track] >= tracks[track].length
+		)
+		const onHome = screen === "home"
+		if (onHome ? finished || hiddenFromHome : screen !== "help") return null
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-start gap-3">
-					<h2 className="font-semibold">{t("title")}</h2>
+					<div className="flex w-full items-start gap-2">
+						<h2 className="font-semibold">{t("title")}</h2>
+						{onHome && (
+							<Button
+								variant="ghost"
+								size="icon"
+								className="-mt-2 ml-auto"
+								aria-label={t("hideFromHome")}
+								title={t("hideFromHome")}
+								onClick={hideFromHome}
+							>
+								<X aria-hidden="true" />
+							</Button>
+						)}
+					</div>
 					<div className="flex flex-wrap gap-2">
 						{(["basics", "migration"] as const).map((track) => {
 							const index = position[track]
@@ -150,6 +183,11 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 							)
 						})}
 					</div>
+					{onHome && (
+						<p className="text-muted-foreground text-sm">
+							{t("hideFromHomeNote")}
+						</p>
+					)}
 				</CardContent>
 			</Card>
 		)
