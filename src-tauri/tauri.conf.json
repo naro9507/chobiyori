@@ -38,6 +38,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "infoPlist": "Info.plist",
       "signingIdentity": "-"
     },
     "windows": {
@@ -45,6 +46,7 @@
         "type": "downloadBootstrapper"
       },
       "nsis": {
+        "installerHooks": "nsis/installer-hooks.nsh",
         "languages": [
           "Japanese",
           "English"
