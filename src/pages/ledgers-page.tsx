@@ -157,6 +157,7 @@ export function LedgersPage() {
 							.map((value) => (
 								<Tabs.Trigger
 									key={value}
+									id={value === "journal" ? "tutorial-journal" : undefined}
 									value={value}
 									className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
 								>

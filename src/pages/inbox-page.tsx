@@ -31,7 +31,11 @@ export function InboxPage() {
 	return (
 		<Page screen="inbox">
 			{activeView && (
-				<Link to="/inbox" className="w-fit text-primary text-sm underline">
+				<Link
+					id="tutorial-review"
+					to="/inbox"
+					className="w-fit text-primary text-sm underline"
+				>
 					{t("backToReview")}
 				</Link>
 			)}
@@ -72,7 +76,11 @@ export function InboxPage() {
 			)}
 			<Card key={activeView}>
 				<CardContent className="flex flex-col gap-4">
-					<h2 className="font-semibold text-lg">
+					<h2
+						id={!activeView ? "tutorial-review" : undefined}
+						tabIndex={-1}
+						className="font-semibold text-lg"
+					>
 						{activeView === "settings"
 							? t("importSettings")
 							: t(`tab_${activeView ?? "review"}`)}

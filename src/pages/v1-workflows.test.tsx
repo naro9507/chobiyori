@@ -427,9 +427,10 @@ it("基本操作の案内を最後まで進め、ホームからやり直せる"
 		)
 	}
 	await user.click(
-		await screen.findByRole("button", { name: "操作する場所へ移動" })
+		await screen.findByRole("button", { name: "操作場所を表示" })
 	)
 	expect(document.activeElement).toHaveAttribute("id", "book-backup")
+	expect(document.activeElement).toHaveAttribute("data-tutorial-highlight")
 	await user.click(
 		screen.getByRole("button", { name: "チュートリアルを完了する" })
 	)

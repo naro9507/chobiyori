@@ -145,7 +145,10 @@ function SettingsGroup({
 	return (
 		<Accordion.Item value={value} className="rounded-lg border bg-card">
 			<Accordion.Header>
-				<Accordion.Trigger className="flex w-full items-center justify-between gap-4 rounded-lg px-5 py-4 text-left font-semibold outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180">
+				<Accordion.Trigger
+					id={value === "business" ? "tutorial-business" : undefined}
+					className="flex w-full items-center justify-between gap-4 rounded-lg px-5 py-4 text-left font-semibold outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180"
+				>
 					{title}
 					<ChevronDown aria-hidden="true" className="size-4 shrink-0" />
 				</Accordion.Trigger>

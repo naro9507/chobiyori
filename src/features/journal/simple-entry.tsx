@@ -430,7 +430,11 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						)}
 
 						{!form.purposeId && (
-							<fieldset className="flex flex-col gap-2">
+							<fieldset
+								id="tutorial-entry-kind"
+								tabIndex={-1}
+								className="flex flex-col gap-2"
+							>
 								<legend className="mb-1.5 font-medium text-sm">
 									{t("kind")}
 								</legend>

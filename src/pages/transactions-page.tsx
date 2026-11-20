@@ -82,6 +82,7 @@ export function TransactionsPage({
 						.map((value) => (
 							<Tabs.Trigger
 								key={value}
+								id={value === "simple" ? "tutorial-entry" : undefined}
 								value={value}
 								className="min-h-9 rounded-md px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
 							>
@@ -154,6 +155,7 @@ function EditTransactionPage({
 	return (
 		<Page screen="transactions">
 			<Link
+				id="tutorial-entry"
 				to="/transactions"
 				search={{}}
 				className="w-fit text-primary text-sm underline underline-offset-4"

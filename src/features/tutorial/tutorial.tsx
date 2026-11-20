@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router"
 import {
-	ArrowRight,
 	BookOpen,
 	CalendarDays,
 	ChartColumn,
@@ -14,9 +13,12 @@ import {
 	Pencil,
 	Receipt,
 	Save,
+	Scan,
 	Search,
 	Settings,
 } from "lucide-react"
+import { createContext, useContext, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { ScreenId } from "@/app/navigation"
@@ -58,6 +60,8 @@ const actionIcons = {
 	backup: [FolderOpen, Save, CircleCheck],
 } as const
 
+export const TutorialDock = createContext<HTMLElement | null>(null)
+
 type Track = keyof typeof tracks
 type Progress = {
 	active: Track | null
@@ -85,6 +89,17 @@ const useProgress = create<Progress>()(
 export function Tutorial({ screen }: { screen: ScreenId }) {
 	const { active, position, move, setActive } = useProgress()
 	const navigate = useNavigate()
+	const dock = useContext(TutorialDock)
+	const marked = useRef<HTMLElement | null>(null)
+	const step = active ? tracks[active][position[active]] : undefined
+	useEffect(() => {
+		// 手順や画面を離れたら、同じページに残る対象の枠も消す。
+		if (!step || screen !== step[0]) return
+		return () => {
+			marked.current?.removeAttribute("data-tutorial-highlight")
+			marked.current = null
+		}
+	}, [step, screen])
 	const t = useTranslations("tutorial")
 	const nav = useTranslations("nav")
 
@@ -136,17 +151,38 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 	const index = position[active]
 	const steps = tracks[active]
 	const [target, task] = steps[index]
-	const anchors: Partial<Record<typeof task, string>> = {
-		backup: "book-backup",
-		preview: "book-import",
-		import: "book-import",
-		compare: "trial-balance",
+	const anchors: Partial<Record<typeof task, string[]>> = {
+		profile: ["#tutorial-business"],
+		entry: ["#tutorial-entry-kind", "#tutorial-entry"],
+		ledger: ["#tutorial-journal"],
+		review: ["#tutorial-review"],
+		month: ["[data-tutorial-month]"],
+		opening: ["#tutorial-opening"],
+		backup: ["#book-backup"],
+		preview: ["#book-import"],
+		import: ["#tutorial-import-preview", "#book-import"],
+		compare: ["#trial-balance"],
 	}
 	const anchor = anchors[task]
 	const last = index === steps.length - 1
-	return (
-		<Card className="border-primary">
-			<CardContent className="flex flex-col items-start gap-3">
+	if (!dock) return null
+	function showControl() {
+		const element = anchor
+			?.map((selector) => document.querySelector<HTMLElement>(selector))
+			.find(Boolean)
+		if (!element) return
+		marked.current?.removeAttribute("data-tutorial-highlight")
+		marked.current = element
+		element.setAttribute("data-tutorial-highlight", "")
+		element.focus({ preventScroll: true })
+		element.scrollIntoView?.({ block: "center", inline: "nearest" })
+	}
+	return createPortal(
+		<aside
+			aria-label={t("title")}
+			className="max-h-[48dvh] overflow-y-auto border-t bg-card px-3 py-3"
+		>
+			<div className="flex flex-col items-start gap-2">
 				<div className="w-full" aria-live="polite">
 					<p className="text-muted-foreground text-sm">
 						{t(active)} ·{" "}
@@ -162,43 +198,30 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 					</div>
 					<h2 className="font-semibold">{t(task)}</h2>
 				</div>
-				<ol className="grid w-full gap-2 sm:grid-cols-3">
-					{([0, 1, 2] as const).map((i) => {
-						const Icon = actionIcons[task][i]
-						const action = (["Action1", "Action2", "Action3"] as const)[i]
-						return (
-							<li
-								key={action}
-								className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm"
-							>
-								<Icon
-									aria-hidden="true"
-									className="size-5 shrink-0 text-primary"
-								/>
-								<span className="flex-1">{t(`${task}${action}`)}</span>
-								{i < 2 && (
-									<ArrowRight
-										aria-hidden="true"
-										className="size-4 shrink-0 rotate-90 text-muted-foreground sm:rotate-0"
-									/>
-								)}
-							</li>
-						)
-					})}
-				</ol>
 				<details key={task} className="text-sm">
 					<summary className="cursor-pointer text-muted-foreground">
 						{t("details")}
 					</summary>
+					<ol className="mt-2 grid gap-1">
+						{(["Action1", "Action2", "Action3"] as const).map((action, i) => {
+							const Icon = actionIcons[task][i]
+							return (
+								<li key={action} className="flex items-start gap-2">
+									<Icon
+										aria-hidden="true"
+										className="mt-0.5 size-4 shrink-0 text-primary"
+									/>
+									{t(`${task}${action}`)}
+								</li>
+							)
+						})}
+					</ol>
 					<p className="mt-2 leading-relaxed">{t(`${task}Body`)}</p>
 				</details>
 				<div className="flex flex-wrap gap-2">
 					{screen === target && anchor && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => document.getElementById(anchor)?.focus()}
-						>
+						<Button variant="outline" size="sm" onClick={showControl}>
+							<Scan aria-hidden="true" />
 							{t("showControl")}
 						</Button>
 					)}
@@ -224,7 +247,8 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 						{t("pause")}
 					</Button>
 				</div>
-			</CardContent>
-		</Card>
+			</div>
+		</aside>,
+		dock
 	)
 }

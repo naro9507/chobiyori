@@ -77,6 +77,7 @@ export function ReportsPage() {
 						</Field>
 						<Field label={t("toMonth")} className="w-36">
 							<NativeSelect
+								data-tutorial-month=""
 								value={toMonth}
 								onChange={(e) => {
 									const month = Number(e.target.value)
