@@ -225,6 +225,16 @@ Issue を閉じたあとに再び失敗したら新しい Issue を作る。監�
 Issue の割り当て通知と Actions の失敗通知を受け取れるよう、GitHub の個人通知設定も確認する。
 Issue 作成・更新自体が失敗した場合は通知ジョブも失敗するので、Actions の失敗通知も有効にしておく。
 
+## Issue から Codex に頼む
+
+Issue の本文（新規作成時）かコメントに `@codex` と書くと、`.github/workflows/codex.yml` が Codex に Issue の内容を実装させ、下書きのプルリクエストを作る。
+動くのは `naro9507` が書いたときだけで、ほかの人のメンションやプルリクエストへのコメントでは動かない。
+
+- 準備: リポジトリの Secrets に `OPENAI_API_KEY` を登録し、Settings → Actions → General の「Allow GitHub Actions to create and approve pull requests」をオンにする。
+- Codex はリポジトリの読み取り権限だけを持つジョブで、sudo とネットワークを外して動く。ブランチの作成とプルリクエストは別のジョブが行う。
+- `GITHUB_TOKEN` で作ったプルリクエストでは CI が自動で走らない。下書きを解除するときに、空でないコミットを足すか、閉じて開き直して CI を走らせる。
+- Codex が `.github/workflows/` を変えた場合、`GITHUB_TOKEN` では push できないので失敗する。
+
 ## 帳日和への名称変更
 
 表示名は「帳日和」、英字名・パッケージ名・リポジトリ名は `Chobiyori` / `chobiyori` とする。
