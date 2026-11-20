@@ -43,12 +43,6 @@
 	"home": {
 		"welcome": "Welcome",
 		"welcomeBody": "Setup is complete and the standard accounts are ready. Record sales and payments on the Transactions screen.",
-		"status": "App status",
-		"connected": "Working normally",
-		"version": "Version {version}",
-		"checking": "Checking the app",
-		"browserOnly": "Only the screens are open in a browser. Bookkeeping features work when you start the app itself.",
-		"connectionError": "Could not load your books. Please restart the app. If that does not help, restart your computer.",
 		"balancesTitle": "Account balances",
 		"balancesAsOf": "Balances at the end of {month:month}",
 		"recurringTitle": "Monthly entries waiting",
@@ -90,7 +84,7 @@
 	},
 	"update": {
 		"sectionTitle": "Updates",
-		"sectionDescription": "When a new version is released, a notice appears at the top of the screen when you start the app.",
+		"sectionDescription": "The app checks for updates at startup and every hour while running. A dialog opens when a new version is available.",
 		"available": "Version {version} is available",
 		"availableBody": "The app restarts after updating. Save anything you are entering first.",
 		"install": "Update now",

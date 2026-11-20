@@ -11,7 +11,7 @@ import {
 	useYearStore,
 } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
-import { UpdateBanner } from "@/features/updater/update-banner"
+import { UpdateDialog } from "@/features/updater/update-dialog"
 import { useTranslations } from "@/i18n/use-translations"
 
 /** サイドメニューと本文の枠。すべての画面で共通。 */
@@ -83,7 +83,7 @@ export function AppShell() {
 			</nav>
 			<main id="main" className="min-w-0 flex-1 overflow-y-auto">
 				<WhatsNewBanner />
-				<UpdateBanner />
+				<UpdateDialog />
 				<FilingCalendarSyncWorker />
 				<FilingNotificationScheduler />
 				<FilingReminderBanner />

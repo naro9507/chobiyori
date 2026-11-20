@@ -1,12 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import {
-	CircleAlert,
-	CircleCheck,
-	Loader2,
-	MonitorSmartphone,
-} from "lucide-react"
 import { Page } from "@/components/layout/page"
-import { Badge } from "@/components/ui/badge"
 import {
 	Card,
 	CardContent,
@@ -14,7 +7,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
-import { useAppInfo } from "@/features/app-info/app-info"
 import { useOpeningBalances } from "@/features/closing/closing-api"
 import { DeadlineNotices } from "@/features/filing/deadline-notices"
 import { useInboxPendingCount } from "@/features/inbox/inbox-api"
@@ -25,7 +17,6 @@ import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
-import { NotInTauriError } from "@/lib/tauri"
 import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function HomePage() {
@@ -40,48 +31,34 @@ export function HomePage() {
 
 	return (
 		<Page screen="home">
-			<div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-				<Card>
-					<CardHeader>
-						<CardTitle>{t(firstSteps ? "firstSteps" : "welcome")}</CardTitle>
-						{!firstSteps && (
-							<CardDescription>{t("welcomeBody")}</CardDescription>
-						)}
-					</CardHeader>
-					{firstSteps && (
-						<CardContent>
-							<ol className="list-decimal space-y-2 pl-5 text-sm [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4">
-								<li>
-									<Link to="/master">{t("firstAccounts")}</Link>
-								</li>
-								<li>
-									<Link to="/closing" search={{ tab: "opening" }}>
-										{t("firstOpening")}
-									</Link>
-								</li>
-								<li>
-									<Link
-										to="/transactions"
-										onClick={() =>
-											useTransactionsTab.getState().setTab("simple")
-										}
-									>
-										{t("firstTransaction")}
-									</Link>
-								</li>
-							</ol>
-						</CardContent>
-					)}
-				</Card>
-				<Card>
-					<CardHeader>
-						<CardTitle>{t("status")}</CardTitle>
-					</CardHeader>
+			<Card>
+				<CardHeader>
+					<CardTitle>{t(firstSteps ? "firstSteps" : "welcome")}</CardTitle>
+					{!firstSteps && <CardDescription>{t("welcomeBody")}</CardDescription>}
+				</CardHeader>
+				{firstSteps && (
 					<CardContent>
-						<ConnectionStatus />
+						<ol className="list-decimal space-y-2 pl-5 text-sm [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4">
+							<li>
+								<Link to="/master">{t("firstAccounts")}</Link>
+							</li>
+							<li>
+								<Link to="/closing" search={{ tab: "opening" }}>
+									{t("firstOpening")}
+								</Link>
+							</li>
+							<li>
+								<Link
+									to="/transactions"
+									onClick={() => useTransactionsTab.getState().setTab("simple")}
+								>
+									{t("firstTransaction")}
+								</Link>
+							</li>
+						</ol>
 					</CardContent>
-				</Card>
-			</div>
+				)}
+			</Card>
 			<DeadlineNotices />
 			{features.recurring && (
 				<PendingRecurring fiscalYear={fiscalYear} month={month} />
@@ -158,55 +135,5 @@ function PendingRecurring({
 				</Link>
 			</CardContent>
 		</Card>
-	)
-}
-
-function ConnectionStatus() {
-	const t = useTranslations("home")
-	const { data, error, isPending } = useAppInfo()
-
-	if (isPending) {
-		return (
-			<p className="flex items-center gap-2 text-muted-foreground text-sm">
-				<Loader2 aria-hidden="true" className="size-4 animate-spin" />
-				{t("checking")}
-			</p>
-		)
-	}
-
-	if (error instanceof NotInTauriError) {
-		return (
-			<p className="flex items-start gap-2 text-muted-foreground text-sm">
-				<MonitorSmartphone
-					aria-hidden="true"
-					className="mt-0.5 size-4 shrink-0"
-				/>
-				{t("browserOnly")}
-			</p>
-		)
-	}
-
-	if (error || !data) {
-		return (
-			<p
-				role="alert"
-				className="flex items-start gap-2 text-destructive text-sm"
-			>
-				<CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-				{t("connectionError")}
-			</p>
-		)
-	}
-
-	return (
-		<div className="flex flex-col items-start gap-2">
-			<Badge variant="success">
-				<CircleCheck aria-hidden="true" />
-				{t("connected")}
-			</Badge>
-			<p className="num text-muted-foreground text-sm">
-				{t("version", { version: data.version })}
-			</p>
-		</div>
 	)
 }

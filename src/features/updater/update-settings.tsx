@@ -7,8 +7,7 @@ import { parseNotes } from "@/features/changelog/changelog"
 import { ReleaseNotes } from "@/features/changelog/release-notes"
 import { useTranslations } from "@/i18n/use-translations"
 import { isTauri } from "@/lib/tauri"
-import { progressText } from "./update-banner"
-import { useInstallUpdate, useUpdateCheck } from "./updater"
+import { progressText, useInstallUpdate, useUpdateCheck } from "./updater"
 
 /** 設定画面の「アップデート」。いまのバージョンと、手動での確認。 */
 export function UpdateSettings() {
