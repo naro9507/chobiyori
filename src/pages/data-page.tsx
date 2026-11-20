@@ -99,7 +99,7 @@ function ImportCard() {
 	}
 
 	return (
-		<Card id="book-import">
+		<Card id="book-import" tabIndex={-1}>
 			<CardHeader>
 				<CardTitle help={t("importDescription")}>{t("importTitle")}</CardTitle>
 			</CardHeader>

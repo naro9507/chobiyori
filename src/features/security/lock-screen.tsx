@@ -1,5 +1,5 @@
 import { KeyRound, Loader2 } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -11,12 +11,30 @@ import {
 import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
-import { fieldError } from "@/lib/errors"
+import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
+import { DeviceUnlock, useLoginStatus } from "./account-login"
 import { type BookStatus, useOpenBooks } from "./security-api"
 
 /** パスワードの最短の長さ。Rust 側 `db::vault::PASSWORD_MIN` と同じ。 */
 export const PASSWORD_MIN = 8
+
+/** `seconds` 秒から 1 秒ずつ減らした残りの秒数。 */
+function useCountdown(seconds: number) {
+	const [left, setLeft] = useState(seconds)
+	useEffect(() => {
+		setLeft(seconds)
+		if (seconds <= 0) return
+		const end = Date.now() + seconds * 1000
+		const timer = setInterval(() => {
+			const rest = Math.max(0, Math.ceil((end - Date.now()) / 1000))
+			setLeft(rest)
+			if (rest === 0) clearInterval(timer)
+		}, 1000)
+		return () => clearInterval(timer)
+	}, [seconds])
+	return left
+}
 
 /** 帳簿を開く前の画面。パスワードの設定・入力・再設定を行う。 */
 export function LockScreen({ status }: { status: BookStatus }) {
@@ -29,6 +47,18 @@ export function LockScreen({ status }: { status: BookStatus }) {
 	const [recovering, setRecovering] = useState(false)
 	const [recoveryCode, setRecoveryCode] = useState("")
 	const choosing = status.state !== "encrypted" || recovering
+	const login = useLoginStatus(!choosing).data
+	// 端末の本人確認は、画面を出したときに 1 回だけ自動で始める
+	const deviceStarted = useRef(false)
+	const waiting = useCountdown(
+		status.state === "encrypted" ? (status.retryAfter ?? 0) : 0
+	)
+	const minutes = Math.floor(waiting / 60)
+	const waitText =
+		minutes > 0
+			? t("waitMinutes", { minutes, seconds: waiting % 60 })
+			: t("waitSeconds", { seconds: waiting })
+	const attemptsLeft = status.attemptsLeft ?? 0
 	const mode = recovering
 		? "reset"
 		: status.state === "notCreated"
@@ -72,11 +102,16 @@ export function LockScreen({ status }: { status: BookStatus }) {
 		setRecovering(!recovering)
 	}
 
+	// 入力を止めているときは、残り時間の案内だけを出す
+	const error =
+		isAppError(open.error) && open.error.code === "tooManyAttempts"
+			? null
+			: open.error
 	const passwordError = fieldError(
-		open.error,
+		error,
 		recovering ? "newPassword" : "password"
 	)
-	const recoveryError = fieldError(open.error, "recoveryCode")
+	const recoveryError = fieldError(error, "recoveryCode")
 
 	return (
 		<main className="flex min-h-full items-center justify-center bg-background px-4 py-10">
@@ -84,11 +119,27 @@ export function LockScreen({ status }: { status: BookStatus }) {
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<KeyRound aria-hidden="true" className="size-5" />
-						{t(`${mode}Title`)}
+						{t(
+							login?.linked && !choosing ? "linkedUnlockTitle" : `${mode}Title`
+						)}
 					</CardTitle>
-					<CardDescription>{t(`${mode}Description`)}</CardDescription>
+					<CardDescription>
+						{t(
+							login?.linked && !choosing
+								? "linkedUnlockDescription"
+								: `${mode}Description`
+						)}
+					</CardDescription>
 				</CardHeader>
 				<CardContent>
+					{!choosing && login?.linked && (
+						<>
+							<DeviceUnlock status={login} autoStarted={deviceStarted} />
+							<p className="mb-3 text-muted-foreground text-sm">
+								{t("orPassword")}
+							</p>
+						</>
+					)}
 					<form onSubmit={submit} className="flex flex-col gap-4">
 						{choosing && !recovering && (
 							<p className="rounded-lg border border-warning/40 bg-warning-background px-3 py-2 text-sm text-warning">
@@ -137,15 +188,32 @@ export function LockScreen({ status }: { status: BookStatus }) {
 								/>
 							</Field>
 						)}
-						{open.error && !passwordError && !recoveryError && (
+						{error && !passwordError && !recoveryError && (
 							<p role="alert" className="text-destructive text-sm">
-								{errorMessage(open.error)}
+								{errorMessage(error)}
 							</p>
+						)}
+						{waiting > 0 ? (
+							<p
+								role="status"
+								className="rounded-lg border border-warning/40 bg-warning-background px-3 py-2 text-sm text-warning"
+							>
+								{t("lockedOut", { time: waitText })}
+							</p>
+						) : (
+							status.state === "encrypted" &&
+							attemptsLeft > 0 &&
+							attemptsLeft <= 2 && (
+								<p className="text-muted-foreground text-sm">
+									{t("attemptsLeft", { count: attemptsLeft })}
+								</p>
+							)
 						)}
 						<Button
 							type="submit"
 							disabled={
 								open.isPending ||
+								waiting > 0 ||
 								password === "" ||
 								(recovering && !recoveryCode.trim())
 							}

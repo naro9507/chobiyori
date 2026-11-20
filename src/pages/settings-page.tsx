@@ -11,6 +11,7 @@ import { MailSettingsCard } from "@/features/documents/mail-settings-card"
 import { FilingReminderSettings } from "@/features/filing/filing-reminder-settings"
 import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
+import { AccountLoginSettings } from "@/features/security/account-login"
 import { PasswordCard } from "@/features/security/password-card"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
@@ -116,6 +117,7 @@ export function SettingsPage() {
 				<SettingsGroup value="security" title={t("securityGroup")}>
 					<PasswordCard />
 					<RecoveryCard />
+					<AccountLoginSettings />
 				</SettingsGroup>
 				<SettingsGroup value="app" title={t("appGroup")}>
 					<UpdateSettings />

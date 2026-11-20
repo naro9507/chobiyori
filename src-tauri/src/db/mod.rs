@@ -28,6 +28,7 @@ pub mod setup;
 pub mod sub_accounts;
 pub mod templates;
 pub mod transactions;
+pub mod unlock_guard;
 pub mod vault;
 
 use crate::error::{AppError, AppResult};
