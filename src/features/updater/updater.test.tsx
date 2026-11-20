@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -15,7 +15,7 @@ vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }))
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }))
 vi.mock("@/lib/tauri", () => ({ isTauri: mocks.isTauri }))
 
-const { UpdateBanner } = await import("./update-banner")
+const { UpdateDialog } = await import("./update-dialog")
 const { toPercent } = await import("./updater")
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -61,17 +61,17 @@ describe("toPercent", () => {
 	})
 })
 
-describe("UpdateBanner", () => {
+describe("UpdateDialog", () => {
 	it("新しいバージョンがなければ何も出さない", async () => {
 		mocks.check.mockResolvedValue(null)
-		const { container } = render(<UpdateBanner />, { wrapper })
+		const { container } = render(<UpdateDialog />, { wrapper })
 		await vi.waitFor(() => expect(mocks.check).toHaveBeenCalled())
 		expect(container).toBeEmptyDOMElement()
 	})
 
 	it("ブラウザで開いているときは確かめない", async () => {
 		mocks.isTauri.mockReturnValue(false)
-		const { container } = render(<UpdateBanner />, { wrapper })
+		const { container } = render(<UpdateDialog />, { wrapper })
 		await new Promise((resolve) => setTimeout(resolve, 0))
 		expect(mocks.check).not.toHaveBeenCalled()
 		expect(container).toBeEmptyDOMElement()
@@ -81,10 +81,12 @@ describe("UpdateBanner", () => {
 		const update = fakeUpdate()
 		mocks.check.mockResolvedValue(update)
 		const user = userEvent.setup()
-		render(<UpdateBanner />, { wrapper })
+		render(<UpdateDialog />, { wrapper })
 
 		expect(
-			await screen.findByText("新しいバージョン 0.2.0 があります")
+			await screen.findByRole("dialog", {
+				name: "新しいバージョン 0.2.0 があります",
+			})
 		).toBeInTheDocument()
 		expect(
 			screen.getByText("仕訳を入力できるようになりました。")
@@ -100,7 +102,7 @@ describe("UpdateBanner", () => {
 	it("「あとで」を押すと消える", async () => {
 		mocks.check.mockResolvedValue(fakeUpdate())
 		const user = userEvent.setup()
-		render(<UpdateBanner />, { wrapper })
+		render(<UpdateDialog />, { wrapper })
 
 		await user.click(await screen.findByRole("button", { name: "あとで" }))
 
@@ -109,12 +111,35 @@ describe("UpdateBanner", () => {
 		).not.toBeInTheDocument()
 	})
 
+	it("次の定期確認で新しいバージョンを見つけると表示する", async () => {
+		vi.useFakeTimers()
+		mocks.check.mockResolvedValueOnce(null).mockResolvedValue(fakeUpdate())
+		const { unmount } = render(<UpdateDialog />, { wrapper })
+
+		try {
+			await act(() => vi.advanceTimersByTimeAsync(100))
+			expect(mocks.check).toHaveBeenCalledOnce()
+			expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+
+			await act(() => vi.advanceTimersByTimeAsync(60 * 60 * 1000))
+			expect(mocks.check).toHaveBeenCalledTimes(2)
+			expect(
+				screen.getByRole("dialog", {
+					name: "新しいバージョン 0.2.0 があります",
+				})
+			).toBeInTheDocument()
+		} finally {
+			unmount()
+			vi.useRealTimers()
+		}
+	})
+
 	it("更新に失敗したら、その旨を出す", async () => {
 		const update = fakeUpdate()
 		update.downloadAndInstall.mockRejectedValue(new Error("network"))
 		mocks.check.mockResolvedValue(update)
 		const user = userEvent.setup()
-		render(<UpdateBanner />, { wrapper })
+		render(<UpdateDialog />, { wrapper })
 
 		await user.click(await screen.findByRole("button", { name: "今すぐ更新" }))
 

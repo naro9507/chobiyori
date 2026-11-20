@@ -48,11 +48,13 @@ describe("アプリの枠", () => {
 		expect(router.state.location.pathname).toBe("/help")
 	})
 
-	it("ブラウザだけで開いたときは、その旨をホームに出す", async () => {
+	it("ブラウザでホームを開いても、アプリの状態は表示しない", async () => {
 		renderApp()
+		await screen.findByRole("heading", { level: 1, name: "ホーム" })
+		expect(screen.queryByText("アプリの状態")).not.toBeInTheDocument()
 		expect(
-			await screen.findByText(/ブラウザで画面だけを表示しています/)
-		).toBeInTheDocument()
+			screen.queryByText(/ブラウザで画面だけを表示しています/)
+		).not.toBeInTheDocument()
 	})
 })
 

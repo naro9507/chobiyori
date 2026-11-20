@@ -6,8 +6,10 @@ import {
 	type Update,
 } from "@tauri-apps/plugin-updater"
 import { useState } from "react"
+import type { useTranslations } from "@/i18n/use-translations"
 import { isTauri } from "@/lib/tauri"
 
+const updateCheckInterval = 60 * 60 * 1000
 const updateQueryKey = ["update"] as const
 
 /**
@@ -22,8 +24,10 @@ export function useUpdateCheck() {
 			if (!isTauri()) return null
 			return check({ timeout: 30_000 })
 		},
-		staleTime: 60 * 60 * 1000,
-		refetchInterval: 60 * 60 * 1000,
+		enabled: isTauri(),
+		staleTime: updateCheckInterval,
+		refetchInterval: updateCheckInterval,
+		refetchIntervalInBackground: true,
 		retry: false,
 	})
 }
@@ -76,4 +80,17 @@ export function useInstallUpdate() {
 		error: mutation.error,
 		isInstalling: mutation.isPending,
 	}
+}
+
+export function progressText(
+	progress: InstallProgress,
+	t: ReturnType<typeof useTranslations<"update">>
+) {
+	if (progress.phase === "downloading") {
+		return progress.percent === null
+			? t("downloadingUnknown")
+			: t("downloading", { percent: progress.percent })
+	}
+	if (progress.phase === "restarting") return t("restarting")
+	return ""
 }
