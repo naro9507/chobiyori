@@ -26,7 +26,9 @@ impl Gemini {
             let _ = rustls::crypto::ring::default_provider().install_default();
         }
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(90))
+            // 混んでいるときは 1 枚に 1 分以上かかる（2026-11 の実測で 35〜85 秒）。
+            // 90 秒では打ち切ってしまい、同じ画像が何度読み直しても読めなかった
+            .timeout(Duration::from_secs(180))
             .build()
             .map_err(|_| ReadError::Offline)?;
         Ok(Self { client, key, model })
@@ -81,7 +83,8 @@ pub fn error_of(status: u16, retry_after: Option<u64>) -> ReadError {
     match status {
         401 | 403 => ReadError::BadKey,
         404 => ReadError::ModelNotFound,
-        429 => ReadError::RateLimited { retry_after },
+        // 503 は「混んでいる」（high demand）。接続できないのではないので、待って読み直す
+        429 | 503 => ReadError::RateLimited { retry_after },
         400 | 413 | 415 => ReadError::Rejected,
         500..=599 => ReadError::Offline,
         _ => ReadError::BadResponse,
@@ -199,7 +202,11 @@ mod tests {
             }
         );
         assert_eq!(error_of(403, None), ReadError::BadKey);
-        assert_eq!(error_of(503, None), ReadError::Offline);
+        assert_eq!(
+            error_of(503, None),
+            ReadError::RateLimited { retry_after: None }
+        );
+        assert_eq!(error_of(500, None), ReadError::Offline);
         assert_eq!(error_of(413, None), ReadError::Rejected);
         // モデルがない（提供の終了など）は 1 枚の失敗にしない
         assert_eq!(error_of(404, None), ReadError::ModelNotFound);

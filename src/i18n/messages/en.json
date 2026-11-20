@@ -838,6 +838,7 @@
 		"check_taxMismatch": "The tax does not match the rate. Check the 8% and 10% amounts.",
 		"check_invalidInvoiceNo": "The registration number is not in the right form (T and 13 digits). Compare with the image.",
 		"check_missingMerchant": "The shop name could not be read. Enter it if you know it.",
+		"check_multipleReceipts": "This image shows more than one receipt. Only one was read. Take a separate photo of each of the others and add them.",
 		"loadingImage": "Loading image",
 		"cannotShow": "This kind of file (HEIC, PDF and so on) can't be shown here. Use \"Save as file\" and open it.",
 		"saveCopy": "Save as file",

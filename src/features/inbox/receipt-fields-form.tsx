@@ -120,7 +120,7 @@ export function ReceiptFieldsForm({
 			</Field>
 			<Field
 				label={t("merchant")}
-				hint={hint("missingMerchant")}
+				hint={hint("multipleReceipts") ?? hint("missingMerchant")}
 				error={error("merchant")}
 			>
 				<Input value={merchant} onChange={(e) => setMerchant(e.target.value)} />

@@ -390,6 +390,7 @@ export type ReceiptCheck =
 	| "taxMismatch"
 	| "invalidInvoiceNo"
 	| "missingMerchant"
+	| "multipleReceipts"
 
 export type ReceiptReading = {
 	date: string | null
@@ -399,6 +400,8 @@ export type ReceiptReading = {
 	invoiceNo: string | null
 	taxParts: { rate: number; amount: number; tax: number | null }[]
 	payment: PaymentMethod | null
+	/** 画像に写っている、読んでいないほかのレシートの枚数 */
+	otherReceipts: number
 }
 
 export type ReceiptStatus = "waiting" | "read" | "failed" | "manual"

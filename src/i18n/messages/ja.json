@@ -838,6 +838,7 @@
 		"check_taxMismatch": "税額が税率と合いません。8% と 10% の金額を確かめてください。",
 		"check_invalidInvoiceNo": "登録番号の形が違います（T と 13 桁の数字）。画像と見比べてください。",
 		"check_missingMerchant": "店名が読めませんでした。分かれば入れてください。",
+		"check_multipleReceipts": "この画像にはレシートがほかにも写っています。読んだのは 1 枚分だけです。残りは 1 枚ずつ撮り直して取り込んでください。",
 		"loadingImage": "画像を読み込んでいます",
 		"cannotShow": "この形式（HEIC・PDF など）は画面に出せません。「ファイルとして保存」して開いてください。",
 		"saveCopy": "ファイルとして保存",

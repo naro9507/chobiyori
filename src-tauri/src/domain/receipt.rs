@@ -47,6 +47,9 @@ pub struct ReceiptReading {
     pub invoice_no: Option<String>,
     pub tax_parts: Vec<TaxPart>,
     pub payment: Option<PaymentMethod>,
+    /// 画像に写っている、ほかのレシートの枚数（読んでいない）
+    #[serde(default)]
+    pub other_receipts: i64,
 }
 
 string_enum! {
@@ -66,6 +69,8 @@ string_enum! {
         InvalidInvoiceNo => "invalidInvoiceNo",
         /// 店名が読めない
         MissingMerchant => "missingMerchant",
+        /// 1 枚の画像にレシートが 2 枚以上写っている（1 枚分しか読んでいない）
+        MultipleReceipts => "multipleReceipts",
     }
 }
 
@@ -91,7 +96,8 @@ pub fn response_schema() -> Value {
                     "required": ["rate", "amount"]
                 }
             },
-            "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] }
+            "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] },
+            "otherReceipts": { "type": "integer", "description": "読んだ 1 枚のほかに、画像に写っているレシート・領収書の枚数（なければ 0）" }
         },
         "required": ["date", "total", "merchant", "payment"]
     })
@@ -101,7 +107,8 @@ pub fn response_schema() -> Value {
 pub const PROMPT: &str = "これは日本のレシートまたは領収書の画像です。印字されている内容だけを読み取り、指定の JSON で返してください。\
 読めない項目は空の文字列にしてください。推測で値を作らないでください。\
 taxParts には「10%対象」「8%対象（軽減税率）」などの税率ごとの対象額（税込）と消費税額を入れてください。\
-payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。";
+payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。\
+画像にレシートが 2 枚以上写っているときは、いちばん大きく写っている 1 枚だけを読み、ほかの枚数を otherReceipts に入れてください。";
 
 fn text_of(value: Option<&Value>) -> String {
     match value {
@@ -197,6 +204,11 @@ pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
         invoice_no,
         tax_parts,
         payment,
+        other_receipts: object
+            .get("otherReceipts")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+            .clamp(0, 99),
     };
     // 登録番号らしいものが書いてあるのに形が違う
     let bad_invoice = !invoice_text.is_empty() && reading.invoice_no.is_none();
@@ -243,6 +255,9 @@ pub fn checks(reading: &ReceiptReading, bad_invoice: bool, today: &str) -> Vec<C
     }
     if bad_invoice {
         found.push(Check::InvalidInvoiceNo);
+    }
+    if reading.other_receipts > 0 {
+        found.push(Check::MultipleReceipts);
     }
     found
 }
@@ -337,6 +352,13 @@ mod tests {
                 Check::InvalidInvoiceNo
             ]
         );
+        // 1 枚の画像に 2 枚写っていたら、読まなかった分があることを知らせる
+        let (r, _) = parse_reading(&GOOD.replace(
+            r#""payment": "card""#,
+            r#""payment": "card", "otherReceipts": 1"#,
+        ))
+        .unwrap();
+        assert_eq!(checks(&r, false, "2026-11-16"), [Check::MultipleReceipts]);
         assert!(parse_reading("こんにちは").is_none());
         assert!(parse_reading("[1, 2]").is_none());
     }
