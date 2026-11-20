@@ -17,8 +17,20 @@ pub enum IndustryTemplate {
     School,
     /// サービス業・フリーランス
     Service,
-    /// 小売・物販と飲食
+    /// 旧版の小売・物販と飲食（保存済みの帳簿用）
     RetailFood,
+    /// 小売・物販
+    Retail,
+    /// 飲食店
+    Restaurant,
+    /// 建設・一人親方
+    Construction,
+    /// 美容・理容
+    Beauty,
+    /// IT・Web 制作
+    ItWeb,
+    /// 運送・配達
+    Delivery,
 }
 
 impl IndustryTemplate {
@@ -28,6 +40,12 @@ impl IndustryTemplate {
             Self::School => "school",
             Self::Service => "service",
             Self::RetailFood => "retailFood",
+            Self::Retail => "retail",
+            Self::Restaurant => "restaurant",
+            Self::Construction => "construction",
+            Self::Beauty => "beauty",
+            Self::ItWeb => "itWeb",
+            Self::Delivery => "delivery",
         }
     }
 }
@@ -132,8 +150,89 @@ const RETAIL_FOOD_RULES: &[ExtraRule] = &[
     rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 70, &["623"]),
 ];
 
+#[rustfmt::skip]
+const RETAIL_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "支払手数料", "Fees", "しはらいてすうりょう", TaxablePurchase10),
+    expense("621", "販売促進費", "Sales promotion", "はんばいそくしんひ", TaxablePurchase10),
+    expense("622", "包装資材費", "Packaging", "ほうそうしざいひ", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const RESTAURANT_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "支払手数料", "Fees", "しはらいてすうりょう", TaxablePurchase10),
+    expense("621", "衛生管理費", "Sanitation", "えいせいかんりひ", TaxablePurchase10),
+    expense("622", "包装資材費", "Packaging", "ほうそうしざいひ", TaxablePurchase10),
+    expense("623", "クリーニング代", "Laundry and dry cleaning", "くりーにんぐだい", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const CONSTRUCTION_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "工具レンタル料", "Tool rental", "こうぐれんたるりょう", TaxablePurchase10),
+    expense("621", "廃材処分費", "Construction waste disposal", "はいざいしょぶんひ", TaxablePurchase10),
+    expense("622", "車両費", "Vehicle expenses", "しゃりょうひ", TaxablePurchase10),
+    expense("623", "作業用品費", "Work supplies", "さぎょうようひんひ", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const BEAUTY_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "施術材料費", "Treatment supplies", "せじゅつざいりょうひ", TaxablePurchase10),
+    expense("621", "クリーニング代", "Laundry and dry cleaning", "くりーにんぐだい", TaxablePurchase10),
+    expense("622", "支払手数料", "Fees", "しはらいてすうりょう", TaxablePurchase10),
+    expense("623", "研修費", "Training", "けんしゅうひ", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const IT_WEB_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "ソフトウェア利用料", "Software subscriptions", "そふとうぇありようりょう", TaxablePurchase10),
+    expense("621", "サーバー・ドメイン費", "Hosting and domain fees", "さーばーどめいんひ", TaxablePurchase10),
+    expense("622", "素材購入費", "Digital assets", "そざいこうにゅうひ", TaxablePurchase10),
+    expense("623", "新聞図書費", "Books and subscriptions", "しんぶんとしょひ", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const DELIVERY_ACCOUNTS: &[ExtraAccount] = &[
+    expense("620", "燃料費", "Fuel", "ねんりょうひ", TaxablePurchase10),
+    expense("621", "有料道路料金", "Road tolls", "ゆうりょうどうろりょうきん", TaxablePurchase10),
+    expense("622", "駐車場代", "Parking fees", "ちゅうしゃじょうだい", TaxablePurchase10),
+    expense("623", "支払手数料", "Fees", "しはらいてすうりょう", TaxablePurchase10),
+];
+
+#[rustfmt::skip]
+const SHOP_RULES: &[ExtraRule] = &[
+    rule("HOME", "店舗兼住宅（家賃・光熱費）", "Shop and home (rent, utilities)", 50, &["616", "603"]),
+];
+
+#[rustfmt::skip]
+const CONSTRUCTION_RULES: &[ExtraRule] = &[
+    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 70, &["622"]),
+    rule("PHONE", "電話・インターネット", "Phone and internet", 50, &["605"]),
+];
+
+#[rustfmt::skip]
+const DELIVERY_RULES: &[ExtraRule] = &[
+    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 70, &["620"]),
+    rule("PHONE", "電話・インターネット", "Phone and internet", 50, &["605"]),
+];
+
+#[rustfmt::skip]
+const HOME_OFFICE_RULES: &[ExtraRule] = &[
+    rule("HOME", "自宅兼事務所（家賃・光熱費）", "Home office (rent, utilities)", 30, &["616", "603"]),
+    rule("PHONE", "電話・インターネット", "Phone and internet", 50, &["605"]),
+];
+
 impl IndustryTemplate {
-    pub const ALL: [Self; 4] = [Self::General, Self::School, Self::Service, Self::RetailFood];
+    pub const ALL: [Self; 10] = [
+        Self::General,
+        Self::School,
+        Self::Service,
+        Self::RetailFood,
+        Self::Retail,
+        Self::Restaurant,
+        Self::Construction,
+        Self::Beauty,
+        Self::ItWeb,
+        Self::Delivery,
+    ];
 
     /// 標準の科目に足す科目。
     pub fn accounts(self) -> &'static [ExtraAccount] {
@@ -142,6 +241,12 @@ impl IndustryTemplate {
             Self::School => SCHOOL_ACCOUNTS,
             Self::Service => SERVICE_ACCOUNTS,
             Self::RetailFood => RETAIL_FOOD_ACCOUNTS,
+            Self::Retail => RETAIL_ACCOUNTS,
+            Self::Restaurant => RESTAURANT_ACCOUNTS,
+            Self::Construction => CONSTRUCTION_ACCOUNTS,
+            Self::Beauty => BEAUTY_ACCOUNTS,
+            Self::ItWeb => IT_WEB_ACCOUNTS,
+            Self::Delivery => DELIVERY_ACCOUNTS,
         }
     }
 
@@ -152,6 +257,10 @@ impl IndustryTemplate {
             Self::School => SCHOOL_RULES,
             Self::Service => SERVICE_RULES,
             Self::RetailFood => RETAIL_FOOD_RULES,
+            Self::Retail | Self::Restaurant | Self::Beauty => SHOP_RULES,
+            Self::Construction => CONSTRUCTION_RULES,
+            Self::Delivery => DELIVERY_RULES,
+            Self::ItWeb => HOME_OFFICE_RULES,
         }
     }
 }

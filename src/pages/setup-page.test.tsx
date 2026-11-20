@@ -73,7 +73,7 @@ describe("初期設定ウィザード", () => {
 		)
 	})
 
-	it("4 つの手順を終えると設定を保存し、ホームを出す", async () => {
+	it("4 つの手順を終えると選んだ業種と設定を保存し、ホームを出す", async () => {
 		const user = userEvent.setup()
 		renderApp()
 
@@ -97,6 +97,7 @@ describe("初期設定ウィザード", () => {
 		const year = screen.getByLabelText("年度（西暦）")
 		await user.clear(year)
 		await user.type(year, "2025")
+		await user.click(screen.getByRole("radio", { name: /^建設・一人親方/ }))
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.type(screen.getByLabelText("開始時点の残高（円）"), "5000")
 		await user.click(
@@ -128,7 +129,7 @@ describe("初期設定ウィザード", () => {
 				fiscalYear: 2025,
 				filingType: "white",
 				taxStatus: "standard",
-				template: "general",
+				template: "construction",
 				accounts: [{ name: "現金", kind: "cash", balance: 5000 }],
 				openingBalances: [{ accountCode: "106", amount: 1200 }],
 				features: {

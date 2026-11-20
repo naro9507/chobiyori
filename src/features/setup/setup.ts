@@ -38,14 +38,20 @@ export type SetupInput = {
 	features: FeatureSettings
 }
 
-/** Rust 側 `domain::industry::IndustryTemplate` と同じ文字列。 */
+/** 初期設定に表示する業種。 */
 export const industryTemplates = [
 	"general",
 	"school",
 	"service",
-	"retailFood",
+	"retail",
+	"restaurant",
+	"construction",
+	"beauty",
+	"itWeb",
+	"delivery",
 ] as const
-export type IndustryTemplate = (typeof industryTemplates)[number]
+/** Rust 側の業種。旧版の帳簿には retailFood が保存されている。 */
+export type IndustryTemplate = (typeof industryTemplates)[number] | "retailFood"
 
 const statusKey = ["setup-status"]
 const profileKey = ["business-profile"]
