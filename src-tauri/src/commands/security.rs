@@ -191,8 +191,19 @@ pub async fn backup_settings(
         is_default: dir == files.default_backup_dir,
         dir: dir.to_string_lossy().into_owned(),
         files: backup::list(&dir)?,
-        book_size: std::fs::metadata(&files.path).map(|m| m.len()).unwrap_or(0),
+        book_size: book_size(&files.path),
     })
+}
+
+/// 帳簿の大きさ。WAL のファイルにまだ書き戻していない分も含める。
+fn book_size(path: &std::path::Path) -> u64 {
+    let mut wal = path.as_os_str().to_owned();
+    wal.push("-wal");
+    [path.to_path_buf(), PathBuf::from(wal)]
+        .iter()
+        .filter_map(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .sum()
 }
 
 /// いますぐバックアップを作る。作ったファイルの名前を返す。

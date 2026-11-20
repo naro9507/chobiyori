@@ -16,6 +16,7 @@ import { PasswordCard } from "@/features/security/password-card"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
 import { FeatureSettingsPanel } from "@/features/setup/feature-settings"
+import { FilingTypeCard } from "@/features/setup/filing-type-card"
 import { useFiscalYear } from "@/features/setup/fiscal-years"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
@@ -41,22 +42,11 @@ export function SettingsPage() {
 		<Page screen="settings">
 			<Accordion.Root
 				key={view}
-				type="single"
-				collapsible
-				defaultValue={view}
+				type="multiple"
+				// 表示の言語と配色をすぐ変えられるよう、初めは「表示」を開いておく
+				defaultValue={view ? [view] : ["appearance"]}
 				className="flex flex-col gap-3"
 			>
-				<SettingsGroup value="business" title={t("businessGroup")}>
-					<BusinessProfileCard />
-					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
-					<FilingReminderSettings />
-				</SettingsGroup>
-				<SettingsGroup value="features" title={t("featuresGroup")}>
-					<FeatureSettingsPanel />
-					<ReceiptSettingsCard />
-					<DocumentSettingsCard />
-					<MailSettingsCard />
-				</SettingsGroup>
 				<SettingsGroup value="appearance" title={t("appearanceGroup")}>
 					<Card>
 						<CardHeader>
@@ -113,6 +103,21 @@ export function SettingsPage() {
 						{changed &&
 							t(changed === "language" ? "languageChanged" : "themeChanged")}
 					</p>
+				</SettingsGroup>
+				<SettingsGroup value="business" title={t("businessGroup")}>
+					<BusinessProfileCard />
+					<FilingTypeCard
+						key={`filing-type-${fiscalYear}`}
+						fiscalYear={fiscalYear}
+					/>
+					<InvoiceRegistrationCard key={fiscalYear} fiscalYear={fiscalYear} />
+					<FilingReminderSettings />
+				</SettingsGroup>
+				<SettingsGroup value="features" title={t("featuresGroup")}>
+					<FeatureSettingsPanel />
+					<ReceiptSettingsCard />
+					<DocumentSettingsCard />
+					<MailSettingsCard />
 				</SettingsGroup>
 				<SettingsGroup value="security" title={t("securityGroup")}>
 					<PasswordCard />

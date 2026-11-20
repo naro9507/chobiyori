@@ -78,6 +78,7 @@ export function SimpleEntry({ fiscalYear }: { fiscalYear: number | null }) {
 
 function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("journal")
+	const listSeparator = useTranslations("app")("listSeparator")
 	const tMaster = useTranslations("master")
 	const locale = useSettingsStore((state) => state.locale)
 	const errorMessage = useJournalErrorMessage(fiscalYear)
@@ -361,7 +362,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					(l) =>
 						`${masters.accountLabel(l.accountId)} ${formatAmount(l.amount)}`
 				)
-				.join("、")
+				.join(listSeparator)
 		return t("recordedLines", { entry: `${side("debit")} / ${side("credit")}` })
 	}
 

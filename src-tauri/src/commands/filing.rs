@@ -25,6 +25,16 @@ pub async fn save_invoice_registration(
     filing::save_registration(&db, &input)
 }
 
+/// 年度の消費税の区分を変える。課税にしたときは付け直した行の数を返す。
+#[tauri::command]
+pub async fn set_tax_status(
+    db: State<'_, Database>,
+    fiscal_year: i64,
+    tax_status: crate::domain::master::TaxStatus,
+) -> AppResult<usize> {
+    filing::set_tax_status(&db, fiscal_year, tax_status)
+}
+
 #[tauri::command]
 pub async fn set_simplified_category(
     db: State<'_, Database>,

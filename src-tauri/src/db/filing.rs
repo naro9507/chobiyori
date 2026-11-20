@@ -142,6 +142,62 @@ pub fn save_registration(
     })
 }
 
+/// 年度の消費税の区分（免税・本則・簡易・2 割特例）を変える。インボイスに登録した年より後は
+/// 免税にできない。免税から課税にしたときは、課税になる日からの取引の「対象外」の行に、
+/// 科目の既定の税区分を付け直す（免税の年度は記録のときに対象外にしているため）。
+/// 付け直した行の数を返す。
+pub fn set_tax_status(db: &Database, year: i64, status: TaxStatus) -> AppResult<usize> {
+    db.transaction(|tx| {
+        transactions::ensure_year_open(tx, year)?;
+        if status == TaxStatus::Exempt {
+            if let Some(date) = registered_on(tx)? {
+                if date.get(..4).and_then(|y| y.parse::<i64>().ok()) <= Some(year) {
+                    return Err(AppError::field(ErrorCode::OutOfRange, "taxStatus"));
+                }
+            }
+        }
+        let before = taxable_from(tx, year)?;
+        tx.execute(
+            "UPDATE fiscal_years SET tax_status = ?1 WHERE year = ?2",
+            params![status, year],
+        )?;
+        let after = taxable_from(tx, year)?;
+        let mut updated = 0;
+        if let (None, Some(start)) = (before, after) {
+            let (_, month, _) =
+                journal::parse_date(&start).ok_or(AppError::new(ErrorCode::Database))?;
+            let locked: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM month_locks WHERE fiscal_year = ?1 AND month >= ?2)",
+                params![year, month],
+                |r| r.get(0),
+            )?;
+            if locked {
+                return Err(AppError::new(ErrorCode::MonthLocked));
+            }
+            updated = tx.execute(
+                "UPDATE journal_lines
+                 SET tax_category = (SELECT a.default_tax_category FROM accounts a
+                                     WHERE a.id = journal_lines.account_id)
+                 WHERE tax_category = 'out_of_scope'
+                   AND transaction_id IN (SELECT id FROM transactions
+                                          WHERE fiscal_year = ?1 AND date >= ?2)
+                   AND coalesce((SELECT a.default_tax_category FROM accounts a
+                                 WHERE a.id = journal_lines.account_id), 'out_of_scope')
+                       <> 'out_of_scope'",
+                params![year, start],
+            )?;
+        }
+        audit::event(
+            tx,
+            "tax_status",
+            "update",
+            Some(year),
+            Some(serde_json::json!({ "taxStatus": status, "updatedLines": updated })),
+        )?;
+        Ok(updated)
+    })
+}
+
 /// 簡易課税の事業の区分（既定）を変える。
 pub fn set_simplified_category(
     conn: &Connection,
@@ -859,6 +915,52 @@ mod tests {
                 was_exempt: None,
             },
         )
+    }
+
+    #[test]
+    fn tax_status_can_be_changed_and_out_of_scope_lines_get_their_account_default() {
+        let db = set_up_db();
+        // 免税の年度に記録した売上は対象外で保存される
+        let sale_id = sale(&db, "2026-03-10", 110_000, TaxCategory::TaxableSales10);
+        assert_eq!(
+            get(&db.conn(), sale_id).unwrap().lines[1].tax_category,
+            Some(TaxCategory::OutOfScope)
+        );
+        assert_eq!(set_tax_status(&db, 2026, TaxStatus::Standard).unwrap(), 1);
+        let t = get(&db.conn(), sale_id).unwrap();
+        assert_eq!(t.lines[1].tax_category, Some(TaxCategory::TaxableSales10));
+        // 口座の行（既定の税区分がない）はそのまま
+        assert_eq!(t.lines[0].tax_category, Some(TaxCategory::OutOfScope));
+        assert_eq!(
+            consumption(&db.conn(), 2026)
+                .unwrap()
+                .taxable_from
+                .as_deref(),
+            Some("2026-01-01")
+        );
+        // 免税に戻しても、記録した税区分は消さない
+        assert_eq!(set_tax_status(&db, 2026, TaxStatus::Exempt).unwrap(), 0);
+        assert_eq!(
+            get(&db.conn(), sale_id).unwrap().lines[1].tax_category,
+            Some(TaxCategory::TaxableSales10)
+        );
+        // 締めた月がある年度は、税区分を付け直せないので変えない
+        crate::db::locks::set_month(&db, 2026, 3, true).unwrap();
+        let err = set_tax_status(&db, 2026, TaxStatus::Standard).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MonthLocked);
+        assert_eq!(
+            setup::fiscal_years(&db.conn()).unwrap()[0].tax_status,
+            TaxStatus::Exempt
+        );
+    }
+
+    #[test]
+    fn exempt_cannot_be_chosen_after_registering() {
+        let db = set_up_db();
+        register(&db, "2026-10-01", TaxStatus::Special20, Some(5)).unwrap();
+        let err = set_tax_status(&db, 2026, TaxStatus::Exempt).unwrap_err();
+        assert_eq!(err.field, Some("taxStatus"));
+        assert_eq!(set_tax_status(&db, 2026, TaxStatus::Standard).unwrap(), 0);
     }
 
     #[test]

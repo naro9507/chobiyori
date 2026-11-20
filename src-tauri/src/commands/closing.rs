@@ -53,8 +53,9 @@ pub async fn useful_life_examples() -> AppResult<Vec<UsefulLife>> {
 pub async fn create_fixed_asset(
     db: State<'_, Database>,
     input: FixedAssetInput,
+    payment_account_id: Option<i64>,
 ) -> AppResult<FixedAsset> {
-    fixed_assets::create(&db.conn(), &input)
+    fixed_assets::create_with_purchase(&db, &input, payment_account_id)
 }
 
 #[tauri::command]

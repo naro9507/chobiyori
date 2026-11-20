@@ -85,9 +85,31 @@ export function HistoryCard() {
 				year: entry.fiscalYear ?? "",
 			})
 		}
+		const detail = (entry.after ?? {}) as Record<string, unknown>
+		if (entry.entity === "document") {
+			const number = typeof detail.number === "string" ? detail.number : ""
+			if (entry.action === "issue") return t("documentIssued", { number })
+			if (entry.action === "cancel") {
+				return t("documentCanceled", { number })
+			}
+			if (entry.action === "send") return t("documentSent")
+		}
+		if (entry.entity === "filing_type") {
+			return t("filingTypeChanged", { year: entry.fiscalYear ?? "" })
+		}
+		if (entry.entity === "tax_status") {
+			return t("taxStatusChanged", { year: entry.fiscalYear ?? "" })
+		}
+		if (entry.entity === "invoice_registration") {
+			return t("invoiceRegistrationSaved")
+		}
+		if (entry.entity === "whiteDeduction") {
+			const amount = typeof detail.amount === "number" ? detail.amount : 0
+			return t("whiteDeductionSaved", { amount: formatAmount(amount) })
+		}
 		if (entry.action === "restore") return t("restored")
 		if (entry.action === "change_password") return t("passwordChanged")
-		return entry.action
+		return t("other", { action: entry.action })
 	}
 
 	return (

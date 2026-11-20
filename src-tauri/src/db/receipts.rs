@@ -105,14 +105,31 @@ fn system_account(conn: &Connection, code: &str) -> AppResult<Option<i64>> {
         .optional()?)
 }
 
+/// 自分で作ったカードの口座（負債の口座）。いくつかあれば並び順で最初のもの。
+fn card_account(conn: &Connection) -> AppResult<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT id FROM accounts
+             WHERE category = 'liability' AND is_payment_account = 1 AND is_active = 1
+               AND is_system = 0
+             ORDER BY sort, code LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 pub fn settings(conn: &Connection, has_key: bool) -> AppResult<ReceiptSettings> {
     let id =
         |key| -> AppResult<Option<i64>> { Ok(setting(conn, key)?.and_then(|v| v.parse().ok())) };
     Ok(ReceiptSettings {
         model: setting(conn, MODEL_KEY)?.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
-        // 決めていなければ、標準の現金（101）とカードの未払金（204）
+        // 決めていなければ、標準の現金（101）と、初期設定などで作ったカードの口座
+        //（なければカードの未払金 204）
         cash_account_id: id(CASH_KEY)?.or(system_account(conn, "101")?),
-        card_account_id: id(CARD_KEY)?.or(system_account(conn, "204")?),
+        card_account_id: id(CARD_KEY)?
+            .or(card_account(conn)?)
+            .or(system_account(conn, "204")?),
         consented_at: setting(conn, CONSENT_KEY)?,
         has_key,
     })
@@ -647,7 +664,17 @@ pub(crate) mod tests {
         let s = settings(&conn, false).unwrap();
         assert_eq!(s.model, DEFAULT_MODEL);
         assert_eq!(s.cash_account_id, Some(account(&conn, "101")));
+        assert_eq!(s.card_account_id, Some(account(&conn, "204")));
         assert_eq!(s.consented_at, None);
+        // 初期設定などでカードの口座を作ったら、それを既定にする
+        conn.execute(
+            "INSERT INTO accounts (code, name_ja, category, statement_line, is_payment_account, sort)
+             VALUES ('W001', '楽天カード', 'liability', 'bs.accrued_payables', 1, 1)",
+            [],
+        )
+        .unwrap();
+        let card = account(&conn, "W001");
+        assert_eq!(settings(&conn, false).unwrap().card_account_id, Some(card));
         let s = save_settings(
             &conn,
             &ReceiptSettingsInput {

@@ -7,6 +7,7 @@ import {
 	Loader2,
 } from "lucide-react"
 import { type FormEvent, useId, useState } from "react"
+import { LanguageSwitch } from "@/components/layout/language-switch"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -32,8 +33,8 @@ import {
 	useCompleteSetup,
 } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
-import { signedAmountForCommand } from "@/lib/amount"
-import { fieldError, isAppError } from "@/lib/errors"
+import { parseSignedAmount, signedAmountForCommand } from "@/lib/amount"
+import { fieldError, isAppError, lineFieldError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 
 const openingAccountOptions = [
@@ -62,6 +63,18 @@ const stepOfField: Record<string, Step> = {
 	fiscalYear: "year",
 	accountName: "accounts",
 	openingBalance: "accounts",
+	otherBalance: "accounts",
+}
+
+/** Rust 側 `domain::master::invoice_registration_no` と同じ読み方で、形が合うか。 */
+function validRegistrationNo(text: string) {
+	const normalized = text.normalize("NFKC").replace(/[-\s]/g, "").toUpperCase()
+	return /^T?\d{13}$/.test(normalized)
+}
+
+/** 開始時点の残高として読めない入力か（空は 0 として扱う）。 */
+function badBalance(text: string) {
+	return Number.isNaN(parseSignedAmount(text))
 }
 
 type Form = {
@@ -129,7 +142,11 @@ export function SetupPage() {
 		openingBalances: [],
 	})
 	const [nextAccountKey, setNextAccountKey] = useState(2)
-	const [missingOwner, setMissingOwner] = useState(false)
+	/** 最初の手順で「次へ」を押したか（氏名と登録番号の誤りを出す） */
+	const [triedNext, setTriedNext] = useState(false)
+	/** 最後の手順で「はじめる」を押したか（残高の入力の誤りを出す） */
+	const [submitted, setSubmitted] = useState(false)
+	const tErrors = useTranslations("errors")
 	const filingId = useId()
 	const taxId = useId()
 	const templateId = useId()
@@ -141,15 +158,36 @@ export function SetupPage() {
 		const e = fieldError(error, field)
 		return e ? errorMessage(e) : undefined
 	}
+	/** 口座やその他の残高の行ごとのエラー */
+	const lineMessage = (line: number, field: string) => {
+		const e = lineFieldError(error, line, field)
+		return e ? errorMessage(e) : undefined
+	}
+	const balanceMessage = (line: number, field: string, balance: string) =>
+		(submitted && badBalance(balance) ? more("balanceInvalid") : undefined) ??
+		lineMessage(line, field)
+	const invalidRegistrationNo =
+		form.invoiceRegistrationNo.trim() !== "" &&
+		!validRegistrationNo(form.invoiceRegistrationNo)
 
 	const onSubmit = (event: FormEvent) => {
 		event.preventDefault()
-		if (step === "business" && !form.ownerName.trim()) {
-			setMissingOwner(true)
+		if (
+			step === "business" &&
+			(!form.ownerName.trim() || invalidRegistrationNo)
+		) {
+			setTriedNext(true)
 			return
 		}
 		if (index < steps.length - 1) {
 			setStep(steps[index + 1])
+			return
+		}
+		setSubmitted(true)
+		if (
+			form.accounts.some((a) => badBalance(a.balance)) ||
+			form.openingBalances.some((r) => badBalance(r.amount))
+		) {
 			return
 		}
 		complete.mutate(toInput(form), {
@@ -171,9 +209,12 @@ export function SetupPage() {
 				className="flex w-full max-w-2xl flex-col gap-6"
 			>
 				<header className="flex flex-col gap-2">
-					<p className="num text-muted-foreground text-sm">
-						{t("progress", { current: index + 1, total: steps.length })}
-					</p>
+					<div className="flex items-center justify-between gap-3">
+						<p className="num text-muted-foreground text-sm">
+							{t("progress", { current: index + 1, total: steps.length })}
+						</p>
+						<LanguageSwitch />
+					</div>
 					<h1 className="font-bold text-2xl leading-snug">{t("title")}</h1>
 					<p className="text-muted-foreground text-sm">{t("intro")}</p>
 				</header>
@@ -189,7 +230,7 @@ export function SetupPage() {
 								label={t("ownerName")}
 								error={
 									message("ownerName") ??
-									(missingOwner && !form.ownerName.trim()
+									(triedNext && !form.ownerName.trim()
 										? t("ownerNameRequired")
 										: undefined)
 								}
@@ -226,7 +267,12 @@ export function SetupPage() {
 								<Field
 									label={t("invoiceRegistrationNo")}
 									hint={t("invoiceRegistrationNoHint")}
-									error={message("invoiceRegistrationNo")}
+									error={
+										message("invoiceRegistrationNo") ??
+										(triedNext && invalidRegistrationNo
+											? tErrors("invalidRegistrationNo")
+											: undefined)
+									}
 								>
 									<Input
 										value={form.invoiceRegistrationNo}
@@ -416,10 +462,10 @@ export function SetupPage() {
 							<CardDescription>{more("openingHint")}</CardDescription>
 						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
-							{form.accounts.map((account) => (
+							{form.accounts.map((account, accountIndex) => (
 								<div
 									key={account.key}
-									className="flex flex-wrap items-end gap-3"
+									className="grid items-end gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_10rem_auto]"
 								>
 									<Field label={more("kind")}>
 										<NativeSelect
@@ -448,7 +494,7 @@ export function SetupPage() {
 									</Field>
 									<Field
 										label={more("accountName")}
-										error={message("accountName")}
+										error={lineMessage(accountIndex, "accountName")}
 									>
 										<Input
 											value={account.name}
@@ -465,7 +511,11 @@ export function SetupPage() {
 									</Field>
 									<Field
 										label={more("balance")}
-										error={message("openingBalance")}
+										error={balanceMessage(
+											accountIndex,
+											"openingBalance",
+											account.balance
+										)}
 									>
 										<Input
 											inputMode="numeric"
@@ -524,8 +574,11 @@ export function SetupPage() {
 									{more("additionalBalances")}
 								</summary>
 								<div className="mt-3 flex flex-col gap-3">
-									{form.openingBalances.map((row) => (
-										<div key={row.key} className="flex items-end gap-3">
+									{form.openingBalances.map((row, rowIndex) => (
+										<div
+											key={row.key}
+											className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
+										>
 											<Field label={more("otherCode")}>
 												<NativeSelect
 													value={row.accountCode}
@@ -548,7 +601,11 @@ export function SetupPage() {
 											</Field>
 											<Field
 												label={more("otherAmount")}
-												error={message("openingBalance")}
+												error={balanceMessage(
+													rowIndex,
+													"otherBalance",
+													row.amount
+												)}
 											>
 												<Input
 													inputMode="numeric"

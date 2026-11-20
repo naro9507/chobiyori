@@ -48,6 +48,8 @@ pub struct ExtraRule {
     pub name_ja: &'static str,
     pub name_en: &'static str,
     pub business_percent: i64,
+    /// 既定の按分ルールとして紐付ける科目のコード
+    pub accounts: &'static [&'static str],
 }
 
 const fn expense(
@@ -72,12 +74,14 @@ const fn rule(
     name_ja: &'static str,
     name_en: &'static str,
     business_percent: i64,
+    accounts: &'static [&'static str],
 ) -> ExtraRule {
     ExtraRule {
         code,
         name_ja,
         name_en,
         business_percent,
+        accounts,
     }
 }
 
@@ -93,8 +97,8 @@ const SCHOOL_ACCOUNTS: &[ExtraAccount] = &[
 
 #[rustfmt::skip]
 const SCHOOL_RULES: &[ExtraRule] = &[
-    rule("HOME", "自宅兼教室（家賃・光熱費）", "Home and classroom (rent, utilities)", 50),
-    rule("PHONE", "電話・インターネット", "Phone and internet", 50),
+    rule("HOME", "自宅兼教室（家賃・光熱費）", "Home and classroom (rent, utilities)", 50, &["616", "603"]),
+    rule("PHONE", "電話・インターネット", "Phone and internet", 50, &["605"]),
 ];
 
 #[rustfmt::skip]
@@ -108,9 +112,9 @@ const SERVICE_ACCOUNTS: &[ExtraAccount] = &[
 
 #[rustfmt::skip]
 const SERVICE_RULES: &[ExtraRule] = &[
-    rule("HOME", "自宅兼事務所（家賃・光熱費）", "Home office (rent, utilities)", 30),
-    rule("PHONE", "電話・インターネット", "Phone and internet", 50),
-    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 50),
+    rule("HOME", "自宅兼事務所（家賃・光熱費）", "Home office (rent, utilities)", 30, &["616", "603"]),
+    rule("PHONE", "電話・インターネット", "Phone and internet", 50, &["605"]),
+    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 50, &["624"]),
 ];
 
 #[rustfmt::skip]
@@ -124,8 +128,8 @@ const RETAIL_FOOD_ACCOUNTS: &[ExtraAccount] = &[
 
 #[rustfmt::skip]
 const RETAIL_FOOD_RULES: &[ExtraRule] = &[
-    rule("HOME", "店舗兼住宅（家賃・光熱費）", "Shop and home (rent, utilities)", 50),
-    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 70),
+    rule("HOME", "店舗兼住宅（家賃・光熱費）", "Shop and home (rent, utilities)", 50, &["616", "603"]),
+    rule("CAR", "車（ガソリン・保険など）", "Car (fuel, insurance, etc.)", 70, &["623"]),
 ];
 
 impl IndustryTemplate {
@@ -178,6 +182,16 @@ mod tests {
             assert_eq!(codes.len(), accounts.len());
             for r in t.allocation_rules() {
                 assert!((1..=99).contains(&r.business_percent));
+                // 紐付ける科目は、標準か業種の経費の科目
+                for code in r.accounts {
+                    assert!(
+                        GENERAL
+                            .iter()
+                            .any(|g| g.code == *code && g.category == AccountCategory::Expense)
+                            || accounts.iter().any(|a| a.code == *code),
+                        "{code}"
+                    );
+                }
                 assert!(crate::domain::master::code(r.code).is_ok());
             }
         }

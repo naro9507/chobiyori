@@ -129,6 +129,7 @@ export type StatementIssueCode =
 	| "ownerOpening"
 	| "whiteFiling"
 	| "whiteDeductionExceedsIncome"
+	| "negativeBalance"
 
 export type StatementAmounts = {
 	fiscalYear: number
@@ -237,9 +238,21 @@ export function useUsefulLifeExamples() {
 export function useSaveFixedAsset() {
 	const onSuccess = useInvalidateAll()
 	return useMutation({
-		mutationFn: ({ id, input }: { id?: number; input: FixedAssetInput }) =>
+		mutationFn: ({
+			id,
+			input,
+			paymentAccountId = null,
+		}: {
+			id?: number
+			input: FixedAssetInput
+			/** 新しく登録するとき、買ったときの支払いも記録する口座 */
+			paymentAccountId?: number | null
+		}) =>
 			id === undefined
-				? callCommand<FixedAsset>("create_fixed_asset", { input })
+				? callCommand<FixedAsset>("create_fixed_asset", {
+						input,
+						paymentAccountId,
+					})
 				: callCommand<FixedAsset>("update_fixed_asset", { id, input }),
 		onSuccess,
 	})
