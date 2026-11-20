@@ -146,6 +146,12 @@ mod tests {
             issue(&db, "wrong").unwrap_err().code,
             ErrorCode::WrongPassword
         );
+        db.conn()
+            .execute(
+                "INSERT INTO settings VALUES (?1, 'device')",
+                [vault::DEVICE_BINDING],
+            )
+            .unwrap();
         let earlier = issue(&db, current).unwrap();
         let code = issue(&db, current).unwrap();
         drop(db);
@@ -170,6 +176,16 @@ mod tests {
             })
             .unwrap();
         assert_eq!(value, "kept");
+        assert_eq!(
+            db.conn()
+                .query_row(
+                    "SELECT count(*) FROM settings WHERE key=?1",
+                    [vault::DEVICE_BINDING],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
         drop(db);
         assert!(!record_path(&path).exists());
         assert_eq!(

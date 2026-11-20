@@ -17,7 +17,10 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 	isTauri: () => true,
 }))
 
+const free = { retryAfter: 0, attemptsLeft: 5 }
 let book: BookStatus
+let linked: "google" | null
+let deviceOk: boolean
 let locks: LockStatus
 
 function renderApp(path = "/") {
@@ -34,25 +37,41 @@ function renderApp(path = "/") {
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
-	book = { state: "encrypted", unlocked: false }
+	book = { state: "encrypted", unlocked: false, ...free }
+	linked = null
+	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
+				case "login_status":
+					return { google: true, microsoft: true, linked }
+				case "open_with_login":
+					if (deviceOk) {
+						book = { state: "encrypted", unlocked: true, ...free }
+						return null
+					}
+					throw { code: args?.online ? "loginMismatch" : "deviceAuthFailed" }
 				case "book_status":
 					return book
 				case "unlock_books":
 					if (args?.password !== "correct horse") {
-						throw { code: "wrongPassword", field: "password" }
+						const attemptsLeft = Math.max(0, book.attemptsLeft - 1)
+						const locked = book.attemptsLeft > 0 && attemptsLeft === 0
+						book = { ...book, attemptsLeft, retryAfter: locked ? 90 : 0 }
+						throw {
+							code: locked ? "tooManyAttempts" : "wrongPassword",
+							field: "password",
+						}
 					}
-					book = { state: "encrypted", unlocked: true }
+					book = { state: "encrypted", unlocked: true, ...free }
 					return null
 				case "reset_books_password":
 					if (args?.recoveryCode !== "saved code") {
 						throw { code: "invalidRecoveryCode", field: "recoveryCode" }
 					}
-					book = { state: "encrypted", unlocked: true }
+					book = { state: "encrypted", unlocked: true, ...free }
 					return null
 				case "issue_recovery_code":
 					if (args?.current !== "correct horse") {
@@ -60,7 +79,7 @@ beforeEach(() => {
 					}
 					return "saved code"
 				case "create_books":
-					book = { state: "encrypted", unlocked: true }
+					book = { state: "encrypted", unlocked: true, ...free }
 					return null
 				case "setup_status":
 					return { completed: true, fiscalYear: 2026 }
@@ -106,9 +125,81 @@ describe("起動時のパスワード", () => {
 		).toBeInTheDocument()
 	})
 
+	it("端末ログインを設定していれば、起動時に 1 回だけ自動で本人確認を始める", async () => {
+		linked = "google"
+		const user = userEvent.setup()
+		renderApp()
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"Windows Hello / Touch ID で認証できませんでした"
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
+			online: false,
+			locale: "ja",
+		})
+		await user.click(
+			screen.getByRole("button", { name: "Google でログインして開く" })
+		)
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"設定時と別のアカウントです"
+		)
+		// 復旧コードの画面から戻っても、自動ではもう始めない
+		await user.click(
+			screen.getByRole("button", { name: "パスワードを忘れたとき" })
+		)
+		await user.click(
+			screen.getByRole("button", { name: "パスワードの入力に戻る" })
+		)
+		await screen.findByRole("button", {
+			name: "Windows Hello / Touch ID で開く",
+		})
+		const automatic = mocks.callCommand.mock.calls.filter(
+			([command, args]) => command === "open_with_login" && !args?.online
+		)
+		expect(automatic).toHaveLength(1)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
+		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
+	})
+
+	it("本人確認ができれば、パスワードを入れずに帳簿を開く", async () => {
+		linked = "google"
+		deviceOk = true
+		renderApp()
+		expect(
+			await screen.findByRole("heading", { level: 1, name: "ホーム" })
+		).toBeInTheDocument()
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"unlock_books",
+			expect.anything()
+		)
+	})
+
+	it("続けて間違えると、待ち時間のあいだ入力を止める", async () => {
+		book = {
+			state: "encrypted",
+			unlocked: false,
+			retryAfter: 0,
+			attemptsLeft: 2,
+		}
+		const user = userEvent.setup()
+		renderApp()
+		expect(
+			await screen.findByText("あと 2 回間違えるとロックされます。")
+		).toBeInTheDocument()
+		await user.type(screen.getByLabelText("パスワード"), "wrong one")
+		await user.click(screen.getByRole("button", { name: "開く" }))
+		await user.clear(screen.getByLabelText("パスワード"))
+		await user.type(screen.getByLabelText("パスワード"), "wrong two")
+		await user.click(screen.getByRole("button", { name: "開く" }))
+		expect(await screen.findByRole("status")).toHaveTextContent(
+			"ロック中です（残り 1 分 30 秒）"
+		)
+		expect(screen.getByRole("button", { name: "開く" })).toBeDisabled()
+		expect(screen.queryByText(/パスワードが違います/)).not.toBeInTheDocument()
+	})
+
 	it("初めての起動では、2 回入れたパスワードがそろうまで作らない", async () => {
 		const user = userEvent.setup()
-		book = { state: "notCreated", unlocked: false }
+		book = { state: "notCreated", unlocked: false, ...free }
 		renderApp()
 		expect(
 			await screen.findByText(/設定で復旧コードを発行/)
@@ -208,7 +299,7 @@ describe("起動時のパスワード", () => {
 describe("月締め", () => {
 	it("月を締めると前の月も締まり、外すと後の月も外れる", async () => {
 		const user = userEvent.setup()
-		book = { state: "encrypted", unlocked: true }
+		book = { state: "encrypted", unlocked: true, ...free }
 		renderApp("/closing")
 		await user.click(await screen.findByRole("tab", { name: "締め" }))
 		const months = await screen.findByRole("list", {

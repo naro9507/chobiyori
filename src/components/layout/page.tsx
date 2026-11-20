@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { type ReactNode, useEffect } from "react"
 import type { ScreenId } from "@/app/navigation"
 import { HelpTip } from "@/components/ui/help-tip"
+import { Tutorial } from "@/features/tutorial/tutorial"
 import { useTranslations } from "@/i18n/use-translations"
 
 /**
@@ -49,6 +50,7 @@ export function Page({
 				</div>
 				{actions && <div className="flex items-center gap-3">{actions}</div>}
 			</header>
+			<Tutorial screen={screen} />
 			{children}
 		</div>
 	)

@@ -17,6 +17,20 @@ const ESTIMATED: Text = Text {
     en: " (estimated)",
 };
 
+/// 書き出しとカレンダー同期で使う種別と見出し。
+pub(crate) fn event_label(notice: &DeadlineNotice, locale: Locale) -> (&'static str, String) {
+    let (kind, label) = match notice.kind {
+        DeadlineKind::Income => ("income", INCOME),
+        DeadlineKind::Consumption => ("consumption", CONSUMPTION),
+    };
+    let estimated = if notice.estimated {
+        ESTIMATED.get(locale)
+    } else {
+        ""
+    };
+    (kind, format!("{}{estimated}", label.get(locale)))
+}
+
 /// 固定の見出しと申告期限だけを書く。予定は現地の日付に従う終日予定。
 pub fn build(deadlines: &[DeadlineNotice], locale: Locale, stamp: &str) -> Option<String> {
     let mut entries = deadlines
@@ -29,21 +43,12 @@ pub fn build(deadlines: &[DeadlineNotice], locale: Locale, stamp: &str) -> Optio
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Chobiyori//Filing deadlines//EN\r\n",
     );
     for notice in entries {
-        let (kind, label) = match notice.kind {
-            DeadlineKind::Income => ("income", INCOME),
-            DeadlineKind::Consumption => ("consumption", CONSUMPTION),
-        };
+        let (kind, label) = event_label(notice, locale);
         let date = notice.date.replace('-', "");
-        let estimated = if notice.estimated {
-            ESTIMATED.get(locale)
-        } else {
-            ""
-        };
         // 固定の見出しなのでエスケープすべき文字を含まず、UTF-8 で 75 バイト以内。
         calendar.push_str(&format!(
-            "BEGIN:VEVENT\r\nUID:{kind}-{}@chobiyori.jp.dcs.accounting\r\nDTSTAMP:{stamp}\r\nDTSTART;VALUE=DATE:{date}\r\nSUMMARY:{}{estimated}\r\nEND:VEVENT\r\n",
+            "BEGIN:VEVENT\r\nUID:{kind}-{}@chobiyori.jp.dcs.accounting\r\nDTSTAMP:{stamp}\r\nDTSTART;VALUE=DATE:{date}\r\nSUMMARY:{label}\r\nEND:VEVENT\r\n",
             notice.fiscal_year,
-            label.get(locale),
         ));
     }
     calendar.push_str("END:VCALENDAR\r\n");

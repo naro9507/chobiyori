@@ -52,7 +52,7 @@ export function ReportsPage() {
 				</CardContent>
 			</Card>
 
-			<Card>
+			<Card id="trial-balance" tabIndex={-1}>
 				<CardHeader>
 					<CardTitle>{t("trialBalance")}</CardTitle>
 					<CardDescription>{t("openingNote")}</CardDescription>

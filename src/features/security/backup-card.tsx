@@ -48,7 +48,7 @@ export function BackupCard() {
 
 	const data = settings.data
 	return (
-		<Card>
+		<Card id="book-backup" tabIndex={-1}>
 			<CardHeader>
 				<CardTitle help={t("description")}>{t("title")}</CardTitle>
 				<CardDescription>{t("restorePasswordNote")}</CardDescription>

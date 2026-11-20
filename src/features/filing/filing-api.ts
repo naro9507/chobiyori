@@ -269,7 +269,7 @@ export function useFilingDay() {
 
 export function useFilingDeadlines(enabled = true, includeFuture = false) {
 	const day = useFilingDay()
-	const { data, isError, refetch } = useQuery({
+	const { data, error, isSuccess, isError, refetch } = useQuery({
 		queryKey: ["filing-deadlines", day, includeFuture],
 		queryFn: () =>
 			callCommand<DeadlineNotice[]>("filing_deadlines", {
@@ -280,7 +280,7 @@ export function useFilingDeadlines(enabled = true, includeFuture = false) {
 		retry: false,
 		retryOnMount: false,
 	})
-	return { data, isError, refetch, day }
+	return { data, error, isSuccess, isError, refetch, day }
 }
 
 export function usePartnerChecks() {

@@ -23,7 +23,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-fn password_store() -> KeyringItem {
+fn password_store() -> KeyringItem<'static> {
     KeyringItem(SMTP_PASSWORD)
 }
 

@@ -383,3 +383,59 @@ it("F1 でその画面の説明を開け、検索欄の編集で全体検索に�
 		screen.getByRole("heading", { name: "現金で文房具を購入" })
 	).toBeInTheDocument()
 })
+
+it("乗り換え案内を中断して再開し、期首残高から取込に進める", async () => {
+	const user = userEvent.setup()
+	const router = renderApp("/")
+	await user.click(
+		await screen.findByRole("button", { name: "他の会計ソフトから乗り換える" })
+	)
+	await user.click(screen.getByRole("button", { name: "確認したので次へ" }))
+	await waitFor(() => expect(router.state.location.search.tab).toBe("opening"))
+	await user.click(screen.getByRole("button", { name: "中断する" }))
+	await user.click(screen.getByRole("link", { name: "ホーム" }))
+	await user.click(
+		await screen.findByRole("button", {
+			name: /他の会計ソフトから乗り換える.*続きから/,
+		})
+	)
+	await screen.findByRole("heading", { name: "科目ごとに期首残高を合わせる" })
+	await user.click(screen.getByRole("button", { name: "確認したので次へ" }))
+	await screen.findByRole("heading", {
+		name: "ファイルを選び、取り込む前に確認する",
+	})
+	await waitFor(() => expect(router.state.location.pathname).toBe("/data"))
+	await user.click(screen.getByRole("button", { name: "中断する" }))
+})
+
+it("基本操作の案内を最後まで進め、ホームからやり直せる", async () => {
+	const user = userEvent.setup()
+	const router = renderApp("/")
+	await user.click(
+		await screen.findByRole("button", { name: "基本操作を覚える" })
+	)
+	for (const path of [
+		"/settings",
+		"/transactions",
+		"/ledgers",
+		"/inbox",
+		"/reports",
+	]) {
+		await waitFor(() => expect(router.state.location.pathname).toBe(path))
+		await user.click(
+			await screen.findByRole("button", { name: "確認したので次へ" })
+		)
+	}
+	await user.click(
+		await screen.findByRole("button", { name: "操作する場所へ移動" })
+	)
+	expect(document.activeElement).toHaveAttribute("id", "book-backup")
+	await user.click(
+		screen.getByRole("button", { name: "チュートリアルを完了する" })
+	)
+	await user.click(
+		await screen.findByRole("button", { name: /基本操作を覚える.*もう一度/ })
+	)
+	await screen.findByRole("heading", { name: "事業者情報と年度を確かめる" })
+	await user.click(screen.getByRole("button", { name: "中断する" }))
+})

@@ -558,6 +558,7 @@ dependencies = [
  "base64 0.22.1",
  "block2",
  "calamine",
+ "cc",
  "csv",
  "encoding_rs",
  "keyring",
