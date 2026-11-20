@@ -1,0 +1,72 @@
+name: Publish latest release
+
+on:
+  workflow_run:
+    workflows: ["Build installers", "CI"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-latest-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: 最新タグの CI・配布ビルド・更新ファイルを確認して公開
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 古いビルドが後から完了しても Latest を巻き戻さない。
+          tag=$(gh api --paginate "repos/$GH_REPO/tags" --jq '.[].name' |
+            awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/' | sort -V | tail -1)
+          [[ -n "$tag" ]] || exit 0
+          sha=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)
+          runs=$(gh api -X GET "repos/$GH_REPO/actions/runs" \
+            -f event=push -f head_sha="$sha" -F per_page=100)
+          check_run() {
+            jq -r --arg path ".github/workflows/$1" --arg branch "$2" '
+              [.workflow_runs[] | select(.path == $path and .head_branch == $branch)]
+              | max_by(.run_number).conclusion // "pending"
+            ' <<< "$runs"
+          }
+          ci=$(check_run ci.yml main)
+          build=$(check_run build.yml "$tag")
+          if [[ "$ci" != success || "$build" != success ]]; then
+            echo "$tag: CI=$ci, Build installers=$build"
+            exit 0
+          fi
+
+          release_id=$(gh api --paginate "repos/$GH_REPO/releases" |
+            jq -r --arg tag "$tag" '.[] | select(.tag_name == $tag and .draft and (.prerelease | not)) | .id')
+          [[ -n "$release_id" ]] || exit 0
+          release=$(gh api "repos/$GH_REPO/releases/$release_id")
+          version=${tag#v}
+          prefix="Chobiyori_${version}"
+          for asset in "${prefix}_x64-setup.exe" "${prefix}_x64-setup.exe.sig" \
+            "${prefix}_aarch64.dmg" "${prefix}_aarch64.app.tar.gz" \
+            "${prefix}_aarch64.app.tar.gz.sig" latest.json; do
+            jq -e --arg name "$asset" 'any(.assets[]; .name == $name and .size > 0)' \
+              <<< "$release" >/dev/null || { echo "::error::Missing $asset"; exit 1; }
+          done
+          manifest_id=$(jq -r '.assets[] | select(.name == "latest.json") | .id' <<< "$release")
+          gh api -H 'Accept: application/octet-stream' "repos/$GH_REPO/releases/assets/$manifest_id" > latest.json
+          jq -e --arg version "$version" '
+            .version == $version and
+            all(.platforms["windows-x86_64"], .platforms["darwin-aarch64"];
+              (.url | type == "string" and length > 0) and
+              (.signature | type == "string" and length > 0))
+          ' latest.json >/dev/null
+          gh api -X PATCH "repos/$GH_REPO/releases/$release_id" -F draft=false -f make_latest=true --jq .html_url

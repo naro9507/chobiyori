@@ -4,7 +4,7 @@
 
 1. `v0.2.0` のようなタグをプッシュすると、GitHub Actions が Windows と macOS のインストーラを作る。
 2. 同時に、GitHub の Release が下書きで作られる。インストーラと、自動アップデート用のファイル（`latest.json` と署名）が添付される。
-3. 下書きを公開すると、利用者のアプリが起動時（と 1 時間ごと）に `latest.json` を確かめ、新しいバージョンを変更点とともに知らせる。
+3. タグのコミットで CI と両 OS のビルドが成功し、更新ファイルと署名がそろうと、Latest として自動公開する。公開後、利用者のアプリが起動時（と 1 時間ごと）に `latest.json` を確かめ、新しいバージョンを変更点とともに知らせる。
 4. 利用者が「今すぐ更新」を押すと、ダウンロードして入れ替え、アプリを再起動する。
 5. 再起動したあと、画面の上部に「バージョン ○○ に更新しました」と変更点を出す。設定画面の「変更履歴」で、これまでの変更点をいつでも見られる。
 
@@ -78,13 +78,12 @@ pnpm version:set 0.2.0          # バージョンを変え、CHANGELOG.md に見
 # CHANGELOG.md の「（変更点を書く）」を、実際の変更点に書き換える
 git commit -am "v0.2.0"
 git tag v0.2.0
-git push --follow-tags
+git push --atomic origin main v0.2.0
 ```
 
-1. GitHub の Actions で「Build installers」が終わるのを待つ（20 分ほど）。
-2. Releases に下書きができる。本文には `CHANGELOG.md` の変更点が入っている。
-3. 添付ファイルを確かめ、できれば手元でインストールして動作を見る。
-4. 「Publish release」で公開する。公開した時点から、利用者のアプリに更新が届く。
+1. Actions で「CI」と「Build installers」の結果を確認する。
+2. 「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開後、アプリが更新を検出できる。
+3. 公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。
 
 バージョンは必ず前より大きい番号にする。同じか小さい番号では、更新として扱われない。
 
