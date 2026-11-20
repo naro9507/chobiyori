@@ -1,11 +1,14 @@
-import { Link, useNavigate } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import { type ReactNode, useEffect } from "react"
 import type { ScreenId } from "@/app/navigation"
 import { HelpTip } from "@/components/ui/help-tip"
 import { Tutorial } from "@/features/tutorial/tutorial"
 import { useTranslations } from "@/i18n/use-translations"
 
-/** 画面の見出しと説明。本文は children に置く。 */
+/**
+ * 画面の見出しと説明。本文は children に置く。
+ * 画面の説明は見出し横の「?」で読め、F1 でヘルプのその画面の記事を開く。
+ */
 export function Page({
 	screen,
 	actions,
@@ -30,7 +33,6 @@ export function Page({
 		window.addEventListener("keydown", listener)
 		return () => window.removeEventListener("keydown", listener)
 	}, [navigate, screen, nav])
-	const tHelp = useTranslations("help")
 	const description = useTranslations("descriptions")
 
 	return (
@@ -46,18 +48,7 @@ export function Page({
 					</h1>
 					<HelpTip topic={nav(screen)}>{description(screen)}</HelpTip>
 				</div>
-				<div className="flex items-center gap-3">
-					{actions}
-					{screen !== "help" && (
-						<Link
-							to="/help"
-							search={{ q: nav(screen), article: `screen_${screen}` }}
-							className="text-primary text-sm underline"
-						>
-							{tHelp("context")}
-						</Link>
-					)}
-				</div>
+				{actions && <div className="flex items-center gap-3">{actions}</div>}
 			</header>
 			<Tutorial screen={screen} />
 			{children}

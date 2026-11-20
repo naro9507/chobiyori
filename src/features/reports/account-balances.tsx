@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router"
+import { useState } from "react"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
@@ -26,13 +27,26 @@ export function AccountBalances({
 	const masters = useJournalMasters()
 	const { data } = useTrialBalance(fiscalYear, 1, month)
 
+	const [showAll, setShowAll] = useState(false)
 	const paymentAccounts = masters.accounts.filter((a) => a.isPaymentAccount)
-	const balanceOf = (id: number) =>
-		data?.rows.find((r) => r.accountId === id)?.balance ?? 0
+	const rowOf = (id: number) => data?.rows.find((r) => r.accountId === id)
+	const balanceOf = (id: number) => rowOf(id)?.balance ?? 0
+	/** この年度に残高か動きがあるか */
+	const usedThisYear = (id: number) => {
+		const row = rowOf(id)
+		return (
+			row !== undefined &&
+			(row.broughtForward !== 0 || row.debit !== 0 || row.credit !== 0)
+		)
+	}
 	// 無効にした口座は、残高があるときだけ出す
-	const shown = paymentAccounts.filter(
+	const active = paymentAccounts.filter(
 		(a) => a.isActive || balanceOf(a.id) !== 0
 	)
+	// 標準の口座（当座預金など）は、使っているときだけ出す。自分で作った口座はいつも出す
+	const used = active.filter((a) => !a.isSystem || usedThisYear(a.id))
+	const hidden = data && used.length > 0 ? active.length - used.length : 0
+	const shown = showAll || hidden === 0 ? active : used
 
 	return (
 		<section
@@ -60,6 +74,17 @@ export function AccountBalances({
 						</div>
 					))}
 				</dl>
+			)}
+			{hidden > 0 && (
+				<button
+					type="button"
+					onClick={() => setShowAll(!showAll)}
+					className="w-fit text-primary text-sm underline-offset-4 hover:underline"
+				>
+					{showAll
+						? t("hideUnusedAccounts")
+						: t("showUnusedAccounts", { count: hidden })}
+				</button>
 			)}
 			{showNegativeBalanceHelp &&
 				shown.some(

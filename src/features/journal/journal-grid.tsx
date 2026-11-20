@@ -24,6 +24,9 @@ import { keepOf, useJournalMasters } from "./use-master-items"
 
 const months = Array.from({ length: 12 }, (_, i) => i + 1)
 
+/** 狭い画面でも「追加」「保存」が見えるよう、操作の列を右端に固定する */
+const stickyCell = "sticky right-0 bg-card"
+
 /**
  * 仕訳グリッド。月ごとの表で、1 行に借方 1 科目・貸方 1 科目の仕訳を入力する。
  * 借方・貸方が複数行の取引は、複合仕訳の画面で変更する。
@@ -71,7 +74,7 @@ export function JournalGrid({
 								setEditingId(null)
 								onMonthChange(m)
 							}}
-							className="num min-h-9 min-w-12 rounded-md px-2 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-selected:bg-accent aria-selected:text-accent-foreground"
+							className="num min-h-9 min-w-10 rounded-md px-1.5 font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-selected:bg-accent aria-selected:text-accent-foreground"
 						>
 							{t("month", { month: m })}
 						</button>
@@ -91,7 +94,7 @@ export function JournalGrid({
 					<caption className="sr-only">
 						{t("gridCaption", { year: fiscalYear ?? "", month })}
 					</caption>
-					<thead className="border-b bg-muted/50 text-left text-muted-foreground">
+					<thead className="border-b bg-muted text-left text-muted-foreground">
 						<tr>
 							<th scope="col" className="w-16 px-3 py-2.5 font-medium">
 								{t("day")}
@@ -114,7 +117,10 @@ export function JournalGrid({
 							<th scope="col" className="px-3 py-2.5 font-medium">
 								{t("partner")}
 							</th>
-							<th scope="col" className="px-3 py-2.5">
+							<th
+								scope="col"
+								className={cn(stickyCell, "bg-muted px-3 py-2.5")}
+							>
 								<span className="sr-only">{t("actions")}</span>
 							</th>
 						</tr>
@@ -157,7 +163,7 @@ export function JournalGrid({
 												?.partnerId ?? null
 										)}
 									</td>
-									<td className="px-3 py-1">
+									<td className={cn(stickyCell, "px-3 py-1")}>
 										<div className="flex justify-end gap-1">
 											<Button
 												variant="ghost"
@@ -444,7 +450,7 @@ function GridEditor({
 						className={cn(cellInput, "num w-14 text-right")}
 					/>
 				</td>
-				<td className="min-w-44 px-2 py-1.5">
+				<td className="min-w-36 px-2 py-1.5 xl:min-w-44">
 					<MasterCombobox
 						aria-label={label(t("debit"))}
 						items={masters.accountItems}
@@ -454,7 +460,7 @@ function GridEditor({
 						className={cellInput}
 					/>
 				</td>
-				<td className="min-w-44 px-2 py-1.5">
+				<td className="min-w-36 px-2 py-1.5 xl:min-w-44">
 					<MasterCombobox
 						aria-label={label(t("credit"))}
 						items={masters.accountItems}
@@ -476,7 +482,7 @@ function GridEditor({
 						className={cn(cellInput, "num w-28 text-right")}
 					/>
 				</td>
-				<td className="min-w-36 px-2 py-1.5">
+				<td className="min-w-28 px-2 py-1.5 xl:min-w-36">
 					<Input
 						aria-label={label(t("summary"))}
 						value={form.memo}
@@ -485,7 +491,7 @@ function GridEditor({
 						className={cellInput}
 					/>
 				</td>
-				<td className="min-w-36 px-2 py-1.5">
+				<td className="min-w-28 px-2 py-1.5 xl:min-w-36">
 					<MasterCombobox
 						aria-label={label(t("partner"))}
 						items={masters.partnerItems}
@@ -497,7 +503,7 @@ function GridEditor({
 						className={cellInput}
 					/>
 				</td>
-				<td className="px-2 py-1.5">
+				<td className={cn(stickyCell, "px-2 py-1.5")}>
 					<div className="flex justify-end gap-1">
 						<Button
 							size="sm"

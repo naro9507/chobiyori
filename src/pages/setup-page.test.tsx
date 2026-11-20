@@ -36,7 +36,7 @@ beforeEach(() => {
 					? { completed: true, fiscalYear: 2026 }
 					: { completed: false, fiscalYear: null }
 			case "complete_setup":
-				if (args.input.profile.invoiceRegistrationNo === "T1") {
+				if (args.input.profile.invoiceRegistrationNo === "T0000000000000") {
 					throw { code: "invalidFormat", field: "invoiceRegistrationNo" }
 				}
 				completed = true
@@ -147,18 +147,39 @@ describe("初期設定ウィザード", () => {
 		renderApp()
 
 		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
-		await user.type(screen.getByLabelText("インボイスの登録番号"), "T1")
+		await user.type(
+			screen.getByLabelText("インボイスの登録番号"),
+			"T0000000000000"
+		)
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 		await user.click(screen.getByRole("button", { name: "はじめる" }))
 
 		expect(
-			await screen.findByText(/形式を確かめてください/)
+			await screen.findByText("登録番号は T と 13 桁の数字で入れてください。")
 		).toBeInTheDocument()
 		expect(screen.getByLabelText("インボイスの登録番号")).toHaveAttribute(
 			"aria-invalid",
 			"true"
+		)
+	})
+
+	it("登録番号の形が違えば、最初の手順で止めて直し方を示す", async () => {
+		const user = userEvent.setup()
+		renderApp()
+
+		await user.type(await screen.findByLabelText("氏名"), "山田 花子")
+		await user.type(screen.getByLabelText("インボイスの登録番号"), "T123")
+		await user.click(screen.getByRole("button", { name: "次へ" }))
+
+		expect(
+			screen.getByText("登録番号は T と 13 桁の数字で入れてください。")
+		).toBeInTheDocument()
+		expect(screen.getByText("手順 1 / 4")).toBeInTheDocument()
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"complete_setup",
+			expect.anything()
 		)
 	})
 

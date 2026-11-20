@@ -189,6 +189,7 @@ function BackupRow({
 /** 選んだバックアップを確かめてから復元する。 */
 function RestorePanel({ name, onDone }: { name: string; onDone: () => void }) {
 	const t = useTranslations("backup")
+	const listSeparator = useTranslations("app")("listSeparator")
 	const errorMessage = useErrorMessage()
 	const inspect = useInspectBackup()
 	const restore = useRestoreBackup()
@@ -247,7 +248,7 @@ function RestorePanel({ name, onDone }: { name: string; onDone: () => void }) {
 						<dd>{inspect.data.tradeName || "-"}</dd>
 						<dt className="text-muted-foreground">{t("summaryYears")}</dt>
 						<dd className="num">
-							{inspect.data.fiscalYears.join("、") || "-"}
+							{inspect.data.fiscalYears.join(listSeparator) || "-"}
 						</dd>
 						<dt className="text-muted-foreground">
 							{t("summaryTransactions")}

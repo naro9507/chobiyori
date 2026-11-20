@@ -4,7 +4,8 @@
 		"skipToContent": "本文へ移動",
 		"fiscalYear": "{year}年度",
 		"loading": "読み込んでいます",
-		"chooseFiscalYear": "見る年度"
+		"chooseFiscalYear": "見る年度",
+		"listSeparator": "、"
 	},
 	"nav": {
 		"label": "メインメニュー",
@@ -79,7 +80,13 @@
 		"securityGroup": "セキュリティ",
 		"appGroup": "アプリ情報",
 		"languageChanged": "表示言語を変更しました。",
-		"themeChanged": "テーマを変更しました。"
+		"themeChanged": "テーマを変更しました。",
+		"filingTypeTitle": "{year}年度の申告の区分と消費税",
+		"filingTypeDescription": "青色申告か白色申告か（決算書の様式と控除額が変わります）と、消費税の区分です。青色申告の承認を受けていない年は白色申告を選んでください。インボイスに登録した年より後は免税事業者にできません。",
+		"filingTypeClosed": "締めた年度は変えられません。",
+		"taxStatusHint": "売上が 1,000 万円を超えたなど、インボイスの登録とは別に課税事業者になったときもここで変えます。",
+		"taxStatusRetag": "課税にすると、この年度に「対象外」で記録した行に、科目の既定の税区分を付け直します。締めた月がある年度は変えられません。",
+		"taxStatusRetagged": "保存し、{count} 行の税区分を付け直しました。取引入力で確かめてください。"
 	},
 	"update": {
 		"sectionTitle": "アップデート",
@@ -109,14 +116,14 @@
 	},
 	"setup": {
 		"title": "はじめの設定",
-		"intro": "帳簿をつけはじめるために、3 つのことを決めます。あとから設定画面で変えられます。",
+		"intro": "帳簿をつけはじめるための設定を、4 つの手順で決めます。あとから設定画面で変えられます。",
 		"progress": "手順 {current} / {total}",
 		"businessTitle": "事業者の情報",
 		"businessDescription": "申告する人と、事業の名前です。",
 		"ownerName": "氏名",
 		"ownerNameRequired": "氏名を入れてください。",
 		"tradeName": "屋号",
-		"industry": "業種",
+		"industry": "事業の内容",
 		"industryHint": "任意。例: 英語教室、デザイン、小売",
 		"address": "住所",
 		"optional": "任意",
@@ -142,7 +149,7 @@
 		"taxHelpStandard": "「一般用」の申告書で「2 割特例」の適用欄に印があれば、2 割特例を使っています。特例を適用していなければ本則課税です。",
 		"taxHelpNotification": "簡易課税は原則として事前に届出が必要で、適用を始めると原則 2 年間はやめられません。これから申告する年は、「消費税簡易課税制度選択届出書」の控えで適用開始時期を確認してください。届出の状況やその年の区分が分からない場合は、所轄の税務署か税理士に確認してください。",
 		"exemptWithInvoiceNo": "インボイスの登録をすると、登録した日から課税事業者になり、消費税の申告が必要になります。帳簿をつける年に登録期間がある場合は、課税事業者のどれかを選んでください。登録をきっかけに課税事業者になった方は、「2 割特例」を使える場合があります。",
-		"yearTitle": "年度と勘定科目",
+		"yearTitle": "年度と業種",
 		"yearDescription": "帳簿をつけはじめる年を選びます。個人事業の年度は 1 月から 12 月です。",
 		"fiscalYear": "年度（西暦）",
 		"fiscalYearHint": "例: 2026",
@@ -388,12 +395,14 @@
 		"noPaymentAccounts": "口座がありません。マスタ画面で、現金や預金の科目を「口座として使う」にしてください。",
 		"loading": "読み込んでいます",
 		"negativeBalanceHint": "残高がマイナスの口座があります。入力漏れや、支払元を選び間違えていないか確かめてください。",
-		"checkOpeningBalance": "期首残高を確認する"
+		"checkOpeningBalance": "期首残高を確認する",
+		"showUnusedAccounts": "使っていない口座も表示（{count} 件）",
+		"hideUnusedAccounts": "使っていない口座を隠す"
 	},
 	"errors": {
 		"required": "入力してください。",
 		"tooLong": "長すぎます。短くしてください。",
-		"invalidFormat": "形式を確かめてください。コードは半角の英数字、登録番号は T と 13 桁の数字です。",
+		"invalidFormat": "形式を確かめてください。",
 		"outOfRange": "入力できる範囲を確かめてください。",
 		"duplicateCode": "同じコードがすでにあります。別のコードにしてください。",
 		"notFound": "見つかりませんでした。画面を開き直してください。",
@@ -441,6 +450,10 @@
 		"mailAuth": "メールのサーバーにログインできませんでした。設定の画面で、送信に使うアドレスとパスワード（Gmail はアプリ パスワード）を確かめてください。",
 		"mailFailed": "メールを送れませんでした。インターネットにつながっているか、宛先のアドレスと送信サーバーの設定を確かめてください。「メールソフトで開く」でも送れます。",
 		"monthInvoiced": "この月は請求書で請求しています。入金は請求書の入金として記録してください。",
+		"invalidDate": "日付を確かめてください。暦にない日（11 月 31 日など）は入れられません。",
+		"invalidCode": "コードは半角の英数字で入れてください。",
+		"invalidRegistrationNo": "登録番号は T と 13 桁の数字で入れてください。",
+		"invalidEmail": "メールアドレスの形を確かめてください。",
 		"calendarAuth": "カレンダーの認証が切れました。再連携してください。",
 		"calendarCancelled": "カレンダーの連携がキャンセルされたか、時間切れになりました。",
 		"calendarFailed": "カレンダーと同期できませんでした。インターネット接続を確認してください。",
@@ -536,7 +549,7 @@
 		"issue_invalidSide": "「借方」か「貸方」と書いてください",
 		"issue_unknownAccount": "科目が見つかりません。科目コードを確かめてください",
 		"issue_unmappedAccount": "この番号の科目を、上の表で選んでください",
-		"issue_inactiveMaster": "使わない設定にした科目か取引先です。マスタ画面で使う設定にしてください",
+		"issue_inactiveMaster": "無効にした科目か取引先です。マスタ画面で有効にしてください",
 		"issue_unknownPartner": "取引先が見つかりません。取引先コードを確かめてください",
 		"issue_unbalanced": "借方の合計と貸方の合計がそろっていません",
 		"issue_sameAccount": "同じ科目が借方と貸方の両方にあります",
@@ -635,7 +648,7 @@
 		"status_pending": "確認待ち",
 		"status_posted": "確定済み",
 		"status_ignored": "対象外",
-		"empty_pending": "確認待ちの候補はありません。「明細を取り込む」から、カードや口座の明細を読み込めます。",
+		"empty_pending": "確認待ちの候補はありません。「銀行・カードの明細を取り込む」から、カードや口座の明細を読み込めます。",
 		"empty_posted": "確定した候補はまだありません。",
 		"empty_ignored": "対象外にした候補はありません。",
 		"loading": "読み込んでいます",
@@ -742,7 +755,7 @@
 		"saveAndImport": "形式を保存して受信箱に入れる",
 		"formatsHint": "保存した形式は、同じ見出しのファイルを開いたときに自動で選ばれます。ファイルに書き出して、ほかの人と共有できます（口座や個人の情報は入りません）。",
 		"myFormats": "保存した形式",
-		"noFormats": "まだありません。「明細を取り込む」でファイルを開くと作れます。",
+		"noFormats": "まだありません。「銀行・カードの明細を取り込む」でファイルを開くと作れます。",
 		"presets": "同梱の形式",
 		"presetsHint": "そのままでは使わず、明細を開いたときに取込先を選んで保存します。",
 		"exportFormat": "書き出す",
@@ -1074,7 +1087,12 @@
 		"nextTask": "次の未完了項目　{task}",
 		"openTask_opening": "期首残高を開く",
 		"openTask_assets": "固定資産と減価償却を開く",
-		"openTask_inventory": "棚卸を開く"
+		"openTask_inventory": "棚卸を開く",
+		"issue_negativeBalance": "年末の残高がマイナスの行があります（{value}）。固定資産や借入の記録漏れ（資産を買ったときの支払いを記録していないなど）や、科目の選び間違いがないか確かめてください。",
+		"assetPurchaseNote": "資産を買ったときの支払いは、登録するときに「買ったときの支払い」を選ぶと一緒に記録できます。取引入力で「工具器具備品 / 普通預金」のように記録してもかまいません。",
+		"purchasePayment": "買ったときの支払い",
+		"purchasePaymentHint": "支払った口座を選ぶと、使い始めた日の「資産 / 口座」の取引も一緒に記録します。私用のお金で買ったときは事業主借を選びます。",
+		"purchaseNotRecorded": "記録しない（取引入力で記録した）"
 	},
 	"security": {
 		"createTitle": "帳簿のパスワードを決めてください",
@@ -1181,7 +1199,15 @@
 		"yearClosed": "{year}年度を締めました",
 		"yearReopened": "{year}年度の締めを外しました",
 		"restored": "バックアップから復元しました",
-		"passwordChanged": "パスワードを変えました"
+		"passwordChanged": "パスワードを変えました",
+		"documentIssued": "書類 {number} を発行しました",
+		"documentCanceled": "書類 {number} を取り消しました",
+		"documentSent": "書類を送った記録を残しました",
+		"invoiceRegistrationSaved": "インボイスの登録番号と登録日を保存しました",
+		"whiteDeductionSaved": "事業専従者控除額を {amount} 円に保存しました",
+		"other": "そのほかの操作（{action}）",
+		"filingTypeChanged": "{year}年度の申告の区分を変えました",
+		"taxStatusChanged": "{year}年度の消費税の区分を変えました"
 	},
 	"locks": {
 		"description": "確かめ終わった月を締めると、その月の取引はどの画面からも足したり直したりできなくなります。月を締めると、その月より前もまとめて締まります。締めを外すと、その月より後もまとめて外れます。締めたことと外したことは、変更履歴に残ります。",
@@ -1300,7 +1326,10 @@
 		"postSale": "記帳する",
 		"paymentDate": "入金日",
 		"paymentAccount": "入金した口座",
-		"savePayment": "入金を記録する"
+		"savePayment": "入金を記録する",
+		"linesHintNoTax": "この発行日は登録番号なしの様式なので、消費税は足しません。単価は受け取る金額で入れてください。値引きは「-1000」のように入れます。数量は 1.5 のように小数も使えます。",
+		"unitPriceNoTax": "単価",
+		"previewEmpty": "品名を入れると、ここに紙面が出ます。"
 	},
 	"documentSettings": {
 		"title": "請求書などの書類",
@@ -1639,7 +1668,8 @@
 		"draftInvoicesDone": "下書きを {count} 件作りました。請求書があって作らなかった分: {invoiced} 件、入金済みで作らなかった分: {paid} 件。",
 		"assignPlan": "定期売上",
 		"assignMonth": "対象の月",
-		"assign": "この月の入金にする"
+		"assign": "この月の入金にする",
+		"markSkipped": "休"
 	},
 	"deposits": {
 		"noTarget": "つなげない",
@@ -1801,7 +1831,8 @@
 		"newTransaction": "取引を新しく作る",
 		"newInvoice": "請求書を新しく作る",
 		"close": "閉じる",
-		"empty": "候補がありません"
+		"empty": "候補がありません",
+		"helpArticle": "ヘルプ：{title}"
 	},
 	"setupMore": {
 		"accounts": "口座の登録",
@@ -1816,7 +1847,7 @@
 		"balance": "開始時点の残高（円）",
 		"opening": "期首残高と開業の案内",
 		"openingHint": "口座ごとに開始時点の残高を入力します。借入金などがあれば、その他の期首残高も入力できます。",
-		"firstYear": "開業 1 年目です",
+		"firstYear": "開業費について（開業 1 年目の方へ）",
 		"startupHint": "開業準備のために特別に支出した費用は、開業費として扱う場合があります。資産の購入代金や前払費用は分けて考えます。開業費は資産として記録し、必要経費にする年の償却額を仕訳で記録します（自動償却はしません）。任意償却では未償却残高の範囲で金額を選び、支出内容と償却の記録を残します。元入金は、期首の資産と負債の差額です。",
 		"features": "使う機能",
 		"featuresHint": "使わない機能はメニューから隠します。記録済みのデータは残り、設定からいつでも戻せます。",
@@ -1845,6 +1876,7 @@
 		"screens_inventory": "決算の「棚卸」",
 		"screens_receivables": "「請求書」、帳簿の「売掛帳・買掛帳」、かんたん入力の「入金をつなげる」",
 		"screens_recurring": "「売上管理」、取引入力の「毎月の取引」",
-		"screens_allocation": "マスタの「家事按分ルール」、かんたん入力の家事按分"
+		"screens_allocation": "マスタの「家事按分ルール」、かんたん入力の家事按分",
+		"balanceInvalid": "残高は整数で入れてください（マイナスも入れられます）。"
 	}
 }

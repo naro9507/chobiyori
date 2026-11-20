@@ -253,6 +253,7 @@ export function AssetsPanel({ fiscalYear }: { fiscalYear: number | null }) {
 				</Button>
 			</div>
 			<p className="text-muted-foreground text-xs">{t("depreciationNote")}</p>
+			<p className="text-muted-foreground text-xs">{t("assetPurchaseNote")}</p>
 		</div>
 	)
 }
@@ -273,7 +274,7 @@ function AssetForm({
 	const examples = useUsefulLifeExamples().data ?? []
 	const save = useSaveFixedAsset()
 	const accounts = masters.accounts.filter(
-		(a) => a.category === "asset" && (a.isActive || a.id === asset?.accountId)
+		(a) => a.id === asset?.accountId || (a.isActive && isDepreciableAccount(a))
 	)
 	// 取得した年より後から帳簿をつけ始めた資産は、年の初めの帳簿価額を入れる
 	const laterStart =
@@ -299,7 +300,13 @@ function AssetForm({
 		bookValue: laterStart && asset ? String(asset.bookValue) : "",
 		disposedOn: asset?.disposedOn ?? "",
 		memo: asset?.memo ?? "",
+		/** 買ったときの支払いを記録する口座。空なら記録しない */
+		paymentAccountId: "",
 	})
+	// 買ったときの支払いに使える口座と、私用のお金（事業主借）
+	const paymentAccounts = masters.accounts.filter(
+		(a) => a.isActive && (a.isPaymentAccount || a.code === "301")
+	)
 	const set = (patch: Partial<typeof form>) =>
 		setForm((prev) => ({ ...prev, ...patch }))
 	const error = (field: string) => {
@@ -326,7 +333,17 @@ function AssetForm({
 			disposedOn: form.disposedOn.trim() === "" ? null : form.disposedOn,
 			memo: form.memo,
 		}
-		save.mutate({ id: asset?.id, input }, { onSuccess: onDone })
+		save.mutate(
+			{
+				id: asset?.id,
+				input,
+				paymentAccountId:
+					!asset && !form.laterStart && form.paymentAccountId
+						? Number(form.paymentAccountId)
+						: null,
+			},
+			{ onSuccess: onDone }
+		)
 	}
 
 	return (
@@ -376,6 +393,25 @@ function AssetForm({
 						onChange={(e) => set({ cost: e.target.value })}
 					/>
 				</Field>
+				{!asset && !form.laterStart && (
+					<Field
+						label={t("purchasePayment")}
+						hint={t("purchasePaymentHint")}
+						error={error("paymentAccountId")}
+					>
+						<NativeSelect
+							value={form.paymentAccountId}
+							onChange={(e) => set({ paymentAccountId: e.target.value })}
+						>
+							<option value="">{t("purchaseNotRecorded")}</option>
+							{paymentAccounts.map((a) => (
+								<option key={a.id} value={a.id}>
+									{masters.accountLabel(a.id)}
+								</option>
+							))}
+						</NativeSelect>
+					</Field>
+				)}
 				<Field
 					term="depreciation"
 					label={t("method")}
@@ -521,5 +557,34 @@ function AssetForm({
 				</Button>
 			</div>
 		</form>
+	)
+}
+
+/** 償却しない資産（現金・預金・債権・棚卸資産・土地・事業主貸など）の決算書の行。 */
+const nonDepreciableLines = new Set([
+	"bs.cash",
+	"bs.checking",
+	"bs.time_deposits",
+	"bs.other_deposits",
+	"bs.notes_receivable",
+	"bs.accounts_receivable",
+	"bs.securities",
+	"bs.inventory",
+	"bs.prepayments",
+	"bs.loans_receivable",
+	"bs.land",
+	"bs.owner_drawings",
+])
+
+/** 固定資産の科目として選べるか。口座や、償却しない資産の科目は出さない。 */
+function isDepreciableAccount(a: {
+	category: string
+	isPaymentAccount: boolean
+	statementLine: string | null
+}) {
+	return (
+		a.category === "asset" &&
+		!a.isPaymentAccount &&
+		!nonDepreciableLines.has(a.statementLine ?? "")
 	)
 }

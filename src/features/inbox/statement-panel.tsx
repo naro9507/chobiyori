@@ -219,6 +219,7 @@ function ImportResultView({
 	onEdit: () => void
 }) {
 	const t = useTranslations("inbox")
+	const listSeparator = useTranslations("app")("listSeparator")
 	if (result.kind === "imported") {
 		return (
 			<div role="status" className="space-y-2 text-sm">
@@ -252,11 +253,11 @@ function ImportResultView({
 			{result.kind === "mismatch" ? (
 				<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
 					<dt className="text-muted-foreground">{t("columnsAdded")}</dt>
-					<dd>{result.diff.added.join("、") || "-"}</dd>
+					<dd>{result.diff.added.join(listSeparator) || "-"}</dd>
 					<dt className="text-muted-foreground">{t("columnsMissing")}</dt>
-					<dd>{result.diff.missing.join("、") || "-"}</dd>
+					<dd>{result.diff.missing.join(listSeparator) || "-"}</dd>
 					<dt className="text-muted-foreground">{t("columnsFound")}</dt>
-					<dd>{result.diff.found.join("、") || "-"}</dd>
+					<dd>{result.diff.found.join(listSeparator) || "-"}</dd>
 				</dl>
 			) : (
 				<NoteList notes={result.errors} />
@@ -310,6 +311,7 @@ function FormatEditor({
 	onSaved: (format: ImportFormat) => void
 }) {
 	const t = useTranslations("inbox")
+	const listSeparator = useTranslations("app")("listSeparator")
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
 	const save = useSaveImportFormat()
@@ -505,7 +507,9 @@ function FormatEditor({
 					{p.missingRoles.length > 0 && (
 						<p role="alert" className="text-destructive">
 							{t("missingRoles", {
-								roles: p.missingRoles.map((r) => t(`role_${r}`)).join("、"),
+								roles: p.missingRoles
+									.map((r) => t(`role_${r}`))
+									.join(listSeparator),
 							})}
 						</p>
 					)}

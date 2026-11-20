@@ -47,9 +47,10 @@ export const useYearStore = create<YearState>()(
 
 /**
  * いま開いている年度。サイドメニューで選んだ年度があればそれ、なければ最も新しい年度。
+ * ただし、年が明ける前に翌年度へ繰り越したときは、今年の年度を開く（今年の記帳が続くため）。
  * 初期設定の前は null。
  */
-export function useFiscalYear() {
+export function useFiscalYear(today = new Date()) {
 	const latest = useSetupStatus().data?.fiscalYear ?? null
 	const years = useFiscalYears()
 	const selected = useYearStore((state) => state.selected)
@@ -57,6 +58,11 @@ export function useFiscalYear() {
 		// 選んだ年度があるか分かるまで待つ（最も新しい年度を読んでから読み直さないように）
 		if (years.isPending) return null
 		if (years.data?.some((y) => y.year === selected)) return selected
+	}
+	if (selected === null && latest !== null && latest > today.getFullYear()) {
+		if (years.isPending) return null
+		const current = years.data?.find((y) => y.year <= today.getFullYear())
+		if (current) return current.year
 	}
 	return latest
 }

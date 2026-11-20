@@ -41,6 +41,7 @@ export function MasterSection<T extends MasterRecord, F, I>({
 	renderFields,
 	searchText,
 	canDelete = () => true,
+	suggestCode = (rows) => nextCode(rows.map((r) => r.code)),
 }: {
 	title: string
 	kind: MasterKind<T, I>
@@ -57,6 +58,8 @@ export function MasterSection<T extends MasterRecord, F, I>({
 	/** 検索の対象にする文字列（コード・名前・かななど） */
 	searchText: (row: T) => string
 	canDelete?: (row: T) => boolean
+	/** 追加するときに初めに入れておくコード */
+	suggestCode?: (rows: T[], form: F) => string
 }) {
 	const t = useTranslations("master")
 	const errorMessage = useErrorMessage()
@@ -74,7 +77,18 @@ export function MasterSection<T extends MasterRecord, F, I>({
 	const open = (row: T | null) => {
 		save.reset()
 		setEditing(row)
-		setFormState(row ? toForm(row) : emptyForm())
+		if (row) {
+			setFormState(toForm(row))
+			return
+		}
+		// 追加するときは、使っていない次のコードを入れておく（書き換えてもよい）
+		const empty = emptyForm()
+		const code = suggestCode(list.data ?? [], empty)
+		setFormState(
+			code && (empty as { code?: unknown }).code === ""
+				? { ...empty, code }
+				: empty
+		)
 	}
 	const close = () => {
 		save.reset()
@@ -311,4 +325,19 @@ function ListState({
 		)
 	}
 	return null
+}
+
+/**
+ * 使っていない次のコード。数字だけのコードのうち最も小さいものから数えて、最初の空き番号
+ * （下 2 桁が 00 の番号は飛ばす）。桁数は元のコードにそろえる。数字のコードがなければ空。
+ */
+export function nextCode(codes: string[]) {
+	const numeric = codes.filter((c) => /^\d+$/.test(c))
+	if (numeric.length === 0) return ""
+	const used = new Set(numeric.map(Number))
+	const min = Math.min(...used)
+	const width = Math.max(...numeric.map((c) => c.length))
+	let n = min + 1
+	while (used.has(n) || n % 100 === 0) n += 1
+	return String(n).padStart(width, "0")
 }

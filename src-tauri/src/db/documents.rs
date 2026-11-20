@@ -262,7 +262,7 @@ pub fn save_mail_settings(conn: &Connection, input: &MailSettings) -> AppResult<
 }
 
 /// 発行日で様式を決める。課税の日（年の途中で登録した年は登録日から）で、登録番号があるときだけ適格請求書。
-fn tax_mode_for(conn: &Connection, issue_date: &str) -> AppResult<TaxMode> {
+pub fn tax_mode_for(conn: &Connection, issue_date: &str) -> AppResult<TaxMode> {
     if journal::parse_date(issue_date).is_none() {
         return Err(AppError::field(ErrorCode::InvalidFormat, "issueDate"));
     }

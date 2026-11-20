@@ -68,7 +68,7 @@ export function CommandPalette() {
 		},
 		...helpArticles.map((a) => ({
 			id: `help-${a.id}`,
-			label: `${nav("help")}：${help(a.id)}`,
+			label: t("helpArticle", { title: help(a.id) }),
 			keywords: `${help(a.body)} ${a.reading ? help(a.reading) : ""}`,
 			run: () => {
 				setOpen(false)

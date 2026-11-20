@@ -633,7 +633,7 @@ function UnassignedCard({ data, month }: { data: MonthlyList; month: string }) {
 	)
 }
 
-function statusMark(c: MonthCell) {
+function statusMark(c: MonthCell, markSkipped: string) {
 	switch (c.status) {
 		case "paid":
 			return "○"
@@ -642,7 +642,7 @@ function statusMark(c: MonthCell) {
 		case "unpaid":
 			return "×"
 		case "skipped":
-			return "休"
+			return markSkipped
 		case "unexpected":
 			return "＋"
 		default:
@@ -715,7 +715,9 @@ function YearTab() {
 														: "px-2 py-2 text-center"
 												}
 											>
-												<span aria-hidden="true">{statusMark(c)}</span>
+												<span aria-hidden="true">
+													{statusMark(c, t("markSkipped"))}
+												</span>
 												<span className="sr-only">
 													{t(`status_${c.status}`)}
 												</span>
@@ -838,8 +840,9 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 	const [revenue, setRevenue] = useState<number | null>(
 		plan?.revenueAccountId ?? revenueAccounts[0]?.id ?? null
 	)
+	// 新しいプランは今月から（過去の年度なら 1 月から）。過去の月が未入金と出ないようにする
 	const [start, setStart] = useState(
-		plan?.startMonth ?? `${fiscalYear ?? new Date().getFullYear()}-01`
+		() => plan?.startMonth ?? defaultStartMonth(fiscalYear)
 	)
 	const [end, setEnd] = useState(plan?.endMonth ?? "")
 	const amount = parseAmount(amountText)
@@ -1031,4 +1034,11 @@ function AssignForm({
 			)}
 		</div>
 	)
+}
+
+/** 新しい定期売上のプランの始まりの月。今年の年度なら今月、ほかの年度なら 1 月。 */
+function defaultStartMonth(fiscalYear: number | null, today = new Date()) {
+	const year = fiscalYear ?? today.getFullYear()
+	const month = year === today.getFullYear() ? today.getMonth() + 1 : 1
+	return `${year}-${String(month).padStart(2, "0")}`
 }

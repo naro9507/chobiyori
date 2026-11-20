@@ -87,20 +87,22 @@ export function ReviewPanel() {
 		{
 			id: "date",
 			header: t("date"),
-			className: "w-28",
-			cell: (item) => item.date,
-		},
-		{
-			id: "source",
-			header: t("source"),
-			className: "w-24",
-			cell: (item) => t(`from_${item.source}`),
+			className: "w-28 whitespace-nowrap",
+			cell: (item) => (
+				<>
+					{item.date}
+					<span className="block text-muted-foreground text-xs">
+						{t(`from_${item.source}`)}
+					</span>
+				</>
+			),
 		},
 		{
 			id: "merchant",
 			header: t("merchant"),
+			className: "min-w-40",
 			cell: (item) => (
-				<div>
+				<div className="break-words">
 					<button
 						type="button"
 						className="text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
@@ -109,7 +111,7 @@ export function ReviewPanel() {
 						{item.merchant || t("noMerchant")}
 					</button>
 					{item.source === "statement" && item.fileRow > 0 && (
-						<p className="break-all text-muted-foreground text-xs">
+						<p className="break-words text-muted-foreground text-xs">
 							{t("sourceRow", { file: item.fileName, row: item.fileRow })}
 						</p>
 					)}
@@ -123,6 +125,7 @@ export function ReviewPanel() {
 			id: "amount",
 			header: t("amount"),
 			numeric: true,
+			className: "whitespace-nowrap",
 			cell: (item) => formatAmount(item.spend),
 		},
 		{
@@ -157,7 +160,12 @@ export function ReviewPanel() {
 							<Button
 								size="sm"
 								variant="outline"
-								disabled={checked.length === 0 || bulk.isPending}
+								// 選んだ中に候補のあるものがなければ、確定するものがない
+								disabled={
+									!list.some(
+										(i) => checked.includes(i.id) && i.suggestion !== null
+									) || bulk.isPending
+								}
 								onClick={() =>
 									bulk.mutate(
 										{ ids: checked, input: null },
@@ -229,7 +237,7 @@ export function ReviewPanel() {
 					{t(`empty_${status}`)}
 				</p>
 			) : (
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
 					<BookTable
 						label={t("listLabel")}
 						rows={list}

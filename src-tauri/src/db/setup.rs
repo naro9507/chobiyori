@@ -179,7 +179,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
     let profile = input.profile.validated()?;
     let year = validate_year(input.fiscal_year)?;
     if input.accounts.len() + input.opening_balances.len() > 100 {
-        return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+        return Err(AppError::new(ErrorCode::OutOfRange));
     }
 
     db.transaction(|tx| {
@@ -204,43 +204,55 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
         seed_accounts(tx, input.template)?;
         let mut asset_total = 0_i64;
         let mut liability_total = 0_i64;
+        // 作った口座のコード（W001 から順に）
+        let mut created = 0;
         for (index, account) in input.accounts.iter().enumerate() {
-            let name = master::required(&account.name, NAME_MAX, "accountName")?;
+            let name = master::required(&account.name, NAME_MAX, "accountName")
+                .map_err(|e| AppError::line(e.code, index, "accountName"))?;
             if account.balance.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
-                return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+                return Err(AppError::line(ErrorCode::OutOfRange, index, "openingBalance"));
             }
-            let (category, line) = match account.kind {
-                SetupAccountKind::Cash => ("asset", "bs.cash"),
-                SetupAccountKind::Bank => ("asset", "bs.other_deposits"),
-                SetupAccountKind::Card => ("liability", "bs.accrued_payables"),
-                SetupAccountKind::EMoney => ("asset", "bs.other_assets"),
+            // 口座は、同じ種類の標準の科目のすぐあとに並べる
+            let (category, line, after) = match account.kind {
+                SetupAccountKind::Cash => ("asset", "bs.cash", "101"),
+                SetupAccountKind::Bank => ("asset", "bs.other_deposits", "104"),
+                SetupAccountKind::Card => ("liability", "bs.accrued_payables", "204"),
+                SetupAccountKind::EMoney => ("asset", "bs.other_assets", "104"),
             };
             let id = if account.kind == SetupAccountKind::Cash && index == 0 {
-                tx.execute("UPDATE accounts SET name_ja = ?1 WHERE code = '101'", [&name])?;
+                // 名前を変えていなければ（どちらかの言語の既定の名前なら）、標準の名前のままにする
+                if name != "現金" && !name.eq_ignore_ascii_case("cash") {
+                    tx.execute("UPDATE accounts SET name_ja = ?1 WHERE code = '101'", [&name])?;
+                }
                 tx.query_row("SELECT id FROM accounts WHERE code = '101'", [], |r| r.get::<_, i64>(0))?
             } else {
-                tx.execute("INSERT INTO accounts (code, name_ja, category, statement_line, is_payment_account, sort) VALUES (?1, ?2, ?3, ?4, 1, ?5)", params![format!("W{:03}", index + 1), name, category, line, index as i64 + 1])?;
+                created += 1;
+                tx.execute(
+                    "INSERT INTO accounts (code, name_ja, category, statement_line, is_payment_account, sort)
+                     VALUES (?1, ?2, ?3, ?4, 1, (SELECT sort + 1 FROM accounts WHERE code = ?5))",
+                    params![format!("W{created:03}"), name, category, line, after],
+                )?;
                 tx.last_insert_rowid()
             };
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, account.balance])?;
             if category == "asset" { asset_total += account.balance; } else { liability_total += account.balance; }
         }
         let mut seen = std::collections::HashSet::new();
-        for row in &input.opening_balances {
+        for (index, row) in input.opening_balances.iter().enumerate() {
             if !seen.insert(row.account_code.clone()) || row.account_code == "302" {
-                return Err(AppError::field(ErrorCode::InvalidFormat, "openingBalance"));
+                return Err(AppError::line(ErrorCode::DuplicateCode, index, "otherBalance"));
             }
             if row.amount.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
-                return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+                return Err(AppError::line(ErrorCode::OutOfRange, index, "otherBalance"));
             }
-            let (id, category): (i64, String) = tx.query_row("SELECT id, category FROM accounts WHERE code = ?1 AND category IN ('asset', 'liability', 'equity')", [&row.account_code], |r| Ok((r.get(0)?, r.get(1)?))).optional()?.ok_or(AppError::field(ErrorCode::NotFound, "openingBalance"))?;
+            let (id, category): (i64, String) = tx.query_row("SELECT id, category FROM accounts WHERE code = ?1 AND category IN ('asset', 'liability', 'equity')", [&row.account_code], |r| Ok((r.get(0)?, r.get(1)?))).optional()?.ok_or(AppError::line(ErrorCode::NotFound, index, "otherBalance"))?;
             let exists: bool = tx.query_row("SELECT EXISTS (SELECT 1 FROM opening_balances WHERE fiscal_year = ?1 AND account_id = ?2)", params![year, id], |r| r.get(0))?;
-            if exists { return Err(AppError::field(ErrorCode::DuplicateCode, "openingBalance")); }
+            if exists { return Err(AppError::line(ErrorCode::DuplicateCode, index, "otherBalance")); }
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, row.amount])?;
             if category == "asset" { asset_total += row.amount; } else { liability_total += row.amount; }
         }
         if (asset_total - liability_total).abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
-            return Err(AppError::field(ErrorCode::OutOfRange, "openingBalance"));
+            return Err(AppError::new(ErrorCode::OutOfRange));
         }
         if !input.accounts.is_empty() || !input.opening_balances.is_empty() {
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) SELECT ?1, id, ?2 FROM accounts WHERE code = '302'", params![year, asset_total - liability_total])?;
@@ -299,6 +311,14 @@ fn seed_accounts(conn: &Connection, template: IndustryTemplate) -> AppResult<()>
             r.business_percent,
             (index as i64 + 1) * 10
         ])?;
+        // ルールの名前にある科目（家賃・光熱費など）の既定の按分ルールにする
+        let id = conn.last_insert_rowid();
+        for code in r.accounts {
+            conn.execute(
+                "UPDATE accounts SET default_allocation_rule_id = ?1 WHERE code = ?2",
+                params![id, code],
+            )?;
+        }
     }
     Ok(())
 }
@@ -340,6 +360,29 @@ pub fn update_profile(conn: &Connection, input: &BusinessProfile) -> AppResult<B
         return Err(AppError::new(ErrorCode::NotSetUp));
     }
     Ok(p)
+}
+
+/// 年度の申告区分（青色・白色）を変える。締めた年度は変えられない。
+pub fn set_filing_type(
+    db: &Database,
+    year: i64,
+    filing_type: FilingType,
+) -> AppResult<Vec<FiscalYear>> {
+    db.transaction(|tx| {
+        super::transactions::ensure_year_open(tx, year)?;
+        tx.execute(
+            "UPDATE fiscal_years SET filing_type = ?1 WHERE year = ?2",
+            params![filing_type, year],
+        )?;
+        super::audit::event(
+            tx,
+            "filing_type",
+            "update",
+            Some(year),
+            Some(serde_json::json!({ "filingType": filing_type })),
+        )?;
+        fiscal_years(tx)
+    })
 }
 
 pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
@@ -424,7 +467,26 @@ pub(crate) mod tests {
             for (actual, expected) in rules.iter().zip(template.allocation_rules()) {
                 assert_eq!(actual.code, expected.code);
                 assert_eq!(actual.business_percent, expected.business_percent);
+                // 家賃・光熱費・通信費・車両費などには、名前の合うルールを既定で付ける
+                for code in expected.accounts {
+                    assert_eq!(
+                        accounts[position(code)].default_allocation_rule_id,
+                        Some(actual.id),
+                        "{template:?} {code}"
+                    );
+                }
             }
+            // ルールに挙げていない科目には付けない
+            let linked = accounts
+                .iter()
+                .filter(|a| a.default_allocation_rule_id.is_some())
+                .count();
+            let expected: usize = template
+                .allocation_rules()
+                .iter()
+                .map(|r| r.accounts.len())
+                .sum();
+            assert_eq!(linked, expected, "{template:?}");
         }
     }
 
@@ -439,6 +501,73 @@ pub(crate) mod tests {
             }
         );
         assert_eq!(profile(&db.conn()).unwrap_err().code, ErrorCode::NotSetUp);
+    }
+
+    #[test]
+    fn filing_type_can_be_changed_until_the_year_is_closed() {
+        let db = Database::open_in_memory().unwrap();
+        complete(&db, &input()).unwrap();
+        let years = set_filing_type(&db, 2026, FilingType::White).unwrap();
+        assert_eq!(years[0].filing_type, FilingType::White);
+        db.conn()
+            .execute(
+                "UPDATE fiscal_years SET status = 'closed' WHERE year = 2026",
+                [],
+            )
+            .unwrap();
+        let err = set_filing_type(&db, 2026, FilingType::Blue65).unwrap_err();
+        assert_eq!(err.code, ErrorCode::YearClosed);
+    }
+
+    #[test]
+    fn setup_accounts_follow_their_standard_account_and_errors_name_the_row() {
+        let db = Database::open_in_memory().unwrap();
+        let mut setup = input();
+        setup.accounts = vec![
+            SetupAccount {
+                name: "現金".into(),
+                kind: SetupAccountKind::Cash,
+                balance: 1_000,
+            },
+            SetupAccount {
+                name: "ゆうちょ".into(),
+                kind: SetupAccountKind::Bank,
+                balance: 2_000,
+            },
+            SetupAccount {
+                name: "カード".into(),
+                kind: SetupAccountKind::Card,
+                balance: 500,
+            },
+        ];
+        let mut bad = setup.clone();
+        bad.accounts[1].name = " ".into();
+        let err = complete(&db, &bad).unwrap_err();
+        assert_eq!((err.field, err.line), (Some("accountName"), Some(1)));
+
+        setup.accounts[0].name = "Cash".into();
+        complete(&db, &setup).unwrap();
+        let conn = db.conn();
+        // 英語の画面で既定の名前のまま進めても、標準の和名は変えない
+        let cash: String = conn
+            .query_row("SELECT name_ja FROM accounts WHERE code = '101'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(cash, "現金");
+        let codes: Vec<String> = conn
+            .prepare(
+                "SELECT code FROM accounts WHERE category IN ('asset', 'liability')
+                 ORDER BY CASE category WHEN 'asset' THEN 1 ELSE 2 END, sort, code",
+            )
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        let at = |code: &str| codes.iter().position(|c| c == code).unwrap();
+        assert_eq!(at("W001"), at("104") + 1, "{codes:?}");
+        assert_eq!(at("W002"), at("204") + 1, "{codes:?}");
     }
 
     #[test]

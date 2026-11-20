@@ -28,7 +28,7 @@ import {
 	taxCategories,
 	useMasterList,
 } from "@/features/master/master-api"
-import { MasterSection } from "@/features/master/master-section"
+import { MasterSection, nextCode } from "@/features/master/master-section"
 import { PurposesSection } from "@/features/master/purposes-section"
 import { useFeatures } from "@/features/setup/setup"
 import { useTranslations } from "@/i18n/use-translations"
@@ -152,6 +152,7 @@ function AccountsSection() {
 	const paymentId = useId()
 	const locale = useSettingsStore((state) => state.locale)
 	const rules = useMasterList(allocationRuleKind)
+	const accounts = useMasterList(accountKind)
 
 	return (
 		<MasterSection<Account, AccountForm, AccountInput>
@@ -159,6 +160,7 @@ function AccountsSection() {
 			kind={accountKind}
 			searchText={(a) => `${a.code} ${a.nameJa} ${a.nameEn} ${a.kana}`}
 			canDelete={(a) => !a.isSystem}
+			suggestCode={(rows, form) => codeFor(rows, form.category)}
 			columns={[
 				{ header: t("code"), cell: (a) => a.code, className: "num w-20" },
 				{
@@ -228,9 +230,18 @@ function AccountsSection() {
 					>
 						<NativeSelect
 							value={form.category}
-							onChange={(e) =>
-								setForm({ category: e.target.value as AccountCategory })
-							}
+							onChange={(e) => {
+								const category = e.target.value as AccountCategory
+								// 追加中で、提案したコードのままなら、区分に合うコードに替える
+								const suggested =
+									!editing &&
+									form.code === codeFor(accounts.data ?? [], form.category)
+								setForm(
+									suggested
+										? { category, code: codeFor(accounts.data ?? [], category) }
+										: { category }
+								)
+							}}
 							disabled={editing?.isSystem}
 						>
 							{accountCategories.map((c) => (
@@ -393,6 +404,8 @@ function PartnersSection() {
 		<MasterSection<Partner, PartnerInput, PartnerInput>
 			title={t("partners")}
 			kind={partnerKind}
+			// 初めての取引先は 1001 から
+			suggestCode={(rows) => nextCode(rows.map((p) => p.code)) || "1001"}
 			searchText={(p) =>
 				`${p.code} ${p.nameJa} ${p.nameEn} ${p.kana} ${p.invoiceRegistrationNo ?? ""}`
 			}
@@ -607,5 +620,12 @@ function AllocationRulesSection() {
 				</>
 			)}
 		/>
+	)
+}
+
+/** 区分の中で使っていない次の科目コード。 */
+function codeFor(rows: Account[], category: AccountCategory) {
+	return nextCode(
+		rows.filter((a) => a.category === category).map((a) => a.code)
 	)
 }

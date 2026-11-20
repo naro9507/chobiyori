@@ -90,6 +90,15 @@ pub struct NewDocumentDefaults {
     pub notes: String,
 }
 
+/// 発行日の様式（適格請求書か、登録番号なしか）。登録番号なしの様式は消費税を足さない。
+#[tauri::command]
+pub async fn document_tax_mode(
+    db: State<'_, Database>,
+    issue_date: String,
+) -> AppResult<doc::TaxMode> {
+    documents::tax_mode_for(&db.conn(), &issue_date)
+}
+
 #[tauri::command]
 pub async fn new_document_defaults(
     db: State<'_, Database>,

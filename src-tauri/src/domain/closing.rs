@@ -194,6 +194,9 @@ pub enum StatementIssueCode {
     WhiteFiling,
     /// 保存後の取引変更などで専従者控除が控除前所得を超えた
     WhiteDeductionExceedsIncome,
+    /// 年末の残高がマイナスの資産・負債の行がある（固定資産の購入の記録漏れなど）。
+    /// `value` は行のキーをカンマでつないだもの
+    NegativeBalance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -451,6 +454,22 @@ pub fn statement(
             account_ids: accounts.iter().map(|f| f.account_id).collect(),
         });
     }
+    let negative: Vec<&str> = bs
+        .iter()
+        .filter(|l| {
+            l.closing < 0
+                && l.opening.is_some()
+                && !owner_keys.contains(&l.key.as_str())
+                && !l.account_ids.is_empty()
+        })
+        .map(|l| l.key.as_str())
+        .collect();
+    if !negative.is_empty() {
+        issues.push(issue(
+            StatementIssueCode::NegativeBalance,
+            Some(negative.join(",")),
+        ));
+    }
     if asset_total.opening != liability_total.opening {
         issues.push(issue(StatementIssueCode::OpeningUnbalanced, None));
     }
@@ -607,6 +626,27 @@ mod tests {
             .issues
             .iter()
             .any(|i| i.code == StatementIssueCode::IncomeMismatch));
+    }
+
+    #[test]
+    fn negative_asset_balance_is_reported() {
+        // 固定資産の購入を記録しないまま減価償却した: 工具器具備品がマイナスになる
+        let figures = vec![
+            f(1, Asset, Some("bs.cash"), 100_000, 100_000),
+            f(2, Asset, Some("bs.tools_equipment"), 0, -30_000),
+            f(7, Equity, Some("bs.capital"), 100_000, 100_000),
+            f(12, Expense, Some("pl.depreciation"), 0, 30_000),
+        ];
+        let s = statement(2026, FilingType::Blue65, &figures, -30_000);
+        let negative: Vec<_> = s
+            .issues
+            .iter()
+            .filter(|i| i.code == StatementIssueCode::NegativeBalance)
+            .collect();
+        assert_eq!(negative.len(), 1, "{:?}", s.issues);
+        assert_eq!(negative[0].value.as_deref(), Some("tools_equipment"));
+        // 所得のマイナスは知らせない
+        assert!(!negative[0].value.as_deref().unwrap().contains("income"));
     }
 
     #[test]
