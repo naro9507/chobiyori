@@ -130,8 +130,8 @@ impl Default for DocumentSettings {
             due_days: 30,
             logo_attachment_id: None,
             seal_attachment_id: None,
-            mail_subject: "{書類}のご送付（{番号}）".into(),
-            mail_body: "{宛名} 様\n\nいつもお世話になっております。{差出人}です。\n{書類}（{番号}）をお送りします。\n合計金額は {金額} 円です。{期限}\n\nご確認のほど、よろしくお願いいたします。\n\n{差出人}"
+            mail_subject: "{書類}送付のご案内（{番号}）".into(),
+            mail_body: "{宛名}\n\nいつもお世話になっております。{差出人}です。\n{書類}（{番号}）を添付いたします。合計金額は{金額}円です。\n\n{ご案内}{期限}\nご不明な点がございましたら、お知らせください。\n\nどうぞよろしくお願いいたします。\n\n{差出人}"
                 .into(),
         }
     }

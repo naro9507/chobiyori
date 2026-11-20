@@ -77,10 +77,25 @@ function renderPage(path = "/documents") {
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	mocks.callCommand.mockReset()
+	const settings: DocumentSettings = {
+		phone: "",
+		email: "",
+		bankAccount: "",
+		defaultNotes: "",
+		dueDays: 30,
+		logoAttachmentId: null,
+		sealAttachmentId: null,
+		mailSubject: "",
+		mailBody: "",
+	}
 	mocks.callCommand.mockImplementation(
 		async (
 			command: string,
-			args?: { input?: DocumentInput | DocumentSettings | MailSettings }
+			args?: {
+				input?: DocumentInput | DocumentSettings | MailSettings
+				role?: string
+				id?: number
+			}
 		) => {
 			switch (command) {
 				case "setup_status":
@@ -97,16 +112,18 @@ beforeEach(() => {
 				case "list_documents":
 					return [issued]
 				case "document_settings":
+					return { ...settings }
+				case "choose_document_image":
+				case "remove_document_image": {
+					const logo = args?.role === "logo"
+					settings[logo ? "logoAttachmentId" : "sealAttachmentId"] =
+						command === "remove_document_image" ? null : logo ? 11 : 12
+					return { ...settings }
+				}
+				case "attachment_content":
 					return {
-						phone: "",
-						email: "",
-						bankAccount: "",
-						defaultNotes: "",
-						dueDays: 30,
-						logoAttachmentId: null,
-						sealAttachmentId: null,
-						mailSubject: "",
-						mailBody: "",
+						attachment: { mime: "image/png" },
+						data: args?.id === 11 ? "AA==" : "AQ==",
 					}
 				case "save_document_settings": {
 					const input = args?.input as DocumentSettings
@@ -166,6 +183,62 @@ describe("書類の画面", () => {
 			expect(mailForm.getByLabelText("ログインに使う名前")).toHaveValue(
 				"sender@example.test"
 			)
+		)
+	})
+
+	it("登録したロゴと印影を表示し、削除した画像だけを外す", async () => {
+		const user = userEvent.setup()
+		renderPage("/settings?view=features")
+		const images = within(
+			await screen.findByRole("group", { name: "ロゴと印影" })
+		)
+		const [logo, seal] = images.getAllByRole("button", { name: "画像を選ぶ" })
+		await user.click(logo)
+		expect(await images.findByRole("img", { name: "ロゴ" })).toHaveAttribute(
+			"src",
+			"data:image/png;base64,AA=="
+		)
+		await user.click(seal)
+		expect(await images.findByRole("img", { name: "印影" })).toHaveAttribute(
+			"src",
+			"data:image/png;base64,AQ=="
+		)
+		await user.click(images.getByRole("button", { name: "ロゴを外す" }))
+		await waitFor(() =>
+			expect(images.queryByRole("img", { name: "ロゴ" })).toBeNull()
+		)
+		expect(images.getByRole("img", { name: "印影" })).toBeVisible()
+	})
+
+	it("件名と本文に選んだ変数を差し込み、保存する", async () => {
+		const user = userEvent.setup()
+		renderPage("/settings?view=features")
+		const subject = await screen.findByRole<HTMLInputElement>("textbox", {
+			name: "件名",
+		})
+		await user.type(subject, "【書類名】")
+		subject.setSelectionRange(1, 4)
+		const subjectTools = within(
+			screen.getByRole("group", { name: "件名に差し込む" })
+		)
+		await user.click(subjectTools.getByRole("button", { name: "書類名" }))
+		expect(subject).toHaveValue("【{書類}】")
+		expect(subject.selectionStart).toBe(5)
+		const bodyTools = within(
+			screen.getByRole("group", { name: "本文に差し込む" })
+		)
+		await user.click(bodyTools.getByRole("button", { name: "ご案内" }))
+		const body = screen.getByRole("textbox", { name: "本文" })
+		expect(body).toHaveValue("{ご案内}")
+		const form = within(body.closest("form") as HTMLFormElement)
+		await user.click(form.getByRole("button", { name: "保存する" }))
+		await waitFor(() =>
+			expect(mocks.callCommand).toHaveBeenCalledWith("save_document_settings", {
+				input: expect.objectContaining({
+					mailSubject: "【{書類}】",
+					mailBody: "{ご案内}",
+				}),
+			})
 		)
 	})
 

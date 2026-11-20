@@ -52,6 +52,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0011_payments.sql"),
     include_str!("migrations/0012_accounting_consistency.sql"),
     include_str!("migrations/0013_receipt_points.sql"),
+    include_str!("migrations/0014_document_mail_template.sql"),
 ];
 
 pub struct Database {

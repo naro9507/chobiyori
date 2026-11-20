@@ -227,11 +227,18 @@ pub fn display_status(
     }
 }
 
-/// メールの件名・本文のひな形に、書類の値を差し込む。`{番号}` `{宛名}` `{金額}` `{期限}` `{差出人}`。
+/// ひな形に書かれた変数だけを展開する。差し込んだ宛名などは再展開しない。
 pub fn fill_template(template: &str, values: &[(&str, String)]) -> String {
-    let mut text = template.to_string();
-    for (key, value) in values {
-        text = text.replace(&format!("{{{key}}}"), value);
+    let mut text = String::with_capacity(template.len());
+    for part in template.split_inclusive('}') {
+        if let Some((prefix, key)) = part.strip_suffix('}').and_then(|s| s.rsplit_once('{')) {
+            if let Some((_, value)) = values.iter().find(|(name, _)| *name == key) {
+                text.push_str(prefix);
+                text.push_str(value);
+                continue;
+            }
+        }
+        text.push_str(part);
     }
     text
 }
@@ -447,6 +454,13 @@ mod tests {
             &[("番号", "INV-2026-0001".into()), ("金額", "11,000".into())],
         );
         assert_eq!(text, "INV-2026-0001 のご請求（11,000円）");
+        assert_eq!(
+            fill_template(
+                "{宛名}{番号}",
+                &[("宛名", "{番号} 御中".into()), ("番号", "1".into())]
+            ),
+            "{番号} 御中1"
+        );
         assert_eq!(
             mailto("a@example.com", "請求書", "よろしく\nお願いします"),
             "mailto:a@example.com?subject=%E8%AB%8B%E6%B1%82%E6%9B%B8&body=%E3%82%88%E3%82%8D%E3%81%97%E3%81%8F%0D%0A%E3%81%8A%E9%A1%98%E3%81%84%E3%81%97%E3%81%BE%E3%81%99"

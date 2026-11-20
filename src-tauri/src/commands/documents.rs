@@ -406,9 +406,15 @@ fn mail_draft_of(conn: &Connection, d: &Document) -> AppResult<MailDraft> {
     };
     let due = match (&d.due_date, d.kind) {
         (Some(due), DocumentKind::Invoice) => {
-            format!("\nお支払期限は {} です。", layout::japanese_date(due))
+            format!("\nお支払期限は{}です。", layout::japanese_date(due))
         }
         _ => String::new(),
+    };
+    let guidance = match d.kind {
+        DocumentKind::Invoice => "お手数をおかけいたしますが、ご請求内容をご確認のうえ、お支払いのお手続きをお願いいたします。",
+        DocumentKind::Estimate => "お見積もりの内容をご確認のうえ、ご検討いただけますと幸いです。",
+        DocumentKind::Delivery => "お手数ですが、納品内容をご確認くださいますようお願いいたします。",
+        DocumentKind::Receipt => "このたびはお支払いいただき、誠にありがとうございます。領収書をお手元にて保管いただけますと幸いです。",
     };
     let values = [
         ("書類", layout::kind_name(d.kind).to_string()),
@@ -416,11 +422,15 @@ fn mail_draft_of(conn: &Connection, d: &Document) -> AppResult<MailDraft> {
         ("宛名", d.recipient_name.clone()),
         ("金額", yen(d.totals.total)),
         ("期限", due),
+        ("ご案内", guidance.to_string()),
         ("差出人", sender),
     ];
     Ok(MailDraft {
         to: d.recipient_email.clone(),
-        subject: doc::fill_template(&s.mail_subject, &values),
+        subject: doc::fill_template(&s.mail_subject, &values)
+            .lines()
+            .collect::<Vec<_>>()
+            .join(" "),
         body: doc::fill_template(&s.mail_body, &values),
     })
 }
@@ -590,10 +600,27 @@ mod tests {
         let d = issued(&db);
         let draft = mail_draft_of(&db.conn(), &d).unwrap();
         assert_eq!(draft.to, "billing@example.com");
-        assert_eq!(draft.subject, "請求書のご送付（INV-2026-0001）");
-        assert!(draft.body.starts_with("株式会社テスト 御中 様"));
-        assert!(draft.body.contains("合計金額は 11,000 円です。"));
-        assert!(draft.body.contains("お支払期限は 2026年3月31日 です。"));
+        assert_eq!(draft.subject, "請求書送付のご案内（INV-2026-0001）");
+        assert!(draft.body.starts_with("株式会社テスト 御中\n"));
+        assert!(draft.body.contains("お支払いのお手続き"));
+        assert!(draft.body.contains("お支払期限は2026年3月31日です。"));
+    }
+
+    #[test]
+    fn other_documents_use_their_own_wording_without_a_payment_deadline() {
+        let db = set_up_db();
+        let mut d = issued(&db);
+        for (kind, wording) in [
+            (DocumentKind::Estimate, "ご検討"),
+            (DocumentKind::Delivery, "納品内容"),
+            (DocumentKind::Receipt, "保管"),
+        ] {
+            d.kind = kind;
+            let draft = mail_draft_of(&db.conn(), &d).unwrap();
+            assert!(draft.subject.starts_with(layout::kind_name(kind)));
+            assert!(draft.body.contains(wording));
+            assert!(!draft.body.contains("お支払期限"));
+        }
     }
 
     #[test]
