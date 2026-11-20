@@ -218,12 +218,12 @@ describe("レシート", () => {
 		).toBeDisabled()
 		expect(
 			screen.getByRole("link", { name: "設定画面で API キーを登録する" })
-		).toHaveAttribute("href", expect.stringContaining("settings"))
+		).toHaveAttribute("href", expect.stringContaining("view=receipts"))
 	})
 
 	it("未設定や利用できない支払口座を別の口座として表示しない", async () => {
 		settings = { ...settings, cashAccountId: null, cardAccountId: 99 }
-		renderPage("/settings?view=features")
+		renderPage("/settings?view=receipts")
 		expect(await screen.findByLabelText("現金で払ったとき")).toHaveValue("")
 		expect(screen.getByLabelText("カード・電子マネーで払ったとき")).toHaveValue(
 			"99"
@@ -232,7 +232,7 @@ describe("レシート", () => {
 
 	it("設定画面でキーの取り方を案内し、同意とキーの登録をする。キーは画面に戻さない", async () => {
 		const user = userEvent.setup()
-		renderPage("/settings?view=features")
+		renderPage("/settings?view=receipts")
 		const card = await screen.findByRole("region", { name: "API キーの取り方" })
 		expect(
 			within(card).getByText("https://aistudio.google.com/")

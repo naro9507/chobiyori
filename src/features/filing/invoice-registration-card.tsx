@@ -1,5 +1,5 @@
 import { CircleCheck, Loader2 } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, type Ref, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,7 +33,9 @@ const methods = ["special20", "simplified", "standard"] as const
  */
 export function InvoiceRegistrationCard({
 	fiscalYear,
+	registrationInput,
 }: {
+	registrationInput?: Ref<HTMLInputElement>
 	fiscalYear: number | null
 }) {
 	const t = useTranslations("filing")
@@ -154,6 +156,7 @@ export function InvoiceRegistrationCard({
 						>
 							<Input
 								className="num"
+								ref={registrationInput}
 								value={current.registrationNo}
 								onChange={(e) => update({ registrationNo: e.target.value })}
 								placeholder="T1234567890123"

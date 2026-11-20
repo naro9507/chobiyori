@@ -59,10 +59,35 @@ describe("アプリの枠", () => {
 })
 
 describe("設定", () => {
+	it("設定を開くと見出しと説明が並び、書類から登録番号の入力欄へ移動できる", async () => {
+		const user = userEvent.setup()
+		renderApp("/settings")
+		const documents = await screen.findByRole("button", {
+			name: "発行する書類・メール",
+		})
+		expect(documents).toHaveAttribute("aria-expanded", "false")
+		expect(documents).toHaveAccessibleDescription(
+			/見積書・納品書・請求書・領収書/
+		)
+		const business = screen.getByRole("button", { name: "事業者情報・申告" })
+		expect(business).toHaveAttribute("aria-expanded", "false")
+
+		await user.click(documents)
+		await user.click(
+			screen.getByRole("button", {
+				name: "書類に載せるインボイス登録番号を変更",
+			})
+		)
+		expect(business).toHaveAttribute("aria-expanded", "true")
+		expect(screen.getByPlaceholderText("T1234567890123")).toHaveFocus()
+	})
+
 	it("言語を英語に切り替えると、メニューが英語になる", async () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
-		await user.click(await screen.findByRole("button", { name: "表示" }))
+		await user.click(
+			await screen.findByRole("button", { name: "画面の言語・配色" })
+		)
 
 		await user.click(await screen.findByRole("radio", { name: "English" }))
 
@@ -79,7 +104,9 @@ describe("設定", () => {
 	it("ダークを選ぶと、画面全体がダークになる", async () => {
 		const user = userEvent.setup()
 		renderApp("/settings")
-		await user.click(await screen.findByRole("button", { name: "表示" }))
+		await user.click(
+			await screen.findByRole("button", { name: "画面の言語・配色" })
+		)
 
 		await user.click(await screen.findByRole("radio", { name: "ダーク" }))
 

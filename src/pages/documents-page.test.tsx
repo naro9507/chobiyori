@@ -146,7 +146,7 @@ beforeEach(() => {
 describe("書類の画面", () => {
 	it("書類とメールの設定に、保存時に整えられた値を表示する", async () => {
 		const user = userEvent.setup()
-		renderPage("/settings?view=features")
+		renderPage("/settings?view=documents")
 		const phone = await screen.findByLabelText("電話番号")
 		const documentForm = within(phone.closest("form") as HTMLFormElement)
 		await user.type(phone, " 03-1234-5678 ")
