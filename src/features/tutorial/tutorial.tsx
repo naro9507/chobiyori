@@ -1,4 +1,22 @@
 import { useNavigate } from "@tanstack/react-router"
+import {
+	ArrowRight,
+	BookOpen,
+	CalendarDays,
+	ChartColumn,
+	CircleCheck,
+	FileDown,
+	FileText,
+	FileUp,
+	FolderOpen,
+	Inbox,
+	NotebookPen,
+	Pencil,
+	Receipt,
+	Save,
+	Search,
+	Settings,
+} from "lucide-react"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { ScreenId } from "@/app/navigation"
@@ -24,6 +42,20 @@ const tracks = {
 		["reports", "compare"],
 		["data", "backup"],
 	],
+} as const
+
+const actionIcons = {
+	profile: [Settings, FileText, CalendarDays],
+	entry: [Receipt, Pencil, NotebookPen],
+	ledger: [BookOpen, CalendarDays, Receipt],
+	review: [Inbox, Search, BookOpen],
+	month: [CalendarDays, BookOpen, Search],
+	prepare: [CalendarDays, FileDown, FolderOpen],
+	opening: [BookOpen, Search, CircleCheck],
+	preview: [FileText, FileUp, Search],
+	import: [Search, FileUp, CircleCheck],
+	compare: [CalendarDays, ChartColumn, Search],
+	backup: [FolderOpen, Save, CircleCheck],
 } as const
 
 type Track = keyof typeof tracks
@@ -115,14 +147,51 @@ export function Tutorial({ screen }: { screen: ScreenId }) {
 	return (
 		<Card className="border-primary">
 			<CardContent className="flex flex-col items-start gap-3">
-				<div aria-live="polite">
+				<div className="w-full" aria-live="polite">
 					<p className="text-muted-foreground text-sm">
 						{t(active)} ·{" "}
 						{t("progress", { current: index + 1, total: steps.length })}
 					</p>
+					<div className="my-2 flex gap-1" aria-hidden="true">
+						{steps.map(([, id], i) => (
+							<span
+								key={id}
+								className={`h-1 flex-1 rounded-full ${i <= index ? "bg-primary" : "bg-muted"}`}
+							/>
+						))}
+					</div>
 					<h2 className="font-semibold">{t(task)}</h2>
-					<p className="mt-1 text-sm leading-relaxed">{t(`${task}Body`)}</p>
 				</div>
+				<ol className="grid w-full gap-2 sm:grid-cols-3">
+					{([0, 1, 2] as const).map((i) => {
+						const Icon = actionIcons[task][i]
+						const action = (["Action1", "Action2", "Action3"] as const)[i]
+						return (
+							<li
+								key={action}
+								className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm"
+							>
+								<Icon
+									aria-hidden="true"
+									className="size-5 shrink-0 text-primary"
+								/>
+								<span className="flex-1">{t(`${task}${action}`)}</span>
+								{i < 2 && (
+									<ArrowRight
+										aria-hidden="true"
+										className="size-4 shrink-0 rotate-90 text-muted-foreground sm:rotate-0"
+									/>
+								)}
+							</li>
+						)
+					})}
+				</ol>
+				<details key={task} className="text-sm">
+					<summary className="cursor-pointer text-muted-foreground">
+						{t("details")}
+					</summary>
+					<p className="mt-2 leading-relaxed">{t(`${task}Body`)}</p>
+				</details>
 				<div className="flex flex-wrap gap-2">
 					{screen === target && anchor && (
 						<Button
