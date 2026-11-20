@@ -14,7 +14,7 @@
 use chobiyori_lib::db::attachments::mime_of;
 use chobiyori_lib::domain::receipt::{checks, parse_reading, reduced_amount};
 use chobiyori_lib::receipt::gemini::{Gemini, DEFAULT_MODEL};
-use chobiyori_lib::receipt::ReceiptReader;
+use chobiyori_lib::receipt::{ReadError, ReceiptReader};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -51,7 +51,17 @@ fn main() {
         let Some(mime) = mime_of(&name) else { continue };
         let bytes = std::fs::read(&path).expect("read");
         let started = Instant::now();
-        let result = tauri::async_runtime::block_on(reader.read(&bytes, mime));
+        // アプリと同じく、回数の上限・混んでいる（503）ときは待って読み直す（ここでは 3 回まで）
+        let mut result = tauri::async_runtime::block_on(reader.read(&bytes, mime));
+        for _ in 0..3 {
+            let Err(ReadError::RateLimited { retry_after }) = result else {
+                break;
+            };
+            let wait = retry_after.unwrap_or(30);
+            println!("  (rate limited / busy: waiting {wait}s)");
+            std::thread::sleep(std::time::Duration::from_secs(wait));
+            result = tauri::async_runtime::block_on(reader.read(&bytes, mime));
+        }
         let ms = started.elapsed().as_millis();
         println!("\n=== {name} ({mime}, {} KB, {ms} ms)", bytes.len() / 1024);
         let text = match result {

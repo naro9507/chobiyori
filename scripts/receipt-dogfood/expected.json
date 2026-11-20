@@ -119,5 +119,7 @@
 		},
 		"checks": []
 	},
-	"12_two_receipts_one_image.png": null
+	"12_two_receipts_one_image.png": {
+		"checks": ["multipleReceipts"]
+	}
 }

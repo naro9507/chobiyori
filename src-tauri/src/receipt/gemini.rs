@@ -10,7 +10,13 @@ use serde_json::Value;
 use std::time::Duration;
 
 /// 設定がないときのモデル。
-pub const DEFAULT_MODEL: &str = "gemini-2.5-flash";
+///
+/// 2026-11-20 に試験用レシート 12 種類で比べて決めた（`scripts/receipt-dogfood`）。
+/// - gemini-2.5-flash: 新しく作った API キーでは 404（「新しい利用者には提供しない」）
+/// - gemini-3.8-flash / gemini-3.5-flash: 読めたものは全問正解。ただし 1 枚 5〜110 秒かかり、
+///   無料枠は 1 日 20 回まで
+/// - gemini-3.5-flash-lite: 12 枚すべて全問正解（75 項目）、1 枚およそ 1 秒
+pub const DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
 const ENDPOINT: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 pub struct Gemini {

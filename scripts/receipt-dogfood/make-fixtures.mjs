@@ -326,8 +326,8 @@ const cases = [
 			row("合計", "¥680"),
 			row("カード", ""),
 		],
-		// 1 枚に 2 枚。仕様では「分割を試みる」。今はどちらか片方になるはず（観察用）
-		expected: null,
+		// 1 枚に 2 枚。1 枚分だけ読み、ほかにも写っていることを知らせる（multipleReceipts）
+		expected: { checks: ["multipleReceipts"] },
 	},
 ]
 
