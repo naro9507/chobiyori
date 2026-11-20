@@ -327,10 +327,40 @@ export function useSendMail() {
 	})
 }
 
+export const mailTargets = [
+	"default",
+	"gmail",
+	"outlookPersonal",
+	"outlookWork",
+] as const
+export type MailTarget = (typeof mailTargets)[number]
+
 export function useOpenInMailApp() {
 	return useMutation({
-		mutationFn: ({ id, draft }: { id: number; draft: MailDraft }) =>
-			callCommand<string | null>("open_document_in_mail_app", { id, draft }),
+		mutationFn: ({
+			id,
+			draft,
+			target,
+		}: {
+			id: number
+			draft: MailDraft
+			target: MailTarget
+		}) =>
+			callCommand<string | null>("open_document_in_mail_app", {
+				id,
+				draft,
+				target,
+			}),
+	})
+}
+
+export function useMailGuidance() {
+	return useQuery({
+		queryKey: [...key, "mailGuidance"],
+		queryFn: () =>
+			callCommand<[DocumentKind, string][]>("document_mail_guidance"),
+		retry: false,
+		staleTime: Number.POSITIVE_INFINITY,
 	})
 }
 

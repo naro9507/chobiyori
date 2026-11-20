@@ -229,6 +229,7 @@ pub fn run() {
             commands::documents::save_mail_settings,
             commands::documents::set_mail_password,
             commands::documents::delete_mail_password,
+            commands::documents::document_mail_guidance,
             commands::documents::document_mail_draft,
             commands::documents::send_document_mail,
             commands::documents::open_document_in_mail_app,

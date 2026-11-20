@@ -4,14 +4,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, Textarea } from "@/components/ui/input"
+import { useAttachmentContent } from "@/features/inbox/inbox-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
 	type DocumentSettings,
 	useDocumentSettings,
+	useMailGuidance,
 	useSaveDocumentSettings,
 } from "./documents-api"
+import { MailTemplateField } from "./mail-template-field"
 
 /** 書類（請求書など）に入れる自分の連絡先・振込先・備考・ロゴと印影、メールのひな形。 */
 export function DocumentSettingsCard() {
@@ -26,6 +29,52 @@ export function DocumentSettingsCard() {
 				{settings.data && <SettingsForm initial={settings.data} />}
 			</CardContent>
 		</Card>
+	)
+}
+
+function ImagePreview({ id, label }: { id: number; label: string }) {
+	const content = useAttachmentContent(id)
+	const errorMessage = useErrorMessage()
+	const t = useTranslations("receipts")
+	if (content.isError) {
+		return <span role="alert">{errorMessage(content.error)}</span>
+	}
+	if (!content.data) {
+		return <span className="text-muted-foreground">{t("loadingImage")}</span>
+	}
+	const { attachment, data } = content.data
+	return (
+		<img
+			alt={label}
+			src={`data:${attachment.mime};base64,${data}`}
+			className="h-20 w-32 rounded-md border bg-white object-contain p-1"
+		/>
+	)
+}
+
+function MailGuidanceExamples() {
+	const t = useTranslations("documentSettings")
+	const documents = useTranslations("documents")
+	const guidance = useMailGuidance()
+	const errorMessage = useErrorMessage()
+	return (
+		<details className="rounded-md border px-3 py-2 text-sm">
+			<summary className="cursor-pointer font-medium">
+				{t("guidanceExamples")}
+			</summary>
+			{guidance.isError && <p role="alert">{errorMessage(guidance.error)}</p>}
+			{guidance.isPending && <p role="status">{t("guidanceLoading")}</p>}
+			{guidance.data && (
+				<dl className="mt-2 grid gap-2 sm:grid-cols-[auto_1fr]">
+					{guidance.data.map(([kind, example]) => (
+						<div key={kind} className="contents">
+							<dt className="font-medium">{documents(`kind_${kind}`)}</dt>
+							<dd className="text-muted-foreground">{example}</dd>
+						</div>
+					))}
+				</dl>
+			)}
+		</details>
 	)
 }
 
@@ -60,11 +109,13 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 	const image = (role: "logo" | "seal") => {
 		const id = role === "logo" ? form.logoAttachmentId : form.sealAttachmentId
 		return (
-			<div className="flex items-center gap-2 text-sm">
+			<div className="flex flex-wrap items-center gap-2 text-sm">
 				<span className="w-20">{t(role)}</span>
-				<span className="text-muted-foreground">
-					{id === null ? t("noImage") : t("imageSet")}
-				</span>
+				{id === null ? (
+					<span className="text-muted-foreground">{t("noImage")}</span>
+				) : (
+					<ImagePreview id={id} label={t(role)} />
+				)}
 				<Button
 					type="button"
 					size="sm"
@@ -93,6 +144,7 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 						size="sm"
 						variant="ghost"
 						aria-label={t("removeImage", { what: t(role) })}
+						disabled={save.isPending}
 						onClick={() =>
 							save.mutate(
 								{ type: "removeImage", role },
@@ -170,19 +222,16 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 			<fieldset className="flex flex-col gap-3">
 				<legend className="mb-1 font-bold text-sm">{t("mailTemplate")}</legend>
 				<p className="text-muted-foreground text-xs">{t("mailTemplateHint")}</p>
-				<Field label={t("mailSubject")} error={errorFor("mailSubject")}>
-					<Input
-						value={form.mailSubject}
-						onChange={(e) => set({ mailSubject: e.target.value })}
+				{(["mailSubject", "mailBody"] as const).map((field) => (
+					<MailTemplateField
+						key={field}
+						field={field}
+						value={form[field] ?? ""}
+						onChange={(value) => set({ [field]: value })}
+						error={errorFor(field)}
 					/>
-				</Field>
-				<Field label={t("mailBody")} error={errorFor("mailBody")}>
-					<Textarea
-						className="min-h-40"
-						value={form.mailBody}
-						onChange={(e) => set({ mailBody: e.target.value })}
-					/>
-				</Field>
+				))}
+				<MailGuidanceExamples />
 			</fieldset>
 			{save.error && !fieldError(save.error, "phone") && (
 				<p role="alert" className="text-destructive text-sm">

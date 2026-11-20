@@ -12,6 +12,8 @@ import {
 	type DocumentKind,
 	type DocumentRecord,
 	type MailDraft,
+	type MailTarget,
+	mailTargets,
 	useDocumentAction,
 	useMailDraft,
 	useOpenInMailApp,
@@ -239,7 +241,8 @@ function MailForm({
 	const openApp = useOpenInMailApp()
 	const action = useDocumentAction()
 	const [draft, setDraft] = useState(initial)
-	const [opened, setOpened] = useState(false)
+	const [mailTarget, setMailTarget] = useState<MailTarget>("default")
+	const [openedTo, setOpenedTo] = useState<string | null>(null)
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
@@ -279,8 +282,28 @@ function MailForm({
 					{errorMessage(send.error ?? openApp.error ?? action.error)}
 				</p>
 			)}
+			<Field
+				label={t("mailTarget")}
+				hint={mailTarget === "default" ? undefined : t("webmailHint")}
+			>
+				<NativeSelect
+					value={mailTarget}
+					disabled={openApp.isPending}
+					onChange={(e) => setMailTarget(e.target.value as MailTarget)}
+				>
+					{mailTargets.map((target) => (
+						<option key={target} value={target}>
+							{t(`mailTarget_${target}`)}
+						</option>
+					))}
+				</NativeSelect>
+			</Field>
 			<div className="flex flex-wrap gap-2">
-				<Button type="submit" size="sm" disabled={send.isPending}>
+				<Button
+					type="submit"
+					size="sm"
+					disabled={send.isPending || openApp.isPending}
+				>
 					{send.isPending ? (
 						<Loader2 aria-hidden="true" className="animate-spin" />
 					) : (
@@ -292,11 +315,11 @@ function MailForm({
 					type="button"
 					size="sm"
 					variant="outline"
-					disabled={openApp.isPending}
+					disabled={openApp.isPending || send.isPending}
 					onClick={() =>
 						openApp.mutate(
-							{ id: d.id, draft },
-							{ onSuccess: (name) => name && setOpened(true) }
+							{ id: d.id, draft, target: mailTarget },
+							{ onSuccess: (name) => name && setOpenedTo(draft.to) }
 						)
 					}
 				>
@@ -307,7 +330,7 @@ function MailForm({
 					{t("close")}
 				</Button>
 			</div>
-			{opened && (
+			{openedTo !== null && (
 				<div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3 text-sm">
 					<p>{t("mailAppOpened")}</p>
 					<Button
@@ -317,7 +340,7 @@ function MailForm({
 						disabled={action.isPending}
 						onClick={() =>
 							action.mutate(
-								{ type: "markSent", id: d.id, to: draft.to },
+								{ type: "markSent", id: d.id, to: openedTo },
 								{ onSuccess: onClose }
 							)
 						}

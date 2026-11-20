@@ -227,28 +227,70 @@ pub fn display_status(
     }
 }
 
-/// メールの件名・本文のひな形に、書類の値を差し込む。`{番号}` `{宛名}` `{金額}` `{期限}` `{差出人}`。
+/// ひな形に書かれた変数だけを展開する。差し込んだ宛名などは再展開しない。
 pub fn fill_template(template: &str, values: &[(&str, String)]) -> String {
-    let mut text = template.to_string();
-    for (key, value) in values {
-        text = text.replace(&format!("{{{key}}}"), value);
+    let mut text = String::with_capacity(template.len());
+    for part in template.split_inclusive('}') {
+        if let Some((prefix, key)) = part.strip_suffix('}').and_then(|s| s.rsplit_once('{')) {
+            if let Some((_, value)) = values.iter().find(|(name, _)| *name == key) {
+                text.push_str(prefix);
+                text.push_str(value);
+                continue;
+            }
+        }
+        text.push_str(part);
     }
     text
 }
 
+/// 下書きを開く先。URL の行き先はこの列挙型で固定する。
+#[derive(Debug, Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MailTarget {
+    #[default]
+    Default,
+    Gmail,
+    OutlookPersonal,
+    OutlookWork,
+}
+
+impl MailTarget {
+    pub fn compose_url(self, to: &str, subject: &str, body: &str) -> String {
+        let (base, subject_key) = match self {
+            Self::Default => return mailto(to, subject, body),
+            Self::Gmail => ("https://mail.google.com/mail/?view=cm&fs=1&", "su"),
+            Self::OutlookPersonal => (
+                "https://outlook.live.com/mail/0/deeplink/compose?",
+                "subject",
+            ),
+            Self::OutlookWork => (
+                "https://outlook.office.com/mail/deeplink/compose?",
+                "subject",
+            ),
+        };
+        format!(
+            "{base}to={}&{subject_key}={}&body={}",
+            encode_mail_query(to),
+            encode_mail_query(subject),
+            encode_mail_query(body),
+        )
+    }
+}
+
+fn encode_mail_query(text: &str) -> String {
+    let mut out = String::new();
+    for b in text.replace('\n', "\r\n").bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 /// メールソフトを開く `mailto:` の URL。件名・本文は URL の決まりで符号化する（RFC 6068）。
 pub fn mailto(to: &str, subject: &str, body: &str) -> String {
-    fn encode(text: &str) -> String {
-        let mut out = String::new();
-        for b in text.replace('\n', "\r\n").bytes() {
-            if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
-                out.push(b as char);
-            } else {
-                out.push_str(&format!("%{b:02X}"));
-            }
-        }
-        out
-    }
     // 宛先のアドレスはそのまま（@ は残す）。区切りに使われる文字は除く
     let to: String = to
         .chars()
@@ -256,8 +298,8 @@ pub fn mailto(to: &str, subject: &str, body: &str) -> String {
         .collect();
     format!(
         "mailto:{to}?subject={}&body={}",
-        encode(subject),
-        encode(body)
+        encode_mail_query(subject),
+        encode_mail_query(body)
     )
 }
 
@@ -448,12 +490,52 @@ mod tests {
         );
         assert_eq!(text, "INV-2026-0001 のご請求（11,000円）");
         assert_eq!(
+            fill_template(
+                "{宛名}{番号}",
+                &[("宛名", "{番号} 御中".into()), ("番号", "1".into())]
+            ),
+            "{番号} 御中1"
+        );
+        assert_eq!(
             mailto("a@example.com", "請求書", "よろしく\nお願いします"),
             "mailto:a@example.com?subject=%E8%AB%8B%E6%B1%82%E6%9B%B8&body=%E3%82%88%E3%82%8D%E3%81%97%E3%81%8F%0D%0A%E3%81%8A%E9%A1%98%E3%81%84%E3%81%97%E3%81%BE%E3%81%99"
         );
         // 宛先に紛れた区切りの文字は除く
         assert!(
             mailto("a@example.com?cc=x@y.z", "", "").starts_with("mailto:a@example.comcc=x@y.z?")
+        );
+    }
+
+    #[test]
+    fn web_mail_links_keep_recipient_and_message_in_their_own_parameters() {
+        let to = "test+bill@example.com";
+        let subject = "A&B";
+        let body = "Line 1\nLine 2#";
+        for (target, base, subject_key) in [
+            (
+                MailTarget::Gmail,
+                "https://mail.google.com/mail/?view=cm&fs=1&",
+                "su",
+            ),
+            (
+                MailTarget::OutlookPersonal,
+                "https://outlook.live.com/mail/0/deeplink/compose?",
+                "subject",
+            ),
+            (
+                MailTarget::OutlookWork,
+                "https://outlook.office.com/mail/deeplink/compose?",
+                "subject",
+            ),
+        ] {
+            assert_eq!(
+                target.compose_url(to, subject, body),
+                format!("{base}to=test%2Bbill%40example.com&{subject_key}=A%26B&body=Line%201%0D%0ALine%202%23")
+            );
+        }
+        assert_eq!(
+            MailTarget::default().compose_url(to, subject, body),
+            mailto(to, subject, body)
         );
     }
 
