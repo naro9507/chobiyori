@@ -10,7 +10,13 @@ use serde_json::Value;
 use std::time::Duration;
 
 /// 設定がないときのモデル。
-pub const DEFAULT_MODEL: &str = "gemini-2.5-flash";
+///
+/// 2026-11-20 に試験用レシート 12 種類で比べて決めた（`scripts/receipt-dogfood`）。
+/// - gemini-2.5-flash: 新しく作った API キーでは 404（「新しい利用者には提供しない」）
+/// - gemini-3.8-flash / gemini-3.5-flash: 読めたものは全問正解。ただし 1 枚 5〜110 秒かかり、
+///   無料枠は 1 日 20 回まで
+/// - gemini-3.5-flash-lite: 12 枚すべて全問正解（75 項目）、1 枚およそ 1 秒
+pub const DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
 const ENDPOINT: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 pub struct Gemini {
@@ -26,7 +32,9 @@ impl Gemini {
             let _ = rustls::crypto::ring::default_provider().install_default();
         }
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(90))
+            // 混んでいるときは 1 枚に 1 分以上かかる（2026-11 の実測で 35〜85 秒）。
+            // 90 秒では打ち切ってしまい、同じ画像が何度読み直しても読めなかった
+            .timeout(Duration::from_secs(180))
             .build()
             .map_err(|_| ReadError::Offline)?;
         Ok(Self { client, key, model })
@@ -80,10 +88,44 @@ pub fn response_text(body: &str) -> Result<String, ReadError> {
 pub fn error_of(status: u16, retry_after: Option<u64>) -> ReadError {
     match status {
         401 | 403 => ReadError::BadKey,
-        429 => ReadError::RateLimited { retry_after },
+        404 => ReadError::ModelNotFound,
+        // 503 は「混んでいる」（high demand）。接続できないのではないので、待って読み直す
+        429 | 503 => ReadError::RateLimited { retry_after },
         400 | 413 | 415 => ReadError::Rejected,
         500..=599 => ReadError::Offline,
         _ => ReadError::BadResponse,
+    }
+}
+
+/// 429 の返事の中身から、待てば読めるのか（1 分あたりの上限）、今日はもう読めないのか
+/// （1 日の上限・無料枠で使えないモデル）を決める。Gemini は待つ秒数を `Retry-After` ではなく
+/// 中身の `RetryInfo.retryDelay`（"39s" など）で返す。
+pub fn rate_limit_of(body: &str, retry_after: Option<u64>) -> ReadError {
+    let value: Value = serde_json::from_str(body).unwrap_or(Value::Null);
+    let details = value
+        .pointer("/error/details")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let exhausted = details
+        .iter()
+        .filter_map(|d| d.get("violations").and_then(Value::as_array))
+        .flatten()
+        .any(|v| {
+            let id = v.get("quotaId").and_then(Value::as_str).unwrap_or("");
+            let limit = v.get("quotaValue").and_then(Value::as_str).unwrap_or("");
+            id.contains("PerDay") || limit == "0"
+        });
+    if exhausted {
+        return ReadError::QuotaExhausted;
+    }
+    let delay = details
+        .iter()
+        .filter_map(|d| d.get("retryDelay").and_then(Value::as_str))
+        .find_map(|s| s.trim_end_matches('s').parse::<f64>().ok())
+        .map(|s| s.ceil() as u64);
+    ReadError::RateLimited {
+        retry_after: delay.or(retry_after),
     }
 }
 
@@ -113,6 +155,9 @@ impl ReceiptReader for Gemini {
             // 400 でもキーの間違いのことがある
             if status == 400 && body.contains("API_KEY_INVALID") {
                 return Err(ReadError::BadKey);
+            }
+            if status == 429 {
+                return Err(rate_limit_of(&body, retry_after));
             }
             return Err(error_of(status, retry_after));
         }
@@ -163,8 +208,42 @@ mod tests {
             }
         );
         assert_eq!(error_of(403, None), ReadError::BadKey);
-        assert_eq!(error_of(503, None), ReadError::Offline);
+        assert_eq!(
+            error_of(503, None),
+            ReadError::RateLimited { retry_after: None }
+        );
+        assert_eq!(error_of(500, None), ReadError::Offline);
         assert_eq!(error_of(413, None), ReadError::Rejected);
+        // モデルがない（提供の終了など）は 1 枚の失敗にしない
+        assert_eq!(error_of(404, None), ReadError::ModelNotFound);
+    }
+
+    #[test]
+    fn rate_limits_tell_waiting_from_giving_up() {
+        // 1 分あたりの上限: 待てば読める。待つ秒数は中身の retryDelay
+        let per_minute = r#"{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","details":[
+            {"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[
+                {"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaValue":"10"}]},
+            {"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"38.5s"}]}}"#;
+        assert_eq!(
+            rate_limit_of(per_minute, None),
+            ReadError::RateLimited {
+                retry_after: Some(39)
+            }
+        );
+        // 1 日の上限: 待っても今日は読めない
+        let per_day = per_minute.replace("PerMinute", "PerDay");
+        assert_eq!(rate_limit_of(&per_day, None), ReadError::QuotaExhausted);
+        // 無料枠で使えないモデル（上限 0）
+        let zero = per_minute.replace(r#""quotaValue":"10""#, r#""quotaValue":"0""#);
+        assert_eq!(rate_limit_of(&zero, None), ReadError::QuotaExhausted);
+        // 中身が読めなければ、ヘッダの秒数で待つ
+        assert_eq!(
+            rate_limit_of("<html>", Some(30)),
+            ReadError::RateLimited {
+                retry_after: Some(30)
+            }
+        );
     }
 
     #[test]

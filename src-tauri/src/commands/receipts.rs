@@ -159,6 +159,8 @@ pub async fn read_next(
         Err(ReadError::NoKey) => Err(AppError::new(ErrorCode::NoApiKey)),
         Err(ReadError::BadKey) => Err(AppError::new(ErrorCode::BadApiKey)),
         Err(ReadError::Offline) => Err(AppError::new(ErrorCode::Offline)),
+        Err(ReadError::ModelNotFound) => Err(AppError::new(ErrorCode::ModelNotFound)),
+        Err(ReadError::QuotaExhausted) => Err(AppError::new(ErrorCode::QuotaExhausted)),
         Err(ReadError::RateLimited { .. }) => Err(AppError::new(ErrorCode::RateLimited)),
     })?;
     Ok(ReadOutcome {
@@ -426,5 +428,28 @@ mod tests {
             .unwrap();
         assert_eq!(count, 0);
         assert_eq!(inbox::pending_count(&db.conn()).unwrap(), 2);
+    }
+
+    #[test]
+    fn a_missing_model_or_used_up_quota_stops_the_bundle_without_failing_receipts() {
+        let db = set_up_db();
+        let jpeg = crate::db::attachments::tests::jpeg;
+        db.transaction(|tx| receipts::add_files(tx, &[("a.jpg".into(), jpeg(1))]))
+            .unwrap();
+        consent(&db);
+        let fake = Fake(Mutex::new(vec![
+            Err(ReadError::ModelNotFound),
+            Err(ReadError::QuotaExhausted),
+        ]));
+        assert_eq!(
+            block_on(read_next(&db, Some(&fake))).unwrap_err(),
+            AppError::new(ErrorCode::ModelNotFound)
+        );
+        assert_eq!(
+            block_on(read_next(&db, Some(&fake))).unwrap_err(),
+            AppError::new(ErrorCode::QuotaExhausted)
+        );
+        // どちらも「読めなかった」にせず、読み取り待ちのまま残す
+        assert_eq!(receipts::waiting_count(&db.conn()).unwrap(), 1);
     }
 }

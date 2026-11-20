@@ -47,6 +47,22 @@ pub struct ReceiptReading {
     pub invoice_no: Option<String>,
     pub tax_parts: Vec<TaxPart>,
     pub payment: Option<PaymentMethod>,
+    /// 画像に写っている、ほかのレシートの枚数（読んでいない）
+    #[serde(default)]
+    pub other_receipts: i64,
+    /// ポイント・商品券などで払った額（合計からは引かれている）
+    #[serde(default)]
+    pub points: i64,
+}
+
+string_enum! {
+    /// ポイントで払った分の貸方。ポイントの出どころで決まる。
+    pub enum PointsAs {
+        /// 個人の買い物で貯めたポイント（事業主が出した）→ 事業主借
+        Owner => "owner",
+        /// 仕事の買い物で貯めたポイント（事業で得た）→ 雑収入（不課税）
+        Income => "income",
+    }
 }
 
 string_enum! {
@@ -66,6 +82,8 @@ string_enum! {
         InvalidInvoiceNo => "invalidInvoiceNo",
         /// 店名が読めない
         MissingMerchant => "missingMerchant",
+        /// 1 枚の画像にレシートが 2 枚以上写っている（1 枚分しか読んでいない）
+        MultipleReceipts => "multipleReceipts",
     }
 }
 
@@ -91,7 +109,9 @@ pub fn response_schema() -> Value {
                     "required": ["rate", "amount"]
                 }
             },
-            "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] }
+            "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] },
+            "points": { "type": "string", "description": "ポイント・商品券・ギフト券など、お金の代わりに使って合計から引かれた額（なければ空）" },
+            "otherReceipts": { "type": "integer", "description": "読んだ 1 枚のほかに、画像に写っているレシート・領収書の枚数（なければ 0）" }
         },
         "required": ["date", "total", "merchant", "payment"]
     })
@@ -101,7 +121,9 @@ pub fn response_schema() -> Value {
 pub const PROMPT: &str = "これは日本のレシートまたは領収書の画像です。印字されている内容だけを読み取り、指定の JSON で返してください。\
 読めない項目は空の文字列にしてください。推測で値を作らないでください。\
 taxParts には「10%対象」「8%対象（軽減税率）」などの税率ごとの対象額（税込）と消費税額を入れてください。\
-payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。";
+payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。\
+「ポイント利用」「商品券」など、お金の代わりに使って合計から引かれた額は points に入れてください（合計は引いた後の、実際に払った額）。\
+画像にレシートが 2 枚以上写っているときは、いちばん大きく写っている 1 枚だけを読み、ほかの枚数を otherReceipts に入れてください。";
 
 fn text_of(value: Option<&Value>) -> String {
     match value {
@@ -116,7 +138,33 @@ fn amount_of(value: Option<&Value>) -> Option<i64> {
     if text.is_empty() {
         return None;
     }
-    parse_amount(&text).map(i64::abs).filter(|a| *a > 0)
+    // 領収書の書き方（「金33,000円也」「¥33,000-」「¥33,000－」）。
+    // 後ろの「-」は、明細の CSV では負の数のことがあるので、レシートのときだけここで外す
+    let text = text.trim_start_matches('金');
+    let text = text.trim_end_matches(['也', '-', '－', '―', '‐', ' ', '　']);
+    parse_amount(text).map(i64::abs).filter(|a| *a > 0)
+}
+
+/// レシートの日付を読む。明細と同じ読み方に加えて、レシートに多い西暦の下 2 桁
+/// （「26/11/02」「26.11.02」）を 2000 年代として読む。
+fn receipt_date(text: &str) -> Option<String> {
+    if let Some(date) = parse_date(text) {
+        return Some(date);
+    }
+    let text: String = text.chars().map(super::statement::to_half_width).collect();
+    let first = text.split_whitespace().next()?;
+    let parts: Vec<&str> = first.split(['/', '.', '-']).collect();
+    match parts[..] {
+        [y, m, d]
+            if y.len() == 2
+                && [y, m, d]
+                    .iter()
+                    .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())) =>
+        {
+            parse_date(&format!("20{y}/{m}/{d}"))
+        }
+        _ => None,
+    }
 }
 
 /// 登録番号を「T + 13 桁」にそろえる。形が違えば None。
@@ -163,7 +211,7 @@ pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
         date: if date_text.is_empty() {
             None
         } else {
-            parse_date(&date_text)
+            receipt_date(&date_text)
         },
         total: amount_of(object.get("total")),
         merchant: text_of(object.get("merchant")).chars().take(100).collect(),
@@ -171,6 +219,12 @@ pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
         invoice_no,
         tax_parts,
         payment,
+        other_receipts: object
+            .get("otherReceipts")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+            .clamp(0, 99),
+        points: amount_of(object.get("points")).unwrap_or(0),
     };
     // 登録番号らしいものが書いてあるのに形が違う
     let bad_invoice = !invoice_text.is_empty() && reading.invoice_no.is_none();
@@ -198,7 +252,8 @@ pub fn checks(reading: &ReceiptReading, bad_invoice: bool, today: &str) -> Vec<C
         None => found.push(Check::MissingTotal),
         Some(total) if !reading.tax_parts.is_empty() => {
             let sum: i64 = reading.tax_parts.iter().map(|p| p.amount).sum();
-            if sum != total {
+            // ポイントで払った分は、税率ごとの対象額に入っていてもよい（お店が支払いとして扱うとき）
+            if sum != total && sum != total + reading.points {
                 found.push(Check::TotalMismatch);
             }
         }
@@ -218,6 +273,9 @@ pub fn checks(reading: &ReceiptReading, bad_invoice: bool, today: &str) -> Vec<C
     if bad_invoice {
         found.push(Check::InvalidInvoiceNo);
     }
+    if reading.other_receipts > 0 {
+        found.push(Check::MultipleReceipts);
+    }
     found
 }
 
@@ -225,7 +283,7 @@ pub fn checks(reading: &ReceiptReading, bad_invoice: bool, today: &str) -> Vec<C
 pub fn reduced_amount(reading: &ReceiptReading) -> i64 {
     let Some(total) = reading.total else { return 0 };
     let sum: i64 = reading.tax_parts.iter().map(|p| p.amount).sum();
-    if sum != total {
+    if sum != total + booked_points(reading) {
         return 0;
     }
     reading
@@ -234,6 +292,21 @@ pub fn reduced_amount(reading: &ReceiptReading) -> i64 {
         .filter(|p| p.rate == 8)
         .map(|p| p.amount)
         .sum()
+}
+
+/// 記帳するポイントの額。経費は「払った額 + この額」、貸方はポイントの分を別の行にする。
+///
+/// 税率ごとの対象額がポイントを引いた後の額と合うときは、お店がポイントを値引きとして
+/// 扱っている（自社ポイントなど）ので、払った額だけを経費にする（0 を返す）。
+pub fn booked_points(reading: &ReceiptReading) -> i64 {
+    let (Some(total), true) = (reading.total, reading.points > 0) else {
+        return 0;
+    };
+    let sum: i64 = reading.tax_parts.iter().map(|p| p.amount).sum();
+    if !reading.tax_parts.is_empty() && sum == total {
+        return 0;
+    }
+    reading.points
 }
 
 /// 経費の行を税率で分ける。`reduced` は 8% の対象額（0〜total）。
@@ -311,8 +384,86 @@ mod tests {
                 Check::InvalidInvoiceNo
             ]
         );
+        // 1 枚の画像に 2 枚写っていたら、読まなかった分があることを知らせる
+        let (r, _) = parse_reading(&GOOD.replace(
+            r#""payment": "card""#,
+            r#""payment": "card", "otherReceipts": 1"#,
+        ))
+        .unwrap();
+        assert_eq!(checks(&r, false, "2026-11-16"), [Check::MultipleReceipts]);
         assert!(parse_reading("こんにちは").is_none());
         assert!(parse_reading("[1, 2]").is_none());
+    }
+
+    #[test]
+    fn reads_receipt_style_dates_and_amounts() {
+        let read = |date: &str, total: &str| {
+            let text = serde_json::json!({
+                "date": date, "total": total, "merchant": "店", "payment": "cash"
+            });
+            let (r, _) = parse_reading(&text.to_string()).unwrap();
+            (r.date, r.total)
+        };
+        // 桁をそろえる空白・曜日・時刻
+        assert_eq!(
+            read("2026年11月 3日(火) 12:34", "¥1,512"),
+            (Some("2026-11-03".into()), Some(1512))
+        );
+        // 西暦の下 2 桁
+        assert_eq!(
+            read("26/11/02 07:41", "450"),
+            (Some("2026-11-02".into()), Some(450))
+        );
+        assert_eq!(
+            read("２６．１１．０２", "450").0.as_deref(),
+            Some("2026-11-02")
+        );
+        // 領収書の金額の書き方
+        assert_eq!(read("2026/9/1", "¥33,000-").1, Some(33000));
+        assert_eq!(read("2026/9/1", "金33,000円也").1, Some(33000));
+        assert_eq!(read("2026/9/1", "￥３３，０００－").1, Some(33000));
+        // 読めないものは読めないまま
+        assert_eq!(read("26/13/02", "").0, None);
+        assert_eq!(read("11/02", "-").1, None);
+    }
+
+    #[test]
+    fn points_paid_count_toward_the_breakdown() {
+        // ポイント 300 円で払った。税率ごとの対象額はポイントを引く前（1,100 + 216 = 1,316）
+        let text = r#"{"date": "2026-11-10", "total": "1,016", "merchant": "ドラッグストア",
+            "payment": "eMoney", "points": "300",
+            "taxParts": [
+                {"rate": 10, "amount": "1,100", "tax": "100"},
+                {"rate": 8, "amount": "216", "tax": "16"}
+            ]}"#;
+        let (r, bad) = parse_reading(text).unwrap();
+        assert_eq!(r.points, 300);
+        assert!(checks(&r, bad, "2026-11-19").is_empty());
+        assert_eq!(booked_points(&r), 300);
+        // 軽減税率の分は、ポイントを引く前の額で分ける
+        assert_eq!(reduced_amount(&r), 216);
+
+        // 自社ポイントの値引き: 対象額がポイントを引いた後の額と合う → 払った額だけを経費にする
+        let (r, _) =
+            parse_reading(&text.replace(r#""1,100", "tax": "100""#, r#""800", "tax": "72""#))
+                .unwrap();
+        assert!(checks(&r, false, "2026-11-19").is_empty());
+        assert_eq!(booked_points(&r), 0);
+        assert_eq!(reduced_amount(&r), 216);
+
+        // 内訳がなければ、ポイントの分を足して記帳する
+        let (r, _) = parse_reading(
+            r#"{"date": "2026-11-10", "total": "700", "merchant": "店", "payment": "cash", "points": "300"}"#,
+        )
+        .unwrap();
+        assert_eq!(booked_points(&r), 300);
+
+        // どちらとも合わなければ、これまでどおり見てもらう
+        let (r, _) =
+            parse_reading(&text.replace(r#""1,100", "tax": "100""#, r#""1,000", "tax": "90""#))
+                .unwrap();
+        assert_eq!(checks(&r, false, "2026-11-19"), [Check::TotalMismatch]);
+        assert_eq!(reduced_amount(&r), 0);
     }
 
     #[test]

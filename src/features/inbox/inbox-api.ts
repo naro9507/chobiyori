@@ -382,6 +382,8 @@ export type Attachment = {
 }
 
 export type PaymentMethod = "cash" | "card" | "eMoney" | "unknown"
+/** ポイントで払った分の貸方。owner = 事業主借、income = 雑収入 */
+export type PointsAs = "owner" | "income"
 export type ReceiptCheck =
 	| "missingDate"
 	| "unlikelyDate"
@@ -390,6 +392,7 @@ export type ReceiptCheck =
 	| "taxMismatch"
 	| "invalidInvoiceNo"
 	| "missingMerchant"
+	| "multipleReceipts"
 
 export type ReceiptReading = {
 	date: string | null
@@ -399,6 +402,9 @@ export type ReceiptReading = {
 	invoiceNo: string | null
 	taxParts: { rate: number; amount: number; tax: number | null }[]
 	payment: PaymentMethod | null
+	/** 画像に写っている、読んでいないほかのレシートの枚数 */
+	otherReceipts: number
+	points: number
 }
 
 export type ReceiptStatus = "waiting" | "read" | "failed" | "manual"
@@ -412,6 +418,9 @@ export type Receipt = {
 	checks: ReceiptCheck[]
 	error: string | null
 	reducedAmount: number
+	/** ポイント・商品券などで払った額。経費は候補の金額 + これ */
+	points: number
+	pointsAs: PointsAs
 	invoiceNo: string | null
 	inboxItemId: number | null
 	inboxStatus: InboxStatus | null
@@ -425,6 +434,8 @@ export type ReceiptFields = {
 	paymentAccountId: number
 	reducedAmount: number
 	invoiceNo: string | null
+	points: number
+	pointsAs: PointsAs
 }
 
 export type ReceiptSettings = {

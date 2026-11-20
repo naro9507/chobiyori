@@ -1,0 +1,126 @@
+{
+	"01_conveni_mixed_emoney.png": {
+		"date": "2026-11-03",
+		"total": 1512,
+		"merchant": "ファミリーストア",
+		"invoiceNo": "T1234567890123",
+		"payment": "eMoney",
+		"taxParts": {
+			"8": 1080,
+			"10": 432
+		},
+		"checks": []
+	},
+	"02_restaurant_card_reiwa_fullwidth_invoice.jpg": {
+		"date": "2026-10-15",
+		"total": 5500,
+		"merchant": "さくら",
+		"invoiceNo": "T9876543210987",
+		"payment": "card",
+		"taxParts": {
+			"10": 5500
+		},
+		"checks": []
+	},
+	"03_handwritten_ryoshusho_cash.png": {
+		"date": "2026-09-01",
+		"total": 33000,
+		"merchant": "青空堂",
+		"invoiceNo": "T5555555555555",
+		"payment": "cash",
+		"taxParts": {
+			"10": 33000
+		},
+		"checks": []
+	},
+	"04_sotozei_exclusive_tax.png": {
+		"date": "2026-08-20",
+		"total": 2200,
+		"merchant": "ヤマダ",
+		"invoiceNo": "T1111111111111",
+		"payment": "cash",
+		"taxParts": {
+			"10": 2200
+		},
+		"checks": []
+	},
+	"05_cash_change_not_total.jpg": {
+		"date": "2026-07-07",
+		"total": 864,
+		"merchant": "こむぎ",
+		"invoiceNo": null,
+		"payment": "cash",
+		"taxParts": {
+			"8": 864
+		},
+		"checks": []
+	},
+	"06_old_date.png": {
+		"date": "2018-03-09",
+		"total": 2420,
+		"merchant": "東都交通",
+		"invoiceNo": null,
+		"payment": "cash",
+		"taxParts": null,
+		"checks": ["unlikelyDate"]
+	},
+	"07_not_a_receipt.png": {
+		"date": null,
+		"total": null,
+		"merchant": "",
+		"invoiceNo": null,
+		"payment": "unknown",
+		"taxParts": null,
+		"checks": ["missingDate", "missingMerchant", "missingTotal"]
+	},
+	"08_points_discount.png": {
+		"date": "2026-11-10",
+		"total": 1016,
+		"merchant": "ミドリ",
+		"invoiceNo": "T2222222222222",
+		"payment": "eMoney",
+		"taxParts": {
+			"8": 216,
+			"10": 1100
+		},
+		"checks": [],
+		"points": 300
+	},
+	"09_rotated_blurry_photo.jpg": {
+		"date": "2026-10-28",
+		"total": 876,
+		"merchant": "マルエツ屋",
+		"invoiceNo": "T3333333333333",
+		"payment": "cash",
+		"taxParts": {
+			"8": 546,
+			"10": 330
+		},
+		"checks": []
+	},
+	"10_pdf_ryoshusho.pdf": {
+		"date": "2026-11-01",
+		"total": 1100,
+		"merchant": "クラウドソフト",
+		"invoiceNo": "T4444444444444",
+		"payment": "card",
+		"taxParts": {
+			"10": 1100
+		},
+		"checks": []
+	},
+	"11_short_year_date.png": {
+		"date": "2026-11-02",
+		"total": 450,
+		"merchant": "COFFEE STAND BLUE",
+		"invoiceNo": null,
+		"payment": "eMoney",
+		"taxParts": {
+			"10": 450
+		},
+		"checks": []
+	},
+	"12_two_receipts_one_image.png": {
+		"checks": ["multipleReceipts"]
+	}
+}

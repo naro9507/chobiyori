@@ -10,7 +10,7 @@ use super::{deposits, rules, Database};
 use crate::domain::allocation;
 use crate::domain::journal::{self, EntryMode, LineInput, Side, TransactionInput, TransactionKind};
 use crate::domain::master::{self, TaxCategory, MEMO_MAX};
-use crate::domain::receipt;
+use crate::domain::receipt::{self, PointsAs};
 use crate::domain::rules::{normalize, Rule, RuleResult};
 use crate::domain::statement::{self, StatementRow};
 use crate::domain::string_enum;
@@ -336,6 +336,18 @@ impl ConfirmInput {
     }
 }
 
+/// 雑収入の科目（ポイントを事業で貯めたときの貸方）。
+fn misc_income_account(conn: &Connection) -> AppResult<i64> {
+    use rusqlite::OptionalExtension;
+    conn.query_row(
+        "SELECT id FROM accounts WHERE statement_line = 'pl.misc_income' ORDER BY is_system DESC, id LIMIT 1",
+        [],
+        |r| r.get(0),
+    )
+    .optional()?
+    .ok_or(AppError::field(ErrorCode::NotFound, "pointsAs"))
+}
+
 /// 候補から仕訳を作る。利用は「科目 / 口座」、返金・入金は「口座 / 科目」。
 fn to_transaction(
     conn: &Connection,
@@ -347,14 +359,38 @@ fn to_transaction(
         return Err(AppError::field(ErrorCode::InvalidFormat, "date"));
     };
     let amount = item.spend.abs();
-    // レシートの税率ごとの内訳と登録番号
-    let (reduced, receipt_invoice) = match item.receipt_id {
+    // レシートの税率ごとの内訳・登録番号と、ポイントで払った分
+    let (reduced, receipt_invoice, points, points_as) = match item.receipt_id {
         Some(id) => conn.query_row(
-            "SELECT reduced_amount, invoice_no IS NOT NULL FROM receipts WHERE id = ?1",
+            "SELECT reduced_amount, invoice_no IS NOT NULL, points, points_as FROM receipts WHERE id = ?1",
             [id],
-            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, bool>(1)?)),
+            |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, bool>(1)?,
+                    r.get::<_, i64>(2)?,
+                    r.get::<_, PointsAs>(3)?,
+                ))
+            },
         )?,
-        None => (0, false),
+        None => (0, false, 0, PointsAs::Owner),
+    };
+    // ポイントで払った分は、経費に含めて別の貸方にする（払った額は口座、ポイントは事業主借か雑収入）。
+    // 口座の行は払った額のままにし、カードの明細と金額で突き合わせられるようにする
+    let points = if item.spend > 0 { points } else { 0 };
+    let expense = amount + points;
+    let points_line = match (points > 0, points_as) {
+        (false, _) => None,
+        (true, PointsAs::Owner) => Some(LineInput::new(
+            Side::Credit,
+            transactions::owner_accounts(conn)?.contributions,
+            points,
+        )),
+        (true, PointsAs::Income) => Some(LineInput {
+            // ポイントの受け取りは売上ではないので、消費税は不課税
+            tax_category: Some(TaxCategory::OutOfScope),
+            ..LineInput::new(Side::Credit, misc_income_account(conn)?, points)
+        }),
     };
     let mut counter = LineInput {
         partner_id: input.partner_id,
@@ -362,7 +398,7 @@ fn to_transaction(
         tax_category: input.tax_category,
         is_qualified_invoice: receipt_invoice
             || transactions::has_invoice_no(conn, input.partner_id)?,
-        ..LineInput::new(Side::Debit, input.account_id, amount)
+        ..LineInput::new(Side::Debit, input.account_id, expense)
     };
     let mut payment = LineInput {
         sub_account_id: item.payment_sub_account_id,
@@ -376,7 +412,7 @@ fn to_transaction(
             None | Some(TaxCategory::TaxablePurchase8 | TaxCategory::TaxablePurchase10)
         );
     let mut lines = if split_rates {
-        let mut lines: Vec<LineInput> = receipt::split_by_rate(amount, reduced)
+        let mut lines: Vec<LineInput> = receipt::split_by_rate(expense, reduced)
             .into_iter()
             .map(|(category, part)| LineInput {
                 tax_category: Some(category),
@@ -385,9 +421,12 @@ fn to_transaction(
             })
             .collect();
         lines.push(payment);
+        lines.extend(points_line);
         lines
     } else if item.spend > 0 {
-        vec![counter, payment]
+        let mut lines = vec![counter, payment];
+        lines.extend(points_line);
+        lines
     } else {
         counter.side = Side::Credit;
         payment.side = Side::Debit;
@@ -400,8 +439,8 @@ fn to_transaction(
             }
             let drawings = transactions::owner_accounts(conn)?.drawings;
             let rounding = transactions::account_rounding(conn, input.account_id)?;
-            // 経費の行（口座の行より前）を後ろから分ける
-            let expense_lines = lines.len() - 1;
+            // 経費の行（口座・ポイントの行より前）を後ろから分ける
+            let expense_lines = lines.iter().filter(|l| l.side == Side::Debit).count();
             for index in (0..expense_lines).rev() {
                 lines = allocation::split_line(&lines, index, drawings, percent, rounding);
             }
@@ -1063,6 +1102,122 @@ pub(crate) mod tests {
         let items = list(&db.conn(), None).unwrap();
         assert_eq!(items[0].possible_duplicate_id, Some(manual.id));
         assert_eq!(items[1].possible_duplicate_id, None);
+    }
+
+    #[test]
+    fn points_paid_on_a_receipt_are_booked_as_expense_with_their_own_credit() {
+        use crate::db::receipts::{self, tests::add_one};
+        // ポイント 300 円で払ったレシート。税率ごとの対象額はポイントを引く前（1,100 + 216）
+        const WITH_POINTS: &str = r#"{"date": "2026-11-10", "total": "1,016",
+            "merchant": "ドラッグストア", "payment": "card", "points": "300",
+            "taxParts": [
+                {"rate": 10, "amount": "1,100", "tax": "100"},
+                {"rate": 8, "amount": "216", "tax": "16"}
+            ]}"#;
+        let db = set_up_db();
+        let (supplies, card, contributions, misc_income) = {
+            let conn = db.conn();
+            conn.execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
+                .unwrap();
+            let owner = transactions::owner_accounts(&conn).unwrap();
+            (
+                account(&conn, "610"),
+                account(&conn, "204"),
+                owner.contributions,
+                account(&conn, "403"),
+            )
+        };
+        let read = |n: u8| {
+            let conn = db.conn();
+            let id = add_one(&conn, n);
+            let r = receipts::record_reading(&conn, id, WITH_POINTS, "2026-11-19").unwrap();
+            assert!(r.checks.is_empty());
+            assert_eq!((r.points, r.reduced_amount), (300, 216));
+            r
+        };
+        let lines = |t: &Transaction| {
+            t.lines
+                .iter()
+                .map(|l| (l.side, l.account_id, l.amount, l.tax_category))
+                .collect::<Vec<_>>()
+        };
+
+        // 既定: ポイントの分は事業主借。口座の行は払った額のまま（カードの明細と突き合わせられる）
+        let r = read(1);
+        let item = get(&db.conn(), r.inbox_item_id.unwrap()).unwrap();
+        assert_eq!(item.spend, 1016);
+        let saved = confirm(&db, item.id, &input(supplies)).unwrap();
+        assert_eq!(
+            lines(&saved),
+            [
+                (
+                    Side::Debit,
+                    supplies,
+                    1100,
+                    Some(TaxCategory::TaxablePurchase10)
+                ),
+                (
+                    Side::Debit,
+                    supplies,
+                    216,
+                    Some(TaxCategory::TaxablePurchase8)
+                ),
+                (Side::Credit, card, 1016, Some(TaxCategory::OutOfScope)),
+                (
+                    Side::Credit,
+                    contributions,
+                    300,
+                    Some(TaxCategory::OutOfScope)
+                ),
+            ]
+        );
+
+        // 事業で貯めたポイントなら雑収入（不課税）
+        let r = read(2);
+        let fields = receipts::ReceiptFields {
+            date: "2026-11-10".into(),
+            total: 1016,
+            merchant: "ドラッグストア".into(),
+            payment_account_id: card,
+            reduced_amount: 216,
+            invoice_no: None,
+            points: 300,
+            points_as: PointsAs::Income,
+        };
+        receipts::save_fields(&db.conn(), r.id, &fields).unwrap();
+        let saved = confirm(&db, r.inbox_item_id.unwrap(), &input(supplies)).unwrap();
+        assert_eq!(
+            lines(&saved)[3],
+            (
+                Side::Credit,
+                misc_income,
+                300,
+                Some(TaxCategory::OutOfScope)
+            )
+        );
+
+        // 家事按分しても貸借が合う（経費の行だけを分ける）
+        let r = read(3);
+        let saved = confirm(
+            &db,
+            r.inbox_item_id.unwrap(),
+            &ConfirmInput {
+                allocation_percent: Some(50),
+                ..input(supplies)
+            },
+        )
+        .unwrap();
+        let debit: i64 = saved
+            .lines
+            .iter()
+            .filter(|l| l.side == Side::Debit)
+            .map(|l| l.amount)
+            .sum();
+        assert_eq!(debit, 1316);
+        assert!(saved
+            .lines
+            .iter()
+            .any(|l| l.side == Side::Credit && l.account_id == contributions && l.amount == 300));
     }
 
     #[test]

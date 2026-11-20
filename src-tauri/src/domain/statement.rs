@@ -142,8 +142,10 @@ pub fn to_half_width(c: char) -> char {
 ///
 /// 「2026/10/05」「2026-10-5」「20261005」「2026年10月5日」「令和8年10月5日」「R8.10.5」
 /// 「平成26年1月5日」「H26/1/5」を読む。後ろに時刻があってもよい。
+/// レシートに多い「2026年11月 3日(火)」「令和 8年」のような、桁をそろえる空白も読む。
 pub fn parse_date(text: &str) -> Option<String> {
     let text: String = text.trim().chars().map(to_half_width).collect();
+    let text = join_date_parts(&text);
     let text = text.split_whitespace().next().unwrap_or("");
     let (base, rest) = era(text);
     let numbers: Vec<&str> = rest
@@ -171,6 +173,23 @@ pub fn parse_date(text: &str) -> Option<String> {
         return None;
     }
     Some(format!("{year:04}-{month:02}-{day:02}"))
+}
+
+/// 「年」「月」の後ろと、元号の後ろの空白を詰める（「2026年11月 3日」→「2026年11月3日」）。
+/// 時刻の前の空白は残す（「2026/10/05 12:34」の時刻を日付に混ぜない）。
+fn join_date_parts(text: &str) -> String {
+    let mut joined = String::with_capacity(text.len());
+    for c in text.chars() {
+        let after_part = joined.ends_with(['年', '月'])
+            || joined.ends_with("令和")
+            || joined.ends_with("平成")
+            || joined.ends_with("昭和");
+        if c.is_whitespace() && after_part {
+            continue;
+        }
+        joined.push(c);
+    }
+    joined
 }
 
 /// 和暦の元号を読む。元号があれば「その元年の西暦」と残りの文字列を返す。
@@ -685,6 +704,10 @@ mod tests {
             ("H26/1/5", "2014-01-05"),
             ("令和元年5月1日", "2019-05-01"),
             ("2026/10/05 12:34", "2026-10-05"),
+            // レシートの、桁をそろえる空白
+            ("2026年11月 3日(火) 12:34", "2026-11-03"),
+            ("2026年 7月 7日", "2026-07-07"),
+            ("令和 8年10月15日", "2026-10-15"),
         ] {
             assert_eq!(parse_date(text).as_deref(), Some(expected), "{text}");
         }
