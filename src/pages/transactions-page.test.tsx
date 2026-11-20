@@ -6,6 +6,7 @@ import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
 import type { Transaction } from "@/features/journal/journal-api"
 import type { Account } from "@/features/master/master-api"
+import { useOnboarding } from "@/stores/onboarding-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useSimpleEntryDrafts } from "@/stores/simple-entry-draft-store"
 
@@ -367,6 +368,18 @@ describe("かんたん入力", () => {
 		expect(
 			await screen.findByRole("tab", { name: "期首残高" })
 		).toHaveAttribute("aria-selected", "true")
+	})
+
+	it("開業後にやることを閉じると、ホームに出さない", async () => {
+		const user = userEvent.setup()
+		renderPage("/")
+		await user.click(
+			await screen.findByRole("button", { name: "この案内を閉じる" })
+		)
+		expect(
+			screen.queryByRole("heading", { name: "開業後にやること" })
+		).not.toBeInTheDocument()
+		useOnboarding.setState({ firstStepsDismissed: false })
 	})
 
 	it("立替経費と未入金の売上を事業用口座の選択なしで記録できる", async () => {

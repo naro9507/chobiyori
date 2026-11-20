@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router"
+import { X } from "lucide-react"
 import { Page } from "@/components/layout/page"
+import { Button } from "@/components/ui/button"
 import {
 	Card,
 	CardContent,
@@ -17,6 +19,7 @@ import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
+import { useOnboarding } from "@/stores/onboarding-store"
 import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function HomePage() {
@@ -27,16 +30,30 @@ export function HomePage() {
 	const years = useFiscalYears().data
 	const firstYear = years?.length === 1 && years[0].year === fiscalYear
 	const opening = useOpeningBalances(firstYear ? fiscalYear : null)
-	const firstSteps = firstYear && opening.data?.confirmed === false
+	const { firstStepsDismissed, dismissFirstSteps } = useOnboarding()
+	// 開業時の残高を確定したら、最初の案内は役目を終えるので出さない。
+	const firstSteps =
+		firstYear && opening.data?.confirmed === false && !firstStepsDismissed
 
 	return (
 		<Page screen="home">
-			<Card>
-				<CardHeader>
-					<CardTitle>{t(firstSteps ? "firstSteps" : "welcome")}</CardTitle>
-					{!firstSteps && <CardDescription>{t("welcomeBody")}</CardDescription>}
-				</CardHeader>
-				{firstSteps && (
+			{firstSteps && (
+				<Card>
+					<CardHeader className="relative pr-14">
+						<CardTitle>{t("firstSteps")}</CardTitle>
+						<CardDescription>{t("firstStepsBody")}</CardDescription>
+						<div className="absolute top-0 right-3">
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label={t("firstStepsDismiss")}
+								title={t("firstStepsDismiss")}
+								onClick={dismissFirstSteps}
+							>
+								<X aria-hidden="true" />
+							</Button>
+						</div>
+					</CardHeader>
 					<CardContent>
 						<ol className="list-decimal space-y-2 pl-5 text-sm [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4">
 							<li>
@@ -57,8 +74,8 @@ export function HomePage() {
 							</li>
 						</ol>
 					</CardContent>
-				)}
-			</Card>
+				</Card>
+			)}
 			<DeadlineNotices />
 			{features.recurring && (
 				<PendingRecurring fiscalYear={fiscalYear} month={month} />

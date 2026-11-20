@@ -41,8 +41,6 @@
 		"body": "When it is finished, you will be able to work here."
 	},
 	"home": {
-		"welcome": "Welcome",
-		"welcomeBody": "Setup is complete and the standard accounts are ready. Record sales and payments on the Transactions screen.",
 		"balancesTitle": "Account balances",
 		"balancesAsOf": "Balances at the end of {month:month}",
 		"recurringTitle": "Monthly entries waiting",
@@ -52,6 +50,8 @@
 		"inboxBody": "Candidates waiting in the inbox: {count}.",
 		"inboxLink": "Open the inbox",
 		"firstSteps": "Get started with your books",
+		"firstStepsBody": "This card goes away once you confirm your opening balances.",
+		"firstStepsDismiss": "Close this guide",
 		"firstAccounts": "Check the accounts you use",
 		"firstOpening": "Enter your opening balances, or confirm zero balances",
 		"firstTransaction": "Record your first sale or expense"
@@ -1772,7 +1772,9 @@
 		"compare": "Reconcile the two trial balances",
 		"compareBody": "Choose the same year and months as in the old app and compare each account on the trial balances. For differences, check opening balances, account codes, dates and duplicates. Once reconciled, record transactions after cutover in this app.",
 		"backup": "Save a backup",
-		"backupBody": "Check the destination under Backup and restore and choose Back up now. Confirm the new backup appears in the list. To restore it, use the book password from the time it was created."
+		"backupBody": "Check the destination under Backup and restore and choose Back up now. Confirm the new backup appears in the list. To restore it, use the book password from the time it was created.",
+		"hideFromHome": "Hide from Home",
+		"hideFromHomeNote": "You can start a walkthrough from Help at any time."
 	},
 	"help": {
 		"search": "Search help",

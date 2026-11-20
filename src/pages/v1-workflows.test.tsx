@@ -452,7 +452,7 @@ it("乗り換え案内を中断して再開し、期首残高から取込に進�
 	await user.click(screen.getByRole("button", { name: "中断する" }))
 })
 
-it("基本操作の案内を最後まで進め、ホームからやり直せる", async () => {
+it("基本操作の案内を最後まで進めるとホームから消え、ヘルプからやり直せる", async () => {
 	const user = userEvent.setup()
 	const router = renderApp("/")
 	await user.click(
@@ -478,6 +478,11 @@ it("基本操作の案内を最後まで進め、ホームからやり直せる"
 	await user.click(
 		screen.getByRole("button", { name: "チュートリアルを完了する" })
 	)
+	await waitFor(() => expect(router.state.location.pathname).toBe("/"))
+	expect(
+		screen.queryByRole("button", { name: /基本操作を覚える/ })
+	).not.toBeInTheDocument()
+	await user.click(screen.getByRole("link", { name: "ヘルプ" }))
 	await user.click(
 		await screen.findByRole("button", { name: /基本操作を覚える.*もう一度/ })
 	)
