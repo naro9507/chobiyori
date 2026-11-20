@@ -1699,6 +1699,8 @@
 		"chooseTarget": "Choose another"
 	},
 	"tutorial": {
+		"collapse": "Collapse tutorial",
+		"expand": "Expand tutorial",
 		"details": "Detailed instructions and notes",
 		"profileAction1": "Open settings",
 		"profileAction2": "Check business details",

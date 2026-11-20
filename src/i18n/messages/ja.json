@@ -1699,6 +1699,8 @@
 		"chooseTarget": "ほかから選ぶ"
 	},
 	"tutorial": {
+		"collapse": "チュートリアルを折りたたむ",
+		"expand": "チュートリアルを開く",
 		"details": "詳しい手順・補足",
 		"profileAction1": "設定を開く",
 		"profileAction2": "事業者情報を確認",
