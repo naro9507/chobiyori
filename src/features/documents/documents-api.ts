@@ -210,6 +210,16 @@ export function useNewDocumentDefaults(kind: DocumentKind | null) {
 	})
 }
 
+/** 発行日の様式。登録番号なし（免税など）の様式は消費税を足さない。 */
+export function useDocumentTaxMode(issueDate: string) {
+	return useQuery({
+		queryKey: [...key, "tax-mode", issueDate],
+		queryFn: () => callCommand<TaxMode>("document_tax_mode", { issueDate }),
+		enabled: /^\d{4}-\d{2}-\d{2}$/.test(issueDate),
+		retry: false,
+	})
+}
+
 /** 紙面のプレビュー。書いている途中なら `input`、発行した書類なら `id`。 */
 export function usePreview(id: number | null, input: DocumentInput | null) {
 	return useQuery({

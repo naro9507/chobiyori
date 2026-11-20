@@ -8,6 +8,7 @@ use crate::db::audit::{self, AuditEntry};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
 use crate::db::recovery;
+use crate::db::unlock_guard::{self, Attempts};
 use crate::db::vault::{self, BookState};
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
@@ -34,6 +35,9 @@ pub struct BookStatus {
     pub state: BookState,
     /// パスワードで開けたあとか
     pub unlocked: bool,
+    /// パスワード・復旧コードの入力の制限
+    #[serde(flatten)]
+    pub attempts: Attempts,
 }
 
 #[tauri::command]
@@ -41,16 +45,17 @@ pub async fn book_status(app: AppHandle, files: State<'_, BookFiles>) -> AppResu
     Ok(BookStatus {
         state: vault::state(&files.path)?,
         unlocked: app.try_state::<Database>().is_some(),
+        attempts: unlock_guard::status(&unlock_guard::path_for(&files.path)),
     })
 }
 
 /// 開けた帳簿をアプリに登録する。2 回目以降は何もしない（もう開いている）。
-fn open_books(app: &AppHandle, db: Database) {
+pub(super) fn open_books(app: &AppHandle, db: Database) {
     db.mark_backed_up();
     app.manage(db);
 }
 
-fn ensure_not_open(app: &AppHandle) -> AppResult<()> {
+pub(super) fn ensure_not_open(app: &AppHandle) -> AppResult<()> {
     if app.try_state::<Database>().is_some() {
         return Err(AppError::new(ErrorCode::AlreadySetUp));
     }
@@ -80,7 +85,12 @@ pub async fn unlock_books(
 ) -> AppResult<()> {
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
-    let db = vault::unlock(&files.path, &password)?;
+    let db = unlock_guard::guard(
+        &unlock_guard::path_for(&files.path),
+        "password",
+        ErrorCode::WrongPassword,
+        || vault::unlock(&files.path, &password),
+    )?;
     open_books(&app, db);
     Ok(())
 }
@@ -106,12 +116,17 @@ pub async fn encrypt_books(
 #[tauri::command]
 pub async fn change_password(
     db: State<'_, Database>,
+    login: State<'_, super::account_login::LoginState>,
     files: State<'_, BookFiles>,
     current: String,
     new: String,
 ) -> AppResult<()> {
+    let _guard = login.0.lock().await;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     vault::change_password(&db, &current, &new)?;
+    if current != new {
+        super::account_login::discard_device_record();
+    }
     audit::event(&db.conn(), "books", "change_password", None, None)
 }
 
@@ -127,14 +142,22 @@ pub async fn issue_recovery_code(
 
 #[tauri::command]
 pub async fn reset_books_password(
+    login: State<'_, super::account_login::LoginState>,
     app: AppHandle,
     files: State<'_, BookFiles>,
     recovery_code: String,
     new: String,
 ) -> AppResult<()> {
+    let _guard = login.0.lock().await;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
-    let db = recovery::reset(&files.path, &recovery_code, &new)?;
+    let db = unlock_guard::guard(
+        &unlock_guard::path_for(&files.path),
+        "recoveryCode",
+        ErrorCode::InvalidRecoveryCode,
+        || recovery::reset(&files.path, &recovery_code, &new),
+    )?;
+    super::account_login::discard_device_record();
     // 履歴の書き込みに失敗しても、再設定したパスワードで帳簿を開けるようにする。
     if let Err(error) = audit::event(&db.conn(), "books", "change_password", None, None) {
         eprintln!("パスワード再設定の履歴を保存できませんでした: {error}");
@@ -168,8 +191,19 @@ pub async fn backup_settings(
         is_default: dir == files.default_backup_dir,
         dir: dir.to_string_lossy().into_owned(),
         files: backup::list(&dir)?,
-        book_size: std::fs::metadata(&files.path).map(|m| m.len()).unwrap_or(0),
+        book_size: book_size(&files.path),
     })
+}
+
+/// 帳簿の大きさ。WAL のファイルにまだ書き戻していない分も含める。
+fn book_size(path: &std::path::Path) -> u64 {
+    let mut wal = path.as_os_str().to_owned();
+    wal.push("-wal");
+    [path.to_path_buf(), PathBuf::from(wal)]
+        .iter()
+        .filter_map(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .sum()
 }
 
 /// いますぐバックアップを作る。作ったファイルの名前を返す。
@@ -257,15 +291,18 @@ pub async fn inspect_backup(
 /// 選んだバックアップから復元する。入れ替える前に、いまの帳簿のバックアップを作る。
 #[tauri::command]
 pub async fn restore_backup(
+    login: State<'_, super::account_login::LoginState>,
     db: State<'_, Database>,
     files: State<'_, BookFiles>,
     state: State<'_, RestoreState>,
     password: Option<String>,
 ) -> AppResult<()> {
+    let _guard = login.0.lock().await;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     let path = chosen(&state)?;
     let dir = backup_dir(&db, &files)?;
     backup::restore(&db, &path, password.as_deref(), &dir)?;
+    super::account_login::discard_device_record();
     *state.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     Ok(())
 }

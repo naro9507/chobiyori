@@ -27,10 +27,21 @@ const num = "num px-3 py-1.5 text-right"
  */
 export function StatementPanel({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("closing")
+	const listSeparator = useTranslations("app")("listSeparator")
+	const label = useLabel()
 	const query = useStatementAmounts(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
 	const data = query.data
 	const { statement } = data
+	/** 行のキー（カンマ区切り）を、表示する言語の行の名前にする */
+	const lineLabels = (keys: string | undefined) =>
+		(keys ?? "")
+			.split(",")
+			.map((key) => {
+				const line = statement.bs.find((l) => l.key === key)
+				return line ? label(line) : key
+			})
+			.join(listSeparator)
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -59,7 +70,12 @@ export function StatementPanel({ fiscalYear }: { fiscalYear: number | null }) {
 								aria-hidden="true"
 								className="mt-0.5 size-4 shrink-0 text-warning"
 							/>
-							{t(`issue_${issue.code}`, { value: issue.value ?? "" })}
+							{t(`issue_${issue.code}`, {
+								value:
+									issue.code === "negativeBalance"
+										? lineLabels(issue.value)
+										: (issue.value ?? ""),
+							})}
 						</li>
 					))}
 				</ul>

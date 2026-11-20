@@ -87,6 +87,8 @@ pub enum ErrorCode {
     WrongPassword,
     /// 復旧コードが現在の帳簿に使えない
     InvalidRecoveryCode,
+    /// パスワード・復旧コードを続けて間違えたため、しばらく入力を受け付けない
+    TooManyAttempts,
     /// 再設定するパスワードがいまのものと同じ
     SamePassword,
     /// パスワードが短すぎる
@@ -109,6 +111,20 @@ pub enum ErrorCode {
     MailAuth,
     /// メールを送れなかった（つながらない・相手のアドレスが受け付けられない）
     MailFailed,
+    /// カレンダーの承認が取り消されたか、期限が切れた
+    CalendarAuth,
+    /// ブラウザでの連携を取り消したか、制限時間を過ぎた
+    CalendarCancelled,
+    /// カレンダーサービスへの接続や同期が失敗した
+    CalendarFailed,
+    /// Google・Microsoft へのログインが完了しなかった
+    LoginFailed,
+    /// 設定したときと別のアカウントでログインした
+    LoginMismatch,
+    /// 端末の設定が古い（パスワードの変更や復元のあと）。設定し直す
+    LoginExpired,
+    /// Windows Hello・Touch ID などの本人確認が完了しなかった
+    DeviceAuthFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

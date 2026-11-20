@@ -11,7 +11,9 @@ function keysOf(value: unknown, prefix = ""): string[] {
 }
 
 function placeholdersOf(text: string) {
-	return [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort()
+	return [...text.matchAll(/\{(\w+)(?::\w+)?\}/g)]
+		.map((match) => match[1])
+		.sort()
 }
 
 describe("文言ファイル", () => {
@@ -34,6 +36,12 @@ describe("文言ファイル", () => {
 describe("format", () => {
 	it("{name} を値で置き換える", () => {
 		expect(format("{year}年度", { year: 2026 })).toBe("2026年度")
+	})
+
+	it("{month:month} と {month:mon} は英語の月の名前にする", () => {
+		expect(format("{month:month}", { month: 11 })).toBe("November")
+		expect(format("{month:mon}", { month: "1" })).toBe("Jan")
+		expect(format("{month:month}", { month: 13 })).toBe("13")
 	})
 
 	it("値がない差し込み項目はそのまま残す", () => {

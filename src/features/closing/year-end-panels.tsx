@@ -244,7 +244,11 @@ export function CarryForwardPanel({
 					carry.isPending ||
 					(alreadyConfirmed && !overwrite)
 				}
-				onClick={() => carry.mutate(alreadyConfirmed && overwrite)}
+				onClick={() => {
+					// 翌年度ができても、決算の途中のこの年度を開いたままにする
+					if (fiscalYear !== null) selectYear(fiscalYear)
+					carry.mutate(alreadyConfirmed && overwrite)
+				}}
 			>
 				{carry.isPending && (
 					<Loader2 aria-hidden="true" className="animate-spin" />

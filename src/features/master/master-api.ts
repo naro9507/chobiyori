@@ -147,10 +147,17 @@ export function useMasterList<T extends MasterRecord, I>(
 	})
 }
 
-/** マスタのどれかを変えたら、すべてのマスタを読み直す（科目名などを互いに表示するため）。 */
+/**
+ * マスタのどれかを変えたら、すべてのマスタを読み直す（科目名などを互いに表示するため）。
+ * 取引先の登録番号の確認の一覧も取引先から作るので、一緒に読み直す。
+ */
 function useInvalidateMasters() {
 	const queryClient = useQueryClient()
-	return () => queryClient.invalidateQueries({ queryKey: ["master"] })
+	return () =>
+		Promise.all([
+			queryClient.invalidateQueries({ queryKey: ["master"] }),
+			queryClient.invalidateQueries({ queryKey: ["invoice-checks"] }),
+		])
 }
 
 export function useSaveMaster<T extends MasterRecord, I>(

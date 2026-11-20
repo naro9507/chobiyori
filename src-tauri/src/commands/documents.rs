@@ -23,7 +23,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-fn password_store() -> KeyringItem {
+fn password_store() -> KeyringItem<'static> {
     KeyringItem(SMTP_PASSWORD)
 }
 
@@ -88,6 +88,15 @@ pub struct NewDocumentDefaults {
     pub issue_date: String,
     pub due_date: Option<String>,
     pub notes: String,
+}
+
+/// 発行日の様式（適格請求書か、登録番号なしか）。登録番号なしの様式は消費税を足さない。
+#[tauri::command]
+pub async fn document_tax_mode(
+    db: State<'_, Database>,
+    issue_date: String,
+) -> AppResult<doc::TaxMode> {
+    documents::tax_mode_for(&db.conn(), &issue_date)
 }
 
 #[tauri::command]

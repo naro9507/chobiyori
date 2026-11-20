@@ -1,7 +1,8 @@
 //! 帳簿の暗号化と起動時のパスワード。
 //!
-//! 帳簿のファイル（`books.db`）は SQLCipher で暗号化する。鍵は起動のたびに入れてもらう
-//! パスワードで、SQLCipher がパスワードから鍵を作る（PBKDF2）。
+//! 帳簿のファイル（`books.db`）は SQLCipher で暗号化する。帳簿パスワードは直接入力するか、
+//! 登録した端末で本人確認して取り出す。SQLCipher がパスワードから
+//! 鍵を作る（PBKDF2）。
 //!
 //! フェーズ 7 までの版で作った帳簿は暗号化されていない。最初にパスワードを決めたときに、
 //! 暗号化した写しを別のファイルに作って中身を確かめてから、元のファイルと入れ替える。
@@ -16,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 /// パスワードの最短の長さ。
 pub const PASSWORD_MIN: usize = 8;
+pub(crate) const DEVICE_BINDING: &str = "device-login-binding-v1";
 const PASSWORD_MAX: usize = 200;
 
 /// パスワード。`Debug` でも中身を出さない。
@@ -241,6 +243,7 @@ pub fn change_password(db: &Database, current: &str, new: &str) -> AppResult<()>
     let current = check_current(db, current)?;
     let new = validate_new(new).map_err(|e| AppError::field(e.code, "newPassword"))?;
     if current != new {
+        conn.execute("DELETE FROM settings WHERE key=?1", [DEVICE_BINDING])?;
         let path = db
             .path()
             .ok_or_else(|| AppError::new(ErrorCode::BooksLocked))?;
@@ -347,7 +350,20 @@ mod tests {
             change_password(&db, "not it", "second password").unwrap_err(),
             AppError::field(ErrorCode::WrongPassword, "currentPassword")
         );
+        db.conn()
+            .execute("INSERT INTO settings VALUES (?1,'old')", [DEVICE_BINDING])
+            .unwrap();
         change_password(&db, "first password", "second password").unwrap();
+        assert_eq!(
+            db.conn()
+                .query_row(
+                    "SELECT count(*) FROM settings WHERE key=?1",
+                    [DEVICE_BINDING],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
         drop(db);
         assert!(unlock(&path, "first password").is_err());
         let db = unlock(&path, "second password").unwrap();
