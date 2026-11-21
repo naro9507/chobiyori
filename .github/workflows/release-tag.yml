@@ -1,0 +1,50 @@
+# リリース準備 PR をマージしたら、そのコミットに vX.Y.Z タグを付けて配布ビルドを始める。
+#
+# GITHUB_TOKEN で作ったタグのプッシュは他のワークフローを起動しないため、
+# タグを作ったあとに build.yml を、そのタグを指定して直接実行する。
+name: Tag release
+
+on:
+  push:
+    branches: ["main"]
+
+permissions: {}
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BEFORE: ${{ github.event.before }}
+    steps:
+      - name: バージョンが上がっていればタグを付けてビルドを始める
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_at() {
+            gh api -H 'Accept: application/vnd.github.raw' \
+              "repos/$GH_REPO/contents/package.json?ref=$1" | jq -r .version
+          }
+          [[ "$BEFORE" =~ ^0+$ ]] && exit 0
+          now=$(version_at "$GITHUB_SHA")
+          prev=$(version_at "$BEFORE")
+          if [[ "$now" == "$prev" ]]; then
+            echo "バージョンは変わっていません（$now）。"
+            exit 0
+          fi
+          tag="v$now"
+          if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag は作成済みです。"
+            exit 0
+          fi
+          gh api -X POST "repos/$GH_REPO/git/refs" \
+            -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" --jq .ref
+          gh workflow run build.yml --ref "$tag"
