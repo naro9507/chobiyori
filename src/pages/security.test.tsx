@@ -391,22 +391,34 @@ describe("端末ログインの設定", () => {
 				name: "アカウントによる本人確認（任意）",
 			})
 		)
+		const device = within(
+			screen.getByRole("group", { name: "Windows Hello / Touch ID で開く" })
+		)
 		expect(account.getByRole("status")).toHaveTextContent("未連携")
 		expect(account.queryByRole("button", { name: "Google と連携" })).toBeNull()
-		const password = screen.getByLabelText("現在のパスワード")
-		await user.type(password, "correct horse")
+		const devicePassword = device.getByLabelText("現在のパスワード")
+		await user.type(devicePassword, "correct horse")
 		await user.click(
-			screen.getByRole("button", { name: "この端末で有効にする" })
+			device.getByRole("button", { name: "この端末で有効にする" })
 		)
-		const deviceStatus = await screen.findByText("この端末で有効")
+		const deviceStatus = await device.findByText("この端末で有効")
 		expect(account.getByRole("status")).toHaveTextContent("未連携")
 
 		let finishAuthorization!: () => void
 		loginAuthorization = new Promise((resolve) => {
 			finishAuthorization = resolve
 		})
-		await user.type(password, "correct horse")
-		await user.click(account.getByRole("button", { name: "Google と連携" }))
+		const accountPassword = account.getByLabelText("現在のパスワード")
+		const connect = account.getByRole("button", { name: "Google と連携" })
+		await user.type(devicePassword, "wrong password")
+		expect(connect).toBeDisabled()
+		await user.type(accountPassword, "correct horse")
+		await user.click(connect)
+		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
+			provider: "google",
+			password: "correct horse",
+			locale: "ja",
+		})
 		expect(await account.findByText("本人確認中…")).toBeInTheDocument()
 		expect(
 			account.getByText(/ブラウザで本人確認.*Touch ID/)
@@ -415,7 +427,7 @@ describe("端末ログインの設定", () => {
 		await act(async () => finishAuthorization())
 		expect(await account.findByText("Google と連携済み")).toBeInTheDocument()
 
-		await user.type(password, "correct horse")
+		await user.type(accountPassword, "correct horse")
 		await user.click(
 			account.getByRole("button", { name: "アカウント連携を解除" })
 		)
