@@ -367,7 +367,9 @@ describe("端末ログインの設定", () => {
 		expect(password).toHaveValue("")
 
 		await user.type(password, "correct horse")
-		await user.click(screen.getByRole("button", { name: "設定を解除" }))
+		await user.click(
+			screen.getByRole("button", { name: "端末ログインを無効にする" })
+		)
 		expect(mocks.callCommand).toHaveBeenCalledWith("unlink_login", {
 			password: "correct horse",
 		})
@@ -377,31 +379,53 @@ describe("端末ログインの設定", () => {
 		expect(screen.getByRole("status")).toHaveTextContent("未設定")
 	})
 
-	it("アカウントを使う場合はブラウザと端末の本人確認を案内する", async () => {
-		let finishAuthorization!: () => void
-		loginAuthorization = new Promise((resolve) => {
-			finishAuthorization = resolve
-		})
+	it("端末ログインを有効にしてから、アカウントを個別に追加・解除できる", async () => {
 		const user = userEvent.setup()
 		render(
 			<AppProviders>
 				<AccountLoginSettings />
 			</AppProviders>
 		)
-		expect(await screen.findByRole("status")).toHaveTextContent("未設定")
-		await user.type(screen.getByLabelText("現在のパスワード"), "correct horse")
-		await user.click(
-			screen.getByRole("button", { name: "Google アカウントで設定" })
+		const account = within(
+			await screen.findByRole("group", {
+				name: "アカウントによる本人確認（任意）",
+			})
 		)
-		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
-		expect(screen.getByText(/ブラウザで本人確認.*Touch ID/)).toBeInTheDocument()
+		expect(account.getByRole("status")).toHaveTextContent("未連携")
+		expect(account.queryByRole("button", { name: "Google と連携" })).toBeNull()
+		const password = screen.getByLabelText("現在のパスワード")
+		await user.type(password, "correct horse")
+		await user.click(
+			screen.getByRole("button", { name: "この端末で有効にする" })
+		)
+		const deviceStatus = await screen.findByText("この端末で有効")
+		expect(account.getByRole("status")).toHaveTextContent("未連携")
+
+		let finishAuthorization!: () => void
+		loginAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
+		await user.type(password, "correct horse")
+		await user.click(account.getByRole("button", { name: "Google と連携" }))
+		expect(await account.findByText("本人確認中…")).toBeInTheDocument()
 		expect(
-			screen.queryByText("設定済み（Google アカウント）")
-		).not.toBeInTheDocument()
-		await act(async () => finishAuthorization())
-		expect(
-			await screen.findByText("設定済み（Google アカウント）")
+			account.getByText(/ブラウザで本人確認.*Touch ID/)
 		).toBeInTheDocument()
+		expect(deviceStatus).toHaveTextContent("この端末で有効")
+		await act(async () => finishAuthorization())
+		expect(await account.findByText("Google と連携済み")).toBeInTheDocument()
+
+		await user.type(password, "correct horse")
+		await user.click(
+			account.getByRole("button", { name: "アカウント連携を解除" })
+		)
+		expect(await account.findByText("未連携")).toBeInTheDocument()
+		expect(deviceStatus).toHaveTextContent("この端末で有効")
+		expect(
+			mocks.callCommand.mock.calls.some(
+				([command]) => command === "unlink_login"
+			)
+		).toBe(false)
 	})
 })
 

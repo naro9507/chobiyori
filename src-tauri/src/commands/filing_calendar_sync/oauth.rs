@@ -315,6 +315,13 @@ mod tests {
                 true,
             ),
             (
+                "code=opaque-code&state=correct",
+                Locale::Ja,
+                Flow::LinkLogin,
+                "「アカウントによる本人確認」で連携状態を確認",
+                true,
+            ),
+            (
                 "error=access_denied&state=correct",
                 Locale::En,
                 Flow::LinkLogin,
