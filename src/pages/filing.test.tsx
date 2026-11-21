@@ -304,9 +304,6 @@ beforeEach(() => {
 				return {
 					supported: true,
 					enabled: false,
-					google: true,
-					microsoft: true,
-					linked: null,
 				}
 			case "filing_calendar_connection":
 				if (!calendarConnections.has(args.provider)) return "disconnected"
@@ -633,10 +630,8 @@ describe("インボイスの登録と期限", () => {
 			await screen.findByRole("region", { name: "外部アカウント連携" })
 		)
 		expect(
-			await external.findByRole("group", {
-				name: "アカウントによる本人確認（任意）",
-			})
-		).toBeInTheDocument()
+			external.queryByRole("button", { name: /Google と連携|Microsoft と連携/ })
+		).toBeNull()
 		expect(
 			external.queryByRole("group", { name: "Windows Hello / Touch ID で開く" })
 		).toBeNull()

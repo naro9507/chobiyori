@@ -14,10 +14,7 @@ import { FilingCalendarSyncSettings } from "@/features/filing/filing-calendar-sy
 import { FilingReminderSettings } from "@/features/filing/filing-reminder-settings"
 import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
-import {
-	AccountLoginSettings,
-	DeviceLoginSettings,
-} from "@/features/security/account-login"
+import { DeviceLoginSettings } from "@/features/security/account-login"
 import { PasswordCard } from "@/features/security/password-card"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
@@ -162,7 +159,6 @@ function SettingsGroups({ view }: { view?: string }) {
 				{isTauri() && (
 					<SettingsGroup value="external">
 						<FilingCalendarSyncSettings />
-						<AccountLoginSettings />
 					</SettingsGroup>
 				)}
 				<SettingsGroup value="security">

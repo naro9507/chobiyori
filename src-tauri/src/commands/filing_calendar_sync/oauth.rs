@@ -12,13 +12,6 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy)]
-pub(in crate::commands) enum Flow {
-    Calendar,
-    LinkLogin,
-    Unlock,
-}
-
 pub(in crate::commands) struct OAuth {
     client_id: &'static str,
     client_secret: Option<&'static str>,
@@ -61,17 +54,10 @@ impl OAuth {
         Some(config)
     }
 
-    pub(in crate::commands) fn login(provider: Provider) -> Option<Self> {
-        let mut config = Self::configured(provider)?;
-        config.scope = "openid";
-        Some(config)
-    }
-
     pub(in crate::commands) async fn connect(
         &self,
         client: &Client,
         locale: Locale,
-        flow: Flow,
     ) -> AppResult<Token> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(|_| failed())?;
         listener.set_nonblocking(true).map_err(|_| failed())?;
@@ -90,7 +76,7 @@ impl OAuth {
             ("code_challenge", &challenge),
             ("code_challenge_method", "S256"),
         ]);
-        if self.client_secret.is_some() && self.scope != "openid" {
+        if self.client_secret.is_some() {
             authorize
                 .query_pairs_mut()
                 .append_pair("access_type", "offline")
@@ -101,10 +87,9 @@ impl OAuth {
                 .append_pair("prompt", "select_account");
         }
         tauri_plugin_opener::open_url(authorize.as_str(), None::<&str>).map_err(|_| failed())?;
-        let code =
-            tauri::async_runtime::spawn_blocking(move || callback(listener, &state, locale, flow))
-                .await
-                .map_err(|_| failed())??;
+        let code = tauri::async_runtime::spawn_blocking(move || callback(listener, &state, locale))
+            .await
+            .map_err(|_| failed())??;
         self.token(
             client,
             &[
@@ -205,12 +190,12 @@ fn nonce() -> AppResult<String> {
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
-fn callback(listener: TcpListener, state: &str, locale: Locale, flow: Flow) -> AppResult<String> {
+fn callback(listener: TcpListener, state: &str, locale: Locale) -> AppResult<String> {
     let deadline = Instant::now() + Duration::from_secs(180);
     while Instant::now() < deadline {
         match listener.accept() {
             Ok((mut stream, _)) => {
-                if let Some(result) = handle_callback(&mut stream, state, locale, flow) {
+                if let Some(result) = handle_callback(&mut stream, state, locale) {
                     return result;
                 }
             }
@@ -227,7 +212,6 @@ fn handle_callback(
     stream: &mut TcpStream,
     state: &str,
     locale: Locale,
-    flow: Flow,
 ) -> Option<AppResult<String>> {
     let timeout = Some(Duration::from_secs(2));
     stream.set_read_timeout(timeout).ok()?;
@@ -242,7 +226,7 @@ fn handle_callback(
         Some(result) => (
             "200 OK",
             "text/html",
-            render(locale, flow, result.as_ref().err().map(|error| error.code)),
+            render(locale, result.as_ref().err().map(|error| error.code)),
         ),
         None => ("400 Bad Request", "text/plain", "Invalid request.".into()),
     };
@@ -306,32 +290,22 @@ mod tests {
 
     #[test]
     fn callback_returns_a_localized_result_page() {
-        for (query, locale, flow, expected, accepted) in [
+        for (query, locale, expected, accepted) in [
             (
                 "code=opaque-code&state=correct",
                 Locale::Ja,
-                Flow::Calendar,
                 "外部アカウント連携 → カレンダー同期で「連携済み」",
-                true,
-            ),
-            (
-                "code=opaque-code&state=correct",
-                Locale::Ja,
-                Flow::LinkLogin,
-                "外部アカウント連携の「アカウントによる本人確認」で連携状態を確認",
                 true,
             ),
             (
                 "error=access_denied&state=correct",
                 Locale::En,
-                Flow::LinkLogin,
                 "Authorization was cancelled",
                 false,
             ),
             (
                 "error=provider-error&state=correct",
                 Locale::Ja,
-                Flow::Unlock,
                 "ブラウザでの認証を完了できませんでした",
                 false,
             ),
@@ -340,7 +314,7 @@ mod tests {
             let mut browser = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
             let (mut stream, _) = listener.accept().unwrap();
             write!(browser, "GET /?{query} HTTP/1.1\r\n\r\n").unwrap();
-            let result = handle_callback(&mut stream, "correct", locale, flow).unwrap();
+            let result = handle_callback(&mut stream, "correct", locale).unwrap();
             assert_eq!(result.is_ok(), accepted);
             drop(stream);
 

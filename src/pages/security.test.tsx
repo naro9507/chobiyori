@@ -4,10 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
-import {
-	AccountLoginSettings,
-	DeviceLoginSettings,
-} from "@/features/security/account-login"
+import { DeviceLoginSettings } from "@/features/security/account-login"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -26,9 +23,6 @@ let book: BookStatus
 let deviceLogin: {
 	supported: boolean
 	enabled: boolean
-	google: boolean
-	microsoft: boolean
-	linked: "google" | "outlook" | null
 }
 let loginAuthorization: Promise<void> | undefined
 let deviceOk: boolean
@@ -52,9 +46,6 @@ beforeEach(() => {
 	deviceLogin = {
 		supported: true,
 		enabled: false,
-		google: true,
-		microsoft: true,
-		linked: null,
 	}
 	loginAuthorization = undefined
 	deviceOk = false
@@ -67,21 +58,17 @@ beforeEach(() => {
 					return deviceLogin
 				case "link_login":
 					await loginAuthorization
-					deviceLogin = {
-						...deviceLogin,
-						enabled: true,
-						linked: args?.provider as typeof deviceLogin.linked,
-					}
+					deviceLogin = { ...deviceLogin, enabled: true }
 					return null
 				case "unlink_login":
-					deviceLogin = { ...deviceLogin, enabled: false, linked: null }
+					deviceLogin = { ...deviceLogin, enabled: false }
 					return null
 				case "open_with_login":
 					if (deviceOk) {
 						book = { state: "encrypted", unlocked: true, ...free }
 						return null
 					}
-					throw { code: args?.online ? "loginMismatch" : "deviceAuthFailed" }
+					throw { code: "deviceAuthFailed" }
 				case "book_status":
 					return book
 				case "unlock_books":
@@ -155,22 +142,16 @@ describe("起動時のパスワード", () => {
 	})
 
 	it("端末ログインを設定していれば、起動時に 1 回だけ自動で本人確認を始める", async () => {
-		deviceLogin = { ...deviceLogin, enabled: true, linked: "google" }
+		deviceLogin = { ...deviceLogin, enabled: true }
 		const user = userEvent.setup()
 		renderApp()
 		expect(await screen.findByRole("alert")).toHaveTextContent(
 			"Windows Hello / Touch ID で認証できませんでした"
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
-			online: false,
-			locale: "ja",
-		})
-		await user.click(
-			screen.getByRole("button", { name: "Google でログインして開く" })
-		)
-		expect(await screen.findByRole("alert")).toHaveTextContent(
-			"設定時と別のアカウントです"
-		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
+		expect(
+			screen.queryByRole("button", { name: /Google|Microsoft/ })
+		).toBeNull()
 		// 復旧コードの画面から戻っても、自動ではもう始めない
 		await user.click(
 			screen.getByRole("button", { name: "パスワードを忘れたとき" })
@@ -182,24 +163,21 @@ describe("起動時のパスワード", () => {
 			name: "Windows Hello / Touch ID で開く",
 		})
 		const automatic = mocks.callCommand.mock.calls.filter(
-			([command, args]) => command === "open_with_login" && !args?.online
+			([command]) => command === "open_with_login"
 		)
 		expect(automatic).toHaveLength(1)
 		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
 		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
 	})
 
-	it("アカウント連携なしで端末の本人確認ができれば、帳簿を開く", async () => {
+	it("端末の本人確認ができれば、帳簿を開く", async () => {
 		deviceLogin = { ...deviceLogin, enabled: true }
 		deviceOk = true
 		renderApp()
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
-			online: false,
-			locale: "ja",
-		})
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
 		expect(mocks.callCommand).not.toHaveBeenCalledWith(
 			"unlock_books",
 			expect.anything()
@@ -330,8 +308,7 @@ describe("起動時のパスワード", () => {
 })
 
 describe("端末ログインの設定", () => {
-	it("OAuth が使えないビルドでも、端末ログインを設定・解除できる", async () => {
-		deviceLogin = { ...deviceLogin, google: false, microsoft: false }
+	it("端末ログインを設定・解除できる", async () => {
 		let finishAuthorization!: () => void
 		loginAuthorization = new Promise((resolve) => {
 			finishAuthorization = resolve
@@ -351,9 +328,7 @@ describe("端末ログインの設定", () => {
 		await user.type(password, "correct horse")
 		await user.click(enable)
 		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
-			provider: null,
 			password: "correct horse",
-			locale: "ja",
 		})
 		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
 		expect(
@@ -380,73 +355,6 @@ describe("端末ログインの設定", () => {
 			await screen.findByRole("button", { name: "この端末で有効にする" })
 		).toBeDisabled()
 		expect(screen.getByRole("status")).toHaveTextContent("未設定")
-	})
-
-	it("端末ログインを有効にしてから、アカウントを個別に追加・解除できる", async () => {
-		const user = userEvent.setup()
-		render(
-			<AppProviders>
-				<DeviceLoginSettings />
-				<AccountLoginSettings />
-			</AppProviders>
-		)
-		const notEnabledAccount = within(
-			await screen.findByRole("group", {
-				name: "アカウントによる本人確認（任意）",
-			})
-		)
-		const device = within(
-			screen.getByRole("group", { name: "Windows Hello / Touch ID で開く" })
-		)
-		expect(notEnabledAccount.getByRole("status")).toHaveTextContent("未連携")
-		expect(
-			notEnabledAccount.queryByRole("button", { name: "Google と連携" })
-		).toBeNull()
-		const devicePassword = device.getByLabelText("現在のパスワード")
-		await user.type(devicePassword, "correct horse")
-		await user.click(
-			device.getByRole("button", { name: "この端末で有効にする" })
-		)
-		const deviceStatus = await device.findByText("この端末で有効")
-		const account = within(
-			screen.getByRole("group", { name: "アカウントによる本人確認（任意）" })
-		)
-		expect(account.getByRole("status")).toHaveTextContent("未連携")
-
-		let finishAuthorization!: () => void
-		loginAuthorization = new Promise((resolve) => {
-			finishAuthorization = resolve
-		})
-		const accountPassword = account.getByLabelText("現在のパスワード")
-		const connect = account.getByRole("button", { name: "Google と連携" })
-		await user.type(devicePassword, "wrong password")
-		expect(connect).toBeDisabled()
-		await user.type(accountPassword, "correct horse")
-		await user.click(connect)
-		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
-			provider: "google",
-			password: "correct horse",
-			locale: "ja",
-		})
-		expect(await account.findByText("本人確認中…")).toBeInTheDocument()
-		expect(
-			account.getByText(/ブラウザで本人確認.*Touch ID/)
-		).toBeInTheDocument()
-		expect(deviceStatus).toHaveTextContent("この端末で有効")
-		await act(async () => finishAuthorization())
-		expect(await account.findByText("Google と連携済み")).toBeInTheDocument()
-
-		await user.type(accountPassword, "correct horse")
-		await user.click(
-			account.getByRole("button", { name: "アカウント連携を解除" })
-		)
-		expect(await account.findByText("未連携")).toBeInTheDocument()
-		expect(deviceStatus).toHaveTextContent("この端末で有効")
-		expect(
-			mocks.callCommand.mock.calls.some(
-				([command]) => command === "unlink_login"
-			)
-		).toBe(false)
 	})
 })
 

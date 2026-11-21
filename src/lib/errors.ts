@@ -56,8 +56,6 @@ export type ErrorCode =
 	| "calendarCancelled"
 	| "calendarFailed"
 	| "deviceAuthFailed"
-	| "loginFailed"
-	| "loginMismatch"
 	| "loginExpired"
 	| "tooManyAttempts"
 

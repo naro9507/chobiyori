@@ -1,11 +1,11 @@
 //! 申告期限だけを、許可されたカレンダーに反映する。
 
 mod api;
-pub(super) mod oauth;
+mod oauth;
 
 use self::{
     api::{CalendarApi, Deadline},
-    oauth::{Flow, OAuth},
+    oauth::OAuth,
 };
 use crate::db::{filing, Database};
 use crate::domain::filing::add_days;
@@ -78,7 +78,7 @@ fn failed() -> AppError {
     AppError::new(ErrorCode::CalendarFailed)
 }
 
-pub(super) fn http_client() -> AppResult<reqwest::Client> {
+fn http_client() -> AppResult<reqwest::Client> {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
@@ -110,7 +110,7 @@ pub async fn connect_filing_calendar(
     let _guard = provider.lock(&state).lock().await;
     let oauth = OAuth::configured(provider).ok_or_else(failed)?;
     let client = http_client()?;
-    let token = oauth.connect(&client, locale, Flow::Calendar).await?;
+    let token = oauth.connect(&client, locale).await?;
     let refresh_token = token
         .refresh_token
         .filter(|token| !token.is_empty())

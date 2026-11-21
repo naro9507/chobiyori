@@ -138,7 +138,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 				<CardContent>
 					{!choosing && login?.enabled && (
 						<>
-							<DeviceUnlock status={login} autoStarted={deviceStarted} />
+							<DeviceUnlock autoStarted={deviceStarted} />
 							<p className="mb-3 text-muted-foreground text-sm">
 								{t("orPassword")}
 							</p>
