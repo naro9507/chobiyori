@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import type { TaxCategory } from "@/features/master/master-api"
 import type { FilingType, TaxStatus } from "@/features/setup/setup"
 import { callCommand } from "@/lib/tauri"
+import { calendarPlanKey } from "./calendar-query"
 
 /** Rust 側 `db::filing` と同じ形。 */
 export type InvoiceRegistration = {
@@ -237,7 +238,10 @@ export function useSetFilingCheck(fiscalYear: number | null) {
 			callCommand<ChecklistItem[]>("set_filing_check", { fiscalYear, ...args }),
 		onSuccess: (data) => {
 			queryClient.setQueryData(["filing-checklist", fiscalYear], data)
-			return queryClient.invalidateQueries({ queryKey: ["filing-deadlines"] })
+			return Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["filing-deadlines"] }),
+				queryClient.invalidateQueries({ queryKey: calendarPlanKey }),
+			])
 		},
 	})
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { calendarPlanKey } from "@/features/filing/calendar-query"
 import { callCommand } from "@/lib/tauri"
 
 /** Rust 側 `commands::security::BookStatus` と同じ形。 */
@@ -182,6 +183,7 @@ export function useSetLock(fiscalYear: number | null) {
 		onSuccess: (status) => {
 			queryClient.setQueryData(["locks", fiscalYear], status)
 			queryClient.invalidateQueries({ queryKey: ["fiscal-years"] })
+			queryClient.invalidateQueries({ queryKey: calendarPlanKey })
 			queryClient.invalidateQueries({ queryKey: ["history"] })
 		},
 	})

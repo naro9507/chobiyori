@@ -525,6 +525,46 @@ pub fn list(conn: &Connection, kind: Option<DocumentKind>) -> AppResult<Vec<Docu
     rows.into_iter().map(|r| build(conn, r, &today)).collect()
 }
 
+/// 発行済みの書類から、カレンダーに必要な番号（内部ID）と期限だけを取り出す。
+pub fn upcoming_dates(
+    conn: &Connection,
+    kind: DocumentKind,
+    today: &str,
+) -> AppResult<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, due_date, issue_date, tax_mode FROM documents AS d
+         WHERE kind = ?1 AND due_date >= ?2 AND status IN ('issued', 'sent')
+           AND (?1 != 'estimate' OR NOT EXISTS (
+                SELECT 1 FROM documents AS invoice WHERE invoice.source_document_id = d.id
+                    AND invoice.kind = 'invoice' AND invoice.status IN ('issued', 'sent', 'paid')
+           ))
+         ORDER BY id",
+    )?;
+    let rows = stmt.query_map(params![kind, today], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, Option<TaxMode>>(3)?,
+        ))
+    })?;
+    let mut due = Vec::new();
+    for row in rows {
+        let (id, date, issue_date, tax_mode) = row?;
+        if kind == DocumentKind::Invoice {
+            let mode = match tax_mode {
+                Some(mode) => mode,
+                None => tax_mode_for(conn, &issue_date)?,
+            };
+            if paid_of(conn, id)? >= doc::totals(&lines_of(conn, id)?, mode).total {
+                continue;
+            }
+        }
+        due.push((id, date));
+    }
+    Ok(due)
+}
+
 fn write_lines(conn: &Connection, id: i64, lines: &[LineInput]) -> AppResult<()> {
     conn.execute("DELETE FROM document_lines WHERE document_id = ?1", [id])?;
     let mut insert = conn.prepare_cached(
@@ -1173,10 +1213,15 @@ mod tests {
             ErrorCode::AlreadyRecorded
         );
 
+        let invoice_dates =
+            || upcoming_dates(&db.conn(), DocumentKind::Invoice, "2026-03-01").unwrap();
+        assert_eq!(invoice_dates(), [(d.id, "2099-12-31".into())]);
+
         // 一部入金 → 残りより多くは入れられない → 残りを入金して入金済み
         assert_eq!(d.last_payment_account_id, None);
         let d = record_payment(&db, d.id, &pay(10_000)).unwrap();
         assert_eq!(d.last_payment_account_id, Some(bank));
+        assert_eq!(invoice_dates(), [(d.id, "2099-12-31".into())]);
         assert_eq!(
             (d.paid, d.display_status),
             (10_000, DisplayStatus::PartlyPaid)
@@ -1187,6 +1232,7 @@ mod tests {
         );
         let d = record_payment(&db, d.id, &pay(13_166)).unwrap();
         assert_eq!(d.display_status, DisplayStatus::Paid);
+        assert!(invoice_dates().is_empty());
 
         // 売掛金は 0 に戻り、売上は税込みの合計
         let tb = crate::db::reports::trial_balance(&db.conn(), 2026, 1, 12).unwrap();
@@ -1288,6 +1334,24 @@ mod tests {
             copy_as(&db, est.id, DocumentKind::Receipt).unwrap_err(),
             AppError::field(ErrorCode::InvalidFormat, "kind")
         );
+    }
+
+    #[test]
+    fn estimate_expiration_is_removed_when_its_invoice_is_issued() {
+        let db = set_up_db();
+        let estimate = create(&db, &input(DocumentKind::Estimate)).unwrap();
+        let dates = || upcoming_dates(&db.conn(), DocumentKind::Estimate, "2026-03-01").unwrap();
+        assert!(dates().is_empty());
+        issue(&db, estimate.id, &fake_pdf).unwrap();
+        let invoice = copy_as(&db, estimate.id, DocumentKind::Invoice).unwrap();
+        assert_eq!(dates(), [(estimate.id, "2099-12-31".into())]);
+
+        // copy_as uses today's issue date, so restore the year that was set up for the test.
+        let invoice = update(&db, invoice.id, &input(DocumentKind::Invoice)).unwrap();
+        issue(&db, invoice.id, &fake_pdf).unwrap();
+        assert!(dates().is_empty());
+        cancel(&db, invoice.id).unwrap();
+        assert_eq!(dates(), [(estimate.id, "2099-12-31".into())]);
     }
 
     #[test]

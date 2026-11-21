@@ -20,6 +20,7 @@ import {
 	useDocuments,
 	useNewDocumentDefaults,
 } from "@/features/documents/documents-api"
+import { ReceivedBills } from "@/features/documents/received-bills"
 import { StatusBadge } from "@/features/documents/status-badge"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
@@ -30,6 +31,7 @@ type View =
 	| { mode: "list" }
 	| { mode: "new"; kind: DocumentKind }
 	| { mode: "open"; id: number }
+	| { mode: "received" }
 
 const statusFilters: (DisplayStatus | "all")[] = [
 	"all",
@@ -54,6 +56,7 @@ export function DocumentsPage() {
 }
 
 function DocumentsView({ newInvoice }: { newInvoice: boolean }) {
+	const received = useTranslations("receivedBills")
 	useEffect(() => {
 		useEntryIntent.setState({ invoicePending: false })
 	}, [])
@@ -83,8 +86,35 @@ function DocumentsView({ newInvoice }: { newInvoice: boolean }) {
 			</Page>
 		)
 	}
+	if (view.mode === "received") {
+		return (
+			<Page screen="documents">
+				<Card>
+					<CardHeader>
+						<BackButton onBack={back} />
+						<CardTitle>{received("title")}</CardTitle>
+						<CardDescription>{received("description")}</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<ReceivedBills />
+					</CardContent>
+				</Card>
+			</Page>
+		)
+	}
 	return (
-		<Page screen="documents">
+		<Page
+			screen="documents"
+			actions={
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => setView({ mode: "received" })}
+				>
+					{received("title")}
+				</Button>
+			}
+		>
 			<DocumentList
 				documents={documents}
 				onNew={(kind) => setView({ mode: "new", kind })}

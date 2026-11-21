@@ -1,10 +1,10 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { act, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
-import { AccountLoginSettings } from "@/features/security/account-login"
+import { DeviceLoginSettings } from "@/features/security/account-login"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -23,10 +23,8 @@ let book: BookStatus
 let deviceLogin: {
 	supported: boolean
 	enabled: boolean
-	google: boolean
-	microsoft: boolean
-	linked: "google" | "outlook" | null
 }
+let loginAuthorization: Promise<void> | undefined
 let deviceOk: boolean
 let locks: LockStatus
 
@@ -48,10 +46,8 @@ beforeEach(() => {
 	deviceLogin = {
 		supported: true,
 		enabled: false,
-		google: true,
-		microsoft: true,
-		linked: null,
 	}
+	loginAuthorization = undefined
 	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
 	mocks.callCommand.mockReset()
@@ -61,21 +57,18 @@ beforeEach(() => {
 				case "login_status":
 					return deviceLogin
 				case "link_login":
-					deviceLogin = {
-						...deviceLogin,
-						enabled: true,
-						linked: args?.provider as typeof deviceLogin.linked,
-					}
+					await loginAuthorization
+					deviceLogin = { ...deviceLogin, enabled: true }
 					return null
 				case "unlink_login":
-					deviceLogin = { ...deviceLogin, enabled: false, linked: null }
+					deviceLogin = { ...deviceLogin, enabled: false }
 					return null
 				case "open_with_login":
 					if (deviceOk) {
 						book = { state: "encrypted", unlocked: true, ...free }
 						return null
 					}
-					throw { code: args?.online ? "loginMismatch" : "deviceAuthFailed" }
+					throw { code: "deviceAuthFailed" }
 				case "book_status":
 					return book
 				case "unlock_books":
@@ -149,22 +142,16 @@ describe("起動時のパスワード", () => {
 	})
 
 	it("端末ログインを設定していれば、起動時に 1 回だけ自動で本人確認を始める", async () => {
-		deviceLogin = { ...deviceLogin, enabled: true, linked: "google" }
+		deviceLogin = { ...deviceLogin, enabled: true }
 		const user = userEvent.setup()
 		renderApp()
 		expect(await screen.findByRole("alert")).toHaveTextContent(
 			"Windows Hello / Touch ID で認証できませんでした"
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
-			online: false,
-			locale: "ja",
-		})
-		await user.click(
-			screen.getByRole("button", { name: "Google でログインして開く" })
-		)
-		expect(await screen.findByRole("alert")).toHaveTextContent(
-			"設定時と別のアカウントです"
-		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
+		expect(
+			screen.queryByRole("button", { name: /Google|Microsoft/ })
+		).toBeNull()
 		// 復旧コードの画面から戻っても、自動ではもう始めない
 		await user.click(
 			screen.getByRole("button", { name: "パスワードを忘れたとき" })
@@ -176,24 +163,21 @@ describe("起動時のパスワード", () => {
 			name: "Windows Hello / Touch ID で開く",
 		})
 		const automatic = mocks.callCommand.mock.calls.filter(
-			([command, args]) => command === "open_with_login" && !args?.online
+			([command]) => command === "open_with_login"
 		)
 		expect(automatic).toHaveLength(1)
 		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
 		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
 	})
 
-	it("アカウント連携なしで端末の本人確認ができれば、帳簿を開く", async () => {
+	it("端末の本人確認ができれば、帳簿を開く", async () => {
 		deviceLogin = { ...deviceLogin, enabled: true }
 		deviceOk = true
 		renderApp()
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
-			online: false,
-			locale: "ja",
-		})
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
 		expect(mocks.callCommand).not.toHaveBeenCalledWith(
 			"unlock_books",
 			expect.anything()
@@ -324,39 +308,53 @@ describe("起動時のパスワード", () => {
 })
 
 describe("端末ログインの設定", () => {
-	it("OAuth が使えないビルドでも、端末ログインを設定・解除できる", async () => {
-		deviceLogin = { ...deviceLogin, google: false, microsoft: false }
+	it("端末ログインを設定・解除できる", async () => {
+		let finishAuthorization!: () => void
+		loginAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
 		const user = userEvent.setup()
 		render(
 			<AppProviders>
-				<AccountLoginSettings />
+				<DeviceLoginSettings />
 			</AppProviders>
 		)
 		const enable = await screen.findByRole("button", {
 			name: "この端末で有効にする",
 		})
+		expect(screen.getByRole("status")).toHaveTextContent("未設定")
 		const password = screen.getByLabelText("現在のパスワード")
 		expect(enable).toBeDisabled()
 		await user.type(password, "correct horse")
 		await user.click(enable)
 		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
-			provider: null,
 			password: "correct horse",
-			locale: "ja",
 		})
-		expect(await screen.findByRole("status")).toHaveTextContent(
-			"この端末で有効です。"
+		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
+		expect(
+			screen.getByText(
+				"Windows Hello / Touch ID の画面で本人確認を行ってください。"
+			)
+		).toBeInTheDocument()
+		expect(screen.queryByText(/ブラウザで本人確認/)).not.toBeInTheDocument()
+		await act(async () => finishAuthorization())
+		expect(await screen.findByText("この端末で有効")).toHaveAttribute(
+			"role",
+			"status"
 		)
 		expect(password).toHaveValue("")
 
 		await user.type(password, "correct horse")
-		await user.click(screen.getByRole("button", { name: "設定を解除" }))
+		await user.click(
+			screen.getByRole("button", { name: "端末ログインを無効にする" })
+		)
 		expect(mocks.callCommand).toHaveBeenCalledWith("unlink_login", {
 			password: "correct horse",
 		})
 		expect(
 			await screen.findByRole("button", { name: "この端末で有効にする" })
 		).toBeDisabled()
+		expect(screen.getByRole("status")).toHaveTextContent("未設定")
 	})
 })
 

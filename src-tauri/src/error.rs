@@ -117,10 +117,6 @@ pub enum ErrorCode {
     CalendarCancelled,
     /// カレンダーサービスへの接続や同期が失敗した
     CalendarFailed,
-    /// Google・Microsoft へのログインが完了しなかった
-    LoginFailed,
-    /// 設定したときと別のアカウントでログインした
-    LoginMismatch,
     /// 端末の設定が古い（パスワードの変更や復元のあと）。設定し直す
     LoginExpired,
     /// Windows Hello・Touch ID などの本人確認が完了しなかった

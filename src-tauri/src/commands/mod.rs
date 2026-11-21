@@ -17,6 +17,7 @@ pub mod inbox;
 pub mod journal;
 pub mod master;
 pub mod receipts;
+pub mod received_bills;
 pub mod recurring;
 pub mod reports;
 pub mod security;

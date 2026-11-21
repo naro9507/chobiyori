@@ -181,6 +181,47 @@ beforeEach(() => {
 })
 
 describe("書類の画面", () => {
+	it("受け取った請求書の支払期限を保存し、支払済みにできる", async () => {
+		type Bill = {
+			id: number
+			payee: string
+			dueDate: string
+			amount: number | null
+			paid: boolean
+		}
+		let bills: Bill[] = []
+		const standardCommand = mocks.callCommand.getMockImplementation()
+		mocks.callCommand.mockImplementation(async (command, args) => {
+			if (command === "list_received_bills") return bills
+			if (command === "save_received_bill") {
+				bills = [{ ...args.input, id: 1, paid: false }]
+				return null
+			}
+			if (command === "set_received_bill_paid") {
+				bills = bills.map((bill) => ({ ...bill, paid: args.paid }))
+				return null
+			}
+			return standardCommand?.(command, args)
+		})
+		const user = userEvent.setup()
+		renderPage()
+		await user.click(
+			await screen.findByRole("button", { name: "受け取った請求書" })
+		)
+		await user.click(screen.getByRole("button", { name: "支払期限を登録" }))
+		await user.type(screen.getByLabelText("支払先"), "株式会社サンプル")
+		await user.type(screen.getByLabelText("支払期限"), "2099-12-25")
+		await user.type(screen.getByLabelText("金額（円・任意）"), "12,345")
+		await user.click(screen.getByRole("button", { name: /^保存$/ }))
+		expect(await screen.findByText("株式会社サンプル")).toBeVisible()
+		expect(screen.getByText("12,345円")).toBeVisible()
+		expect(screen.getByText("未払い")).toBeVisible()
+		await user.click(screen.getByRole("button", { name: "支払済みにする" }))
+		expect(await screen.findByText("支払済み")).toBeVisible()
+		await user.click(screen.getByRole("button", { name: "未払いに戻す" }))
+		expect(await screen.findByText("未払い")).toBeVisible()
+	})
+
 	it("書類とメールの設定に、保存時に整えられた値を表示する", async () => {
 		const user = userEvent.setup()
 		renderPage("/settings?view=documents")

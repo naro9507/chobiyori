@@ -10,10 +10,11 @@ import { RadioCards, RadioCardsItem } from "@/components/ui/radio-cards"
 import { ChangelogCard } from "@/features/changelog/changelog-card"
 import { DocumentSettingsCard } from "@/features/documents/document-settings-card"
 import { MailSettingsCard } from "@/features/documents/mail-settings-card"
+import { FilingCalendarSyncSettings } from "@/features/filing/filing-calendar-sync"
 import { FilingReminderSettings } from "@/features/filing/filing-reminder-settings"
 import { InvoiceRegistrationCard } from "@/features/filing/invoice-registration-card"
 import { ReceiptSettingsCard } from "@/features/inbox/receipt-settings-card"
-import { AccountLoginSettings } from "@/features/security/account-login"
+import { DeviceLoginSettings } from "@/features/security/account-login"
 import { PasswordCard } from "@/features/security/password-card"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import { BusinessProfileCard } from "@/features/setup/business-profile-card"
@@ -23,6 +24,7 @@ import { useFiscalYear } from "@/features/setup/fiscal-years"
 import { UpdateSettings } from "@/features/updater/update-settings"
 import { isLocale } from "@/i18n/i18n"
 import { useTranslations } from "@/i18n/use-translations"
+import { isTauri } from "@/lib/tauri"
 import { type Theme, useSettingsStore } from "@/stores/settings-store"
 
 const themes: Theme[] = ["light", "dark", "system"]
@@ -154,10 +156,15 @@ function SettingsGroups({ view }: { view?: string }) {
 				<SettingsGroup value="receipts">
 					<ReceiptSettingsCard />
 				</SettingsGroup>
+				{isTauri() && (
+					<SettingsGroup value="external">
+						<FilingCalendarSyncSettings />
+					</SettingsGroup>
+				)}
 				<SettingsGroup value="security">
 					<PasswordCard />
 					<RecoveryCard />
-					<AccountLoginSettings />
+					<DeviceLoginSettings />
 				</SettingsGroup>
 				<SettingsGroup value="app">
 					<UpdateSettings />
@@ -178,19 +185,23 @@ function SettingsGroup({
 		| "documents"
 		| "menus"
 		| "receipts"
+		| "external"
 		| "security"
 		| "app"
 	children: ReactNode
 }) {
 	const t = useTranslations("settings")
 	const summaryId = useId()
+	const generatedTriggerId = useId()
+	const triggerId =
+		value === "business" ? "tutorial-business" : generatedTriggerId
 	return (
 		<Accordion.Item value={value} className="rounded-lg border bg-card">
 			<Accordion.Header>
 				<Accordion.Trigger
 					aria-label={t(`${value}Group`)}
 					aria-describedby={summaryId}
-					id={value === "business" ? "tutorial-business" : undefined}
+					id={triggerId}
 					className="flex w-full items-center justify-between gap-4 rounded-lg px-5 py-4 text-left font-semibold outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180"
 				>
 					<span className="flex min-w-0 flex-col gap-1">
@@ -205,7 +216,11 @@ function SettingsGroup({
 					<ChevronDown aria-hidden="true" className="size-4 shrink-0" />
 				</Accordion.Trigger>
 			</Accordion.Header>
-			<Accordion.Content forceMount className="data-[state=closed]:hidden">
+			<Accordion.Content
+				aria-labelledby={triggerId}
+				forceMount
+				className="data-[state=closed]:hidden"
+			>
 				<div className="flex flex-col gap-4 px-4 pb-4">{children}</div>
 			</Accordion.Content>
 		</Accordion.Item>

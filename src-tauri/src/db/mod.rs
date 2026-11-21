@@ -20,6 +20,7 @@ pub mod locks;
 pub mod partners;
 pub mod purposes;
 pub mod receipts;
+pub mod received_bills;
 pub mod recovery;
 pub mod recurring;
 pub mod reports;
@@ -53,6 +54,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0012_accounting_consistency.sql"),
     include_str!("migrations/0013_receipt_points.sql"),
     include_str!("migrations/0014_document_mail_template.sql"),
+    include_str!("migrations/0015_received_bills.sql"),
 ];
 
 pub struct Database {

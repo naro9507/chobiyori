@@ -1,6 +1,10 @@
+mod callback_page;
+
 use super::{failed, Provider};
 use crate::error::{AppError, AppResult, ErrorCode};
+use crate::export::labels::Locale;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use callback_page::render;
 use reqwest::{Client, Url};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -50,16 +54,10 @@ impl OAuth {
         Some(config)
     }
 
-    pub(in crate::commands) fn login(provider: Provider) -> Option<Self> {
-        let mut config = Self::configured(provider)?;
-        config.scope = "openid";
-        Some(config)
-    }
-
     pub(in crate::commands) async fn connect(
         &self,
         client: &Client,
-        japanese: bool,
+        locale: Locale,
     ) -> AppResult<Token> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(|_| failed())?;
         listener.set_nonblocking(true).map_err(|_| failed())?;
@@ -78,7 +76,7 @@ impl OAuth {
             ("code_challenge", &challenge),
             ("code_challenge_method", "S256"),
         ]);
-        if self.client_secret.is_some() && self.scope != "openid" {
+        if self.client_secret.is_some() {
             authorize
                 .query_pairs_mut()
                 .append_pair("access_type", "offline")
@@ -89,10 +87,9 @@ impl OAuth {
                 .append_pair("prompt", "select_account");
         }
         tauri_plugin_opener::open_url(authorize.as_str(), None::<&str>).map_err(|_| failed())?;
-        let code =
-            tauri::async_runtime::spawn_blocking(move || callback(listener, &state, japanese))
-                .await
-                .map_err(|_| failed())??;
+        let code = tauri::async_runtime::spawn_blocking(move || callback(listener, &state, locale))
+            .await
+            .map_err(|_| failed())??;
         self.token(
             client,
             &[
@@ -193,12 +190,12 @@ fn nonce() -> AppResult<String> {
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
-fn callback(listener: TcpListener, state: &str, japanese: bool) -> AppResult<String> {
+fn callback(listener: TcpListener, state: &str, locale: Locale) -> AppResult<String> {
     let deadline = Instant::now() + Duration::from_secs(180);
     while Instant::now() < deadline {
         match listener.accept() {
             Ok((mut stream, _)) => {
-                if let Some(result) = handle_callback(&mut stream, state, japanese) {
+                if let Some(result) = handle_callback(&mut stream, state, locale) {
                     return result;
                 }
             }
@@ -214,7 +211,7 @@ fn callback(listener: TcpListener, state: &str, japanese: bool) -> AppResult<Str
 fn handle_callback(
     stream: &mut TcpStream,
     state: &str,
-    japanese: bool,
+    locale: Locale,
 ) -> Option<AppResult<String>> {
     let timeout = Some(Duration::from_secs(2));
     stream.set_read_timeout(timeout).ok()?;
@@ -225,22 +222,21 @@ fn handle_callback(
         .read_line(&mut line)
         .ok()?;
     let result = parse_callback(&line, state);
-    let (status, message) = if result.is_some() {
-        (
+    let (status, content_type, body) = match &result {
+        Some(result) => (
             "200 OK",
-            if japanese {
-                "帳日和に戻ってください。"
-            } else {
-                "Return to Chobiyori."
-            },
-        )
-    } else {
-        ("400 Bad Request", "Invalid request.")
+            "text/html",
+            render(locale, result.as_ref().err().map(|error| error.code)),
+        ),
+        None => ("400 Bad Request", "text/plain", "Invalid request.".into()),
     };
     let _ = write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{message}",
-        message.len()
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}; charset=utf-8\r\n\
+         Cache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\
+         Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'\r\n\
+         Connection: close\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
     );
     result
 }
@@ -290,5 +286,46 @@ mod tests {
                 .code,
             ErrorCode::CalendarCancelled
         );
+    }
+
+    #[test]
+    fn callback_returns_a_localized_result_page() {
+        for (query, locale, expected, accepted) in [
+            (
+                "code=opaque-code&state=correct",
+                Locale::Ja,
+                "外部アカウント連携 → カレンダー同期で「連携済み」",
+                true,
+            ),
+            (
+                "error=access_denied&state=correct",
+                Locale::En,
+                "Authorization was cancelled",
+                false,
+            ),
+            (
+                "error=provider-error&state=correct",
+                Locale::Ja,
+                "ブラウザでの認証を完了できませんでした",
+                false,
+            ),
+        ] {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+            let mut browser = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (mut stream, _) = listener.accept().unwrap();
+            write!(browser, "GET /?{query} HTTP/1.1\r\n\r\n").unwrap();
+            let result = handle_callback(&mut stream, "correct", locale).unwrap();
+            assert_eq!(result.is_ok(), accepted);
+            drop(stream);
+
+            let mut response = String::new();
+            browser.read_to_string(&mut response).unwrap();
+            let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+            assert!(headers.contains("Content-Type: text/html; charset=utf-8"));
+            assert!(headers.contains(&format!("Content-Length: {}", body.len())));
+            assert!(body.contains(expected));
+            assert!(!body.contains("opaque-code"));
+            assert!(!body.contains("provider-error"));
+        }
     }
 }

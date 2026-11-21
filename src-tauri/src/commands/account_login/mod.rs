@@ -1,13 +1,10 @@
-//! Device unlock requires access to the platform key. An optional provider can
-//! also verify the linked account during enrollment and online unlock.
+//! Device unlock requires fresh access to the platform key.
 mod device;
 
-use super::filing_calendar_sync::{http_client, oauth::OAuth, Provider};
 use super::security::{ensure_not_open, open_books, BookFiles};
 use crate::{
     db::{unlock_guard, vault, Database},
     error::{AppError, AppResult, ErrorCode},
-    export::labels::Locale,
     receipt::secret::{KeyringItem, SecretStore},
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -33,15 +30,15 @@ pub(super) fn discard_device_record() {
 
 #[derive(Serialize, Deserialize)]
 struct Record {
-    provider: Option<Provider>,
     envelope: device::Envelope,
+    // Recognize old linked accounts so a successful unlock can rewrite the record.
+    #[serde(rename = "provider", default, skip_serializing)]
+    legacy_provider: Option<serde::de::IgnoredAny>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Credential {
     binding: String,
-    provider: Option<Provider>,
-    account: Option<String>,
     password: String,
     // Present while the SQLCipher rekey may still be pending.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,17 +49,8 @@ struct Credential {
 pub struct LoginStatus {
     supported: bool,
     enabled: bool,
-    google: bool,
-    microsoft: bool,
-    linked: Option<Provider>,
 }
 
-fn failed() -> AppError {
-    AppError::new(ErrorCode::LoginFailed)
-}
-fn mismatch() -> AppError {
-    AppError::new(ErrorCode::LoginMismatch)
-}
 /// 端末に残した設定が、いまの帳簿と合わない。
 fn expired() -> AppError {
     AppError::new(ErrorCode::LoginExpired)
@@ -91,8 +79,8 @@ fn seal_record(
 ) -> AppResult<Vec<u8>> {
     let data = serde_json::to_vec(credential).map_err(|_| device::failed())?;
     let record = Record {
-        provider: credential.provider,
         envelope: protect(data)?,
+        legacy_provider: None,
     };
     serde_json::to_vec(&record).map_err(|_| device::failed())
 }
@@ -122,7 +110,6 @@ pub(super) async fn prepare_password_change(
     let new = new.to_owned();
     let (pending, updated) = tauri::async_runtime::spawn_blocking(move || -> AppResult<_> {
         let (key, mut credential) = authenticate_record(&record)?;
-        authorize(&credential, record.provider, None)?;
         if credential.binding != binding
             || (credential.password != current
                 && credential.previous_password.as_deref() != Some(&current))
@@ -152,27 +139,10 @@ pub(super) fn finish_password_change(updated: &[u8]) {
 
 #[tauri::command]
 pub async fn login_status() -> AppResult<LoginStatus> {
-    let record = if SUPPORTED { record()? } else { None };
     Ok(LoginStatus {
         supported: SUPPORTED,
-        enabled: record.is_some(),
-        google: SUPPORTED && OAuth::login(Provider::Google).is_some(),
-        microsoft: SUPPORTED && OAuth::login(Provider::Outlook).is_some(),
-        linked: record.and_then(|r| r.provider),
+        enabled: SUPPORTED && record()?.is_some(),
     })
-}
-
-async fn identify(provider: Provider, locale: Locale) -> AppResult<String> {
-    let oauth = OAuth::login(provider).ok_or_else(failed)?;
-    let client = http_client().map_err(|_| failed())?;
-    let token = oauth
-        .connect(&client, locale == Locale::Ja)
-        .await
-        .map_err(|_| failed())?;
-    oauth
-        .account_key(&client, &token.access_token)
-        .await
-        .map_err(|_| failed())
 }
 
 fn verify_password(db: &Database, password: &str) -> AppResult<()> {
@@ -188,23 +158,15 @@ pub async fn link_login(
     state: State<'_, LoginState>,
     db: State<'_, Database>,
     password: String,
-    provider: Option<Provider>,
-    locale: Locale,
 ) -> AppResult<()> {
     let _guard = state.0.lock().await;
     verify_password(&db, &password)?;
     if !SUPPORTED {
         return Err(device::failed());
     }
-    let account = match provider {
-        Some(provider) => Some(identify(provider, locale).await?),
-        None => None,
-    };
     let binding = URL_SAFE_NO_PAD.encode(device::random::<32>()?);
     let credential = Credential {
         binding: binding.clone(),
-        provider,
-        account,
         password: password.clone(),
         previous_password: None,
     };
@@ -236,20 +198,6 @@ pub async fn unlink_login(
     })
 }
 
-fn authorize(
-    credential: &Credential,
-    provider: Option<Provider>,
-    account: Option<&str>,
-) -> AppResult<()> {
-    if provider != credential.provider
-        || provider.is_some() != credential.account.is_some()
-        || account.is_some_and(|id| Some(id) != credential.account.as_deref())
-    {
-        return Err(mismatch());
-    }
-    Ok(())
-}
-
 fn unlock_credential<'a>(
     path: &Path,
     credential: &'a Credential,
@@ -271,8 +219,6 @@ pub async fn open_with_login(
     app: AppHandle,
     files: State<'_, BookFiles>,
     state: State<'_, LoginState>,
-    online: bool,
-    locale: Locale,
 ) -> AppResult<()> {
     let _guard = state.0.lock().await;
     ensure_not_open(&app)?;
@@ -280,24 +226,18 @@ pub async fn open_with_login(
         return Err(expired());
     }
     let record = record()?.ok_or_else(device::failed)?;
-    let account = if online {
-        Some(identify(record.provider.ok_or_else(failed)?, locale).await?)
-    } else {
-        None
-    };
-    let provider = record.provider;
+    let retire_link = record.legacy_provider.is_some();
     let (key, mut credential) =
         tauri::async_runtime::spawn_blocking(move || authenticate_record(&record))
             .await
             .map_err(|_| device::failed())??;
-    authorize(&credential, provider, account.as_deref())?;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
     let (db, password) = unlock_credential(&files.path, &credential)?;
     if book_binding(&db)?.as_deref() != Some(&credential.binding) {
         return Err(expired());
     }
-    if credential.previous_password.is_some() {
+    if retire_link || credential.previous_password.is_some() {
         credential.password = password.to_owned();
         credential.previous_password = None;
         if let Ok(updated) = seal_record(&credential, |data| key.seal(data)) {
@@ -314,32 +254,32 @@ pub async fn open_with_login(
 mod tests {
     use super::*;
     #[test]
-    fn linked_credentials_from_previous_versions_check_provider_and_subject() {
-        let credential: Credential = serde_json::from_str(
-            r#"{"provider":"google","account":"owner","binding":"device","password":"sample"}"#,
-        )
+    fn legacy_account_record_can_be_opened_and_rewritten_for_device_login() {
+        let key = device::DeviceKey::test_key();
+        let old_credential =
+            br#"{"provider":"google","account":"owner","binding":"device","password":"sample"}"#;
+        let envelope = key.seal(old_credential.to_vec()).unwrap();
+        let record: Record = serde_json::from_value(serde_json::json!({
+            "provider": "google",
+            "envelope": envelope,
+        }))
         .unwrap();
+        assert!(record.legacy_provider.is_some());
+        let credential: Credential =
+            serde_json::from_slice(&key.open(&record.envelope).unwrap()).unwrap();
+        assert_eq!(credential.binding, "device");
+        assert_eq!(credential.password, "sample");
         assert!(credential.previous_password.is_none());
-        let google = Some(Provider::Google);
-        assert!(authorize(&credential, google, Some("owner")).is_ok());
-        assert!(authorize(&credential, google, Some("other")).is_err());
-        assert!(authorize(&credential, Some(Provider::Outlook), Some("owner")).is_err());
-        assert!(authorize(&credential, google, None).is_ok());
-        assert!(authorize(&credential, None, None).is_err());
-    }
 
-    #[test]
-    fn device_only_credentials_require_no_account() {
-        let credential = Credential {
-            provider: None,
-            account: None,
-            binding: "device".into(),
-            password: "sample".into(),
-            previous_password: None,
-        };
-        assert!(authorize(&credential, None, None).is_ok());
-        assert!(authorize(&credential, Some(Provider::Google), None).is_err());
-        assert!(authorize(&credential, None, Some("owner")).is_err());
+        let updated = seal_record(&credential, |data| key.seal(data)).unwrap();
+        let updated: Record = serde_json::from_slice(&updated).unwrap();
+        assert!(updated.legacy_provider.is_none());
+        let data: serde_json::Value =
+            serde_json::from_slice(&key.open(&updated.envelope).unwrap()).unwrap();
+        assert_eq!(
+            data,
+            serde_json::json!({ "binding": "device", "password": "sample" })
+        );
     }
 
     #[test]
@@ -348,8 +288,6 @@ mod tests {
         let path = dir.path().join("books.db");
         drop(vault::create(&path, "old password").unwrap());
         let credential = Credential {
-            provider: None,
-            account: None,
             binding: "device".into(),
             password: "new password".into(),
             previous_password: Some("old password".into()),
@@ -367,8 +305,6 @@ mod tests {
     fn pending_record_fits_windows_credential_manager_with_long_passwords() {
         let password = "𠀀".repeat(200);
         let credential = Credential {
-            provider: Some(Provider::Outlook),
-            account: Some("a".repeat(43)),
             binding: "b".repeat(43),
             password: password.clone(),
             previous_password: Some(password),

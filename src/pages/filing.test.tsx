@@ -197,18 +197,35 @@ const deadline: DeadlineNotice = {
 	done: 2,
 	total: 7,
 }
+const defaultCalendarOptions = {
+	invoiceDue: false,
+	estimateExpiry: false,
+	monthlyClose: false,
+	monthlyCloseDay: 10,
+	receivedBillDue: false,
+}
+let calendarOptions: typeof defaultCalendarOptions
 let notices: DeadlineNotice[]
 let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
 let calendarConnections: Set<string>
+let pausedCalendars: Set<string>
+let calendarAuthorization: Promise<void> | undefined
+let calendarSync: Promise<void> | undefined
+let calendarAccessExpired: boolean
 let registration: InvoiceRegistration
 let taxStatus: ConsumptionReport["taxStatus"]
 
 beforeEach(() => {
 	notices = [deadline]
+	calendarOptions = defaultCalendarOptions
 	scheduleResult = "ready"
 	calendarResult = "saved"
 	calendarConnections = new Set()
+	pausedCalendars = new Set()
+	calendarAuthorization = undefined
+	calendarSync = undefined
+	calendarAccessExpired = false
 	registration = {
 		registrationNo: null,
 		registeredOn: null,
@@ -292,17 +309,49 @@ beforeEach(() => {
 			}
 			case "filing_deadlines":
 				return notices
+			case "login_status":
+				return {
+					supported: true,
+					enabled: false,
+				}
+			case "filing_calendar_options":
+				return calendarOptions
+			case "save_filing_calendar_options":
+				calendarOptions = args.options
+				return null
+			case "filing_calendar_plan": {
+				const dates = notices
+					.filter((notice) => !notice.submitted && notice.daysLeft >= 0)
+					.map(({ kind, fiscalYear, date }) => ({
+						key: `${kind}-${fiscalYear}`,
+						date,
+					}))
+				if (calendarOptions.monthlyClose) {
+					dates.push({
+						key: "close-2026-12",
+						date: `2027-01-${calendarOptions.monthlyCloseDay}`,
+					})
+				}
+				return dates
+			}
 			case "filing_calendar_connection":
-				return calendarConnections.has(args?.provider ?? "")
-					? "connected"
-					: "disconnected"
+				if (!calendarConnections.has(args.provider)) return "disconnected"
+				return pausedCalendars.has(args.provider) ? "paused" : "connected"
 			case "connect_filing_calendar":
+				await calendarAuthorization
 				calendarConnections.add(args?.provider ?? "")
 				return null
 			case "disconnect_filing_calendar":
 				calendarConnections.delete(args?.provider ?? "")
+				pausedCalendars.delete(args?.provider ?? "")
+				return null
+			case "set_filing_calendar_sync_enabled":
+				if (args.enabled) pausedCalendars.delete(args.provider)
+				else pausedCalendars.add(args.provider)
 				return null
 			case "sync_filing_calendar":
+				await calendarSync
+				if (calendarAccessExpired) throw { code: "calendarAuth" }
 				return null
 			case "export_filing_calendar":
 				return calendarResult
@@ -592,17 +641,43 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
 	})
 
-	it("連携したカレンダーだけを同期する", async () => {
+	it("カレンダーの連携状態と同期状態を個別に表示する", async () => {
+		let finishAuthorization!: () => void
+		let finishSync!: () => void
+		calendarAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
+		calendarSync = new Promise((resolve) => {
+			finishSync = resolve
+		})
 		const user = userEvent.setup()
 		renderAt("/settings?view=business")
+		await user.click(
+			await screen.findByRole("link", { name: "カレンダー同期の設定を開く" })
+		)
+		const external = within(
+			await screen.findByRole("region", { name: "外部アカウント連携" })
+		)
+		expect(
+			external.queryByRole("button", { name: /Google と連携|Microsoft と連携/ })
+		).toBeNull()
+		expect(
+			external.queryByRole("group", { name: "Windows Hello / Touch ID で開く" })
+		).toBeNull()
 		const google = within(
-			await screen.findByRole("group", { name: "Google カレンダー" })
+			await external.findByRole("group", { name: "Google カレンダー" })
 		)
 		const outlook = within(
-			await screen.findByRole("group", { name: "Outlook" })
+			await external.findByRole("group", { name: "Outlook" })
 		)
-		await user.click(await google.findByRole("button", { name: "連携する" }))
+		expect(await google.findByText("未連携")).toBeInTheDocument()
+		await user.click(google.getByRole("button", { name: "連携する" }))
+		expect(await google.findByText("認証中…")).toBeInTheDocument()
+		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
+		await act(async () => finishAuthorization())
 		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(await google.findByText("同期中…")).toBeInTheDocument()
+		expect(outlook.getByText("未連携")).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
@@ -616,19 +691,150 @@ describe("インボイスの登録と期限", () => {
 			today: today(),
 			locale: "ja",
 		})
+		await act(async () => finishSync())
+		expect(
+			await google.findByText("カレンダーの同期が完了しました。")
+		).toBeInTheDocument()
 		await user.click(await outlook.findByRole("button", { name: "連携する" }))
 		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			await outlook.findByText("カレンダーの同期が完了しました。")
+		).toBeInTheDocument()
 		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
 			today: today(),
 			locale: "ja",
 		})
 		await user.click(google.getByRole("button", { name: "連携を解除" }))
+		expect(await google.findByText("未連携")).toBeInTheDocument()
 		expect(
 			await google.findByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携を解除" })
+		).toBeInTheDocument()
+	})
+
+	it("サービスごとに同期を一時停止し、再認証せずに再開できる", async () => {
+		calendarConnections.add("google")
+		calendarConnections.add("outlook")
+		const user = userEvent.setup()
+		const { unmount } = renderAt("/settings?view=external")
+		const providerSettings = async (name: string) =>
+			within(await screen.findByRole("group", { name }))
+		const google = await providerSettings("Google カレンダー")
+		const outlook = await providerSettings("Outlook")
+		const googleSwitch = await google.findByRole("switch", {
+			name: "予定を同期",
+		})
+		expect(googleSwitch).toBeChecked()
+		expect(
+			await google.findByText("カレンダーの同期が完了しました。")
+		).toBeInTheDocument()
+		expect(
+			await outlook.findByText("カレンダーの同期が完了しました。")
+		).toBeInTheDocument()
+		const syncs = (provider: string) =>
+			mocks.callCommand.mock.calls.filter(
+				([command, args]) =>
+					command === "sync_filing_calendar" && args?.provider === provider
+			).length
+		const previousGoogleSyncs = syncs("google")
+		const previousOutlookSyncs = syncs("outlook")
+
+		await user.click(googleSwitch)
+		expect(await google.findByText(/同期はオフです/)).toBeInTheDocument()
+		expect(googleSwitch).not.toBeChecked()
+		expect(google.getByText("連携済み")).toBeInTheDocument()
+		expect(google.getByRole("button", { name: "今すぐ同期" })).toBeDisabled()
+		expect(outlook.getByRole("switch", { name: "予定を同期" })).toBeChecked()
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"set_filing_calendar_sync_enabled",
+			{ provider: "google", enabled: false }
+		)
+		unmount()
+
+		renderAt("/settings?view=external")
+		const reopened = await providerSettings("Google カレンダー")
+		expect(await reopened.findByText(/同期はオフです/)).toBeInTheDocument()
+		await waitFor(() =>
+			expect(syncs("outlook")).toBeGreaterThan(previousOutlookSyncs)
+		)
+		expect(syncs("google")).toBe(previousGoogleSyncs)
+		await user.click(reopened.getByRole("switch", { name: "予定を同期" }))
+		expect(
+			await reopened.findByText("カレンダーの同期が完了しました。")
+		).toBeInTheDocument()
+		expect(syncs("google")).toBeGreaterThan(previousGoogleSyncs)
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"set_filing_calendar_sync_enabled",
+			{ provider: "google", enabled: true }
+		)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"connect_filing_calendar",
+			{ provider: "google", locale: "ja" }
+		)
+	})
+
+	it("予定の種類と月締め日を保存すると、連携中のカレンダーに同期する", async () => {
+		calendarConnections.add("google")
+		const user = userEvent.setup()
+		renderAt("/settings?view=external")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		await google.findByText("カレンダーの同期が完了しました。")
+		const group = within(screen.getByRole("group", { name: "同期する予定" }))
+		const labels = [
+			"発行した請求書の入金期限",
+			"見積書の有効期限",
+			"月締めの予定",
+			"受け取った請求書の支払期限",
+		]
+		for (const label of labels) {
+			const checkbox = group.getByRole("checkbox", { name: label })
+			expect(checkbox).not.toBeChecked()
+			await user.click(checkbox)
+		}
+		await user.selectOptions(group.getByLabelText("月締めの予定日"), "15")
+		await user.click(group.getByRole("button", { name: "同期する予定を保存" }))
+		expect(await group.findByText("保存しました。")).toBeVisible()
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"save_filing_calendar_options",
+			{
+				options: {
+					invoiceDue: true,
+					estimateExpiry: true,
+					monthlyClose: true,
+					monthlyCloseDay: 15,
+					receivedBillDue: true,
+				},
+			}
+		)
+		await waitFor(() =>
+			expect(
+				mocks.callCommand.mock.calls.filter(
+					([command]) => command === "sync_filing_calendar"
+				)
+			).toHaveLength(2)
+		)
+	})
+
+	it("認証が切れたカレンダーは再連携が必要だと表示する", async () => {
+		calendarConnections.add("google")
+		calendarAccessExpired = true
+		const user = userEvent.setup()
+		renderAt("/settings?view=external")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		expect(await google.findByText("再連携が必要")).toBeInTheDocument()
+		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
+		calendarAccessExpired = false
+		await user.click(google.getByRole("button", { name: "再連携する" }))
+		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			await google.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 	})
 
