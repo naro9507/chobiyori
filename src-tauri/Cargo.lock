@@ -569,6 +569,7 @@ dependencies = [
  "calamine",
  "cc",
  "chobiyori-core",
+ "chobiyori-storage",
  "csv",
  "encoding_rs",
  "keyring",
@@ -605,6 +606,20 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "chobiyori-storage"
+version = "0.0.0"
+dependencies = [
+ "base64 0.23.1",
+ "chobiyori-core",
+ "ring",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
 ]
 
 [[package]]

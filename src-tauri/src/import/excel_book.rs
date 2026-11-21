@@ -15,10 +15,10 @@
 use super::{
     AccountRef, BookAccount, BookPartner, Draft, DraftLine, Issue, IssueCode, Parsed, PartnerRef,
 };
-use crate::db::accounts::Account;
 use calamine::{Data, Range, Reader};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::{days_in_month, Side};
+use chobiyori_storage::accounts::Account;
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -484,10 +484,10 @@ pub fn suggest_account(name_ja: &str, name_en: &str, accounts: &[Account]) -> Op
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
-    use crate::db::{accounts, books, reports};
     use crate::import::{commit, preview, AccountMapping};
+    use chobiyori_storage::test_support::account;
+    use chobiyori_storage::test_support::set_up_db;
+    use chobiyori_storage::{accounts, books, reports};
     use rust_xlsxwriter::{Formula, Workbook, Worksheet};
 
     /// 匿名化した 2014 年帳簿のフィクスチャ。様式は SPEC 第 1 章（ブック A）に合わせる。
@@ -793,7 +793,7 @@ pub(crate) mod tests {
             (16_000 * 12 - 8_000) - (6_000 * 12 + 100 * 78) - 50_000 * 12 - (1_080 * 12 + 1_000)
         );
         // 取引先: 生徒は顧客、501 番からは仕入先
-        let partners = crate::db::partners::list(&conn).unwrap();
+        let partners = chobiyori_storage::partners::list(&conn).unwrap();
         let shop = partners.iter().find(|p| p.name_ja == "文具店").unwrap();
         assert!(shop.is_vendor && !shop.is_customer);
         drop(conn);
@@ -801,7 +801,10 @@ pub(crate) mod tests {
         // もう一度取り込んでも二重にならない（同じ日・同じ金額の 2 件も 2 件のまま）
         let again = commit(&db, &parsed, Some(2014), &mapping).unwrap();
         assert_eq!((again.imported, again.duplicates), (0, expected));
-        assert_eq!(crate::db::partners::list(&db.conn()).unwrap().len(), 3);
+        assert_eq!(
+            chobiyori_storage::partners::list(&db.conn()).unwrap().len(),
+            3
+        );
     }
 
     #[test]

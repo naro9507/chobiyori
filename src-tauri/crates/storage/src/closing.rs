@@ -4,10 +4,10 @@
 //! 期末の棚卸などの仕訳は、利用者が「記録する」を押したときだけ作る。
 
 use super::Database;
-use crate::db::accounts::{self, Account};
-use crate::db::fixed_assets;
-use crate::db::reports;
-use crate::db::transactions::{self, ensure_year_open};
+use crate::accounts::{self, Account};
+use crate::fixed_assets;
+use crate::reports;
+use crate::transactions::{self, ensure_year_open};
 use chobiyori_core::balance::TrialBalance;
 use chobiyori_core::closing::{
     self, AccountFigure, CheckItem, ChecklistFacts, InventoryStatus, OpeningRow, OpeningTotals,
@@ -24,7 +24,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 
 /// 決算書の行（`statement_line`）で科目を探す。標準の科目を優先する。
-pub(crate) fn account_by_line(conn: &Connection, line: &str) -> AppResult<i64> {
+pub fn account_by_line(conn: &Connection, line: &str) -> AppResult<i64> {
     conn.query_row(
         "SELECT id FROM accounts WHERE statement_line = ?1 ORDER BY is_system DESC, sort, id LIMIT 1",
         [line],
@@ -68,7 +68,7 @@ pub struct OpeningBalances {
 }
 
 /// 帳簿に反映する期首残高。編集中の残高は期首残高の画面だけで読む。
-pub(crate) fn opening_map(conn: &Connection, year: i64) -> AppResult<HashMap<i64, i64>> {
+pub fn opening_map(conn: &Connection, year: i64) -> AppResult<HashMap<i64, i64>> {
     read_opening(conn, year, true)
 }
 
@@ -684,7 +684,7 @@ pub fn save_white_deduction(db: &Database, year: i64, amount: i64) -> AppResult<
             return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
         }
         tx.execute("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![format!("white_deduction_{year}"),amount.to_string()])?;
-        crate::db::audit::event(tx,"whiteDeduction","update",Some(year),Some(serde_json::json!({"amount":amount})))?;
+        crate::audit::event(tx,"whiteDeduction","update",Some(year),Some(serde_json::json!({"amount":amount})))?;
         statement(tx, year)
     })
 }
@@ -692,10 +692,10 @@ pub fn save_white_deduction(db: &Database, year: i64, amount: i64) -> AppResult<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::fixed_assets::tests::pc;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::create;
-    use crate::db::transactions::tests::{account, entry};
+    use crate::test_support::pc;
+    use crate::test_support::set_up_db;
+    use crate::test_support::{account, entry};
+    use crate::transactions::create;
 
     fn row(account_id: i64, amount: i64) -> OpeningRow {
         OpeningRow { account_id, amount }
@@ -772,7 +772,7 @@ mod tests {
                 .brought_forward,
             50_000
         );
-        let ledger = crate::db::books::ledger(&conn, 2026, 1, 12, cash).unwrap();
+        let ledger = crate::books::ledger(&conn, 2026, 1, 12, cash).unwrap();
         assert_eq!(
             (ledger.brought_forward, ledger.closing_balance),
             (50_000, 60_000)

@@ -4,17 +4,17 @@
 //! 画面からは「開いた明細」に対して、形式の試し読みと受信箱への取込だけを頼める。
 
 use super::files;
-use crate::db::formats::{self, FormatFile, FormatInput, ImportFormat};
-use crate::db::inbox::{self, AddResult, BulkResult, ConfirmInput, InboxItem, InboxStatus};
-use crate::db::rules::{self, RuleInput};
-use crate::db::transactions::Transaction;
-use crate::db::Database;
 use crate::import::statement_file;
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::rules::Rule;
 use chobiyori_core::statement::{
     self, ColumnRole, FormatDefinition, HeaderDiff, RowNote, StatementRow,
 };
+use chobiyori_storage::formats::{self, FormatFile, FormatInput, ImportFormat};
+use chobiyori_storage::inbox::{self, AddResult, BulkResult, ConfirmInput, InboxItem, InboxStatus};
+use chobiyori_storage::rules::{self, RuleInput};
+use chobiyori_storage::transactions::Transaction;
+use chobiyori_storage::Database;
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{AppHandle, State};

@@ -411,32 +411,7 @@ pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-
-    pub(crate) fn input() -> SetupInput {
-        SetupInput {
-            profile: BusinessProfile {
-                trade_name: "テスト教室".into(),
-                owner_name: " 山田 花子 ".into(),
-                address: "".into(),
-                industry: "教室".into(),
-                invoice_registration_no: Some("t1234567890123".into()),
-            },
-            fiscal_year: 2026,
-            filing_type: FilingType::Blue65,
-            tax_status: TaxStatus::Exempt,
-            template: IndustryTemplate::General,
-            accounts: vec![],
-            opening_balances: vec![],
-            features: FeatureSettings::default(),
-        }
-    }
-
-    /// 初期設定を済ませた DB。他のテストからも使う。
-    pub(crate) fn set_up_db() -> Database {
-        let db = Database::open_in_memory().unwrap();
-        complete(&db, &input()).unwrap();
-        db
-    }
+    use crate::test_support::{input, set_up_db};
 
     #[test]
     fn industry_templates_add_accounts_before_misc_and_allocation_rules() {
@@ -452,7 +427,7 @@ pub(crate) mod tests {
             .unwrap();
             let conn = db.conn();
             assert_eq!(industry_template(&conn).unwrap(), template);
-            let accounts = crate::db::accounts::list(&conn).unwrap();
+            let accounts = crate::accounts::list(&conn).unwrap();
             let position = |code: &str| accounts.iter().position(|a| a.code == code).unwrap();
             // 追加科目は貸倒金のあと、雑費の前に並ぶ
             let extras = &accounts[position("617") + 1..position("699")];
@@ -462,7 +437,7 @@ pub(crate) mod tests {
                 assert_eq!(actual.name_ja, expected.name_ja);
                 assert!(actual.statement_line.is_none() && !actual.is_system);
             }
-            let rules = crate::db::allocation_rules::list(&conn).unwrap();
+            let rules = crate::allocation_rules::list(&conn).unwrap();
             assert_eq!(rules.len(), template.allocation_rules().len());
             for (actual, expected) in rules.iter().zip(template.allocation_rules()) {
                 assert_eq!(actual.code, expected.code);
@@ -671,8 +646,8 @@ pub(crate) mod tests {
 
 #[cfg(test)]
 mod extended_tests {
-    use super::tests::input;
     use super::*;
+    use crate::test_support::input;
     #[test]
     fn accounts_opening_capital_and_features_are_saved_together() {
         let db = Database::open_in_memory().unwrap();
@@ -776,7 +751,7 @@ mod help_context_tests {
         );
         let input = SetupInput {
             template: IndustryTemplate::School,
-            ..super::tests::input()
+            ..crate::test_support::input()
         };
         complete(&db, &input).unwrap();
         assert_eq!(

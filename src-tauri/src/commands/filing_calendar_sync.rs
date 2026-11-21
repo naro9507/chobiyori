@@ -9,10 +9,10 @@ use self::{
     oauth::OAuth,
     plan::{CalendarOptions, Deadline},
 };
-use crate::db::Database;
 use crate::export::labels::Locale;
 use crate::receipt::secret::{KeyringItem, SecretStore};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::Database;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{async_runtime::Mutex, State};

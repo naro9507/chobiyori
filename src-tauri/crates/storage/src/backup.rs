@@ -363,9 +363,9 @@ pub fn restore(db: &Database, source: &Path, password: Option<&str>, dir: &Path)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::input;
-    use crate::db::transactions::tests::{account, entry};
-    use crate::db::{setup, transactions, vault};
+    use crate::test_support::input;
+    use crate::test_support::{account, entry};
+    use crate::{setup, transactions, vault};
 
     fn books(dir: &Path) -> Database {
         let path = dir.join("books.db");

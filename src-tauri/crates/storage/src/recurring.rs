@@ -807,8 +807,8 @@ pub fn year_of(date: &str) -> AppResult<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
 
     fn partner(conn: &Connection, code: &str, name: &str) -> i64 {
         conn.execute(
@@ -937,7 +937,7 @@ mod tests {
         );
 
         // 売上は入金 − 返金（8,000 + 6,000 + 8,000 − 3,000 + 2,500）
-        let tb = crate::db::reports::trial_balance(&conn, 2026, 1, 12).unwrap();
+        let tb = crate::reports::trial_balance(&conn, 2026, 1, 12).unwrap();
         let sales_row = tb.rows.iter().find(|r| r.account_id == sales).unwrap();
         assert_eq!(sales_row.balance, 21_500);
 
@@ -974,7 +974,7 @@ mod tests {
             &pay(Some(pa), Some("2026-04"), "2026-04-05", 8_000, bank),
         )
         .unwrap();
-        crate::db::transactions::delete(&db, t.id).unwrap();
+        crate::transactions::delete(&db, t.id).unwrap();
         let april = monthly(&db.conn(), 2026, 4).unwrap();
         assert_eq!(april.rows[0].cell.status, PaymentStatus::Unpaid);
         // 入金がなくなったので、プランを消せる

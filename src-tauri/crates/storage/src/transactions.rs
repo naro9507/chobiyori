@@ -78,7 +78,7 @@ fn tax_start(conn: &Connection, year: i64) -> AppResult<Option<String>> {
 }
 
 /// 科目・取引先・補助科目の有効・無効と、科目の既定の税区分。件数は多くても数百なので、まとめて読む。
-pub(crate) struct DbMasters {
+pub struct DbMasters {
     accounts: HashMap<i64, (bool, Option<TaxCategory>)>,
     partners: HashMap<i64, bool>,
     sub_accounts: HashMap<i64, (i64, bool)>,
@@ -86,7 +86,7 @@ pub(crate) struct DbMasters {
 }
 
 impl DbMasters {
-    pub(crate) fn load(conn: &Connection, year: i64) -> AppResult<Self> {
+    pub fn load(conn: &Connection, year: i64) -> AppResult<Self> {
         let mut stmt = conn.prepare("SELECT id, is_active, default_tax_category FROM accounts")?;
         let accounts = stmt
             .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?
@@ -202,11 +202,7 @@ pub(crate) fn remove(conn: &Connection, id: i64) -> AppResult<()> {
 
 /// 取込で、たくさんの取引をまとめて保存する。呼び出し側の DB トランザクションの中で使う。
 /// マスタは 1 回だけ読む。1 件でも検証を通らなければエラーにする（呼び出し側で全部取り消す）。
-pub(crate) fn insert_many(
-    conn: &Connection,
-    year: i64,
-    inputs: &[TransactionInput],
-) -> AppResult<usize> {
+pub fn insert_many(conn: &Connection, year: i64, inputs: &[TransactionInput]) -> AppResult<usize> {
     ensure_year_open(conn, year)?;
     let masters = DbMasters::load(conn, year)?;
     let mut insert = conn.prepare(
@@ -565,46 +561,8 @@ pub fn list_between(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
+    use crate::test_support::{account, entry, set_up_db};
     use chobiyori_core::journal::{LineInput, SimpleKind};
-
-    /// コードから科目の id を引く。
-    pub(crate) fn account(conn: &Connection, code: &str) -> i64 {
-        conn.query_row("SELECT id FROM accounts WHERE code = ?1", [code], |r| {
-            r.get(0)
-        })
-        .unwrap()
-    }
-
-    pub(crate) fn entry(date: &str, debit: i64, credit: i64, amount: i64) -> TransactionInput {
-        TransactionInput {
-            date: date.into(),
-            entry_mode: EntryMode::Grid,
-            memo: String::new(),
-            lines: vec![
-                LineInput {
-                    sub_account_id: None,
-                    tax_category: None,
-                    is_qualified_invoice: false,
-                    side: Side::Debit,
-                    account_id: debit,
-                    amount,
-                    partner_id: None,
-                    memo: String::new(),
-                },
-                LineInput {
-                    sub_account_id: None,
-                    tax_category: None,
-                    is_qualified_invoice: false,
-                    side: Side::Credit,
-                    account_id: credit,
-                    amount,
-                    partner_id: None,
-                    memo: String::new(),
-                },
-            ],
-        }
-    }
 
     #[test]
     fn creates_and_lists_transactions_by_month_in_date_order() {
@@ -638,7 +596,7 @@ pub(crate) mod tests {
         assert_eq!((t.lines[1].line_no, t.lines[1].amount), (2, 1200));
         assert_eq!(list(&conn, 2026, None).unwrap().len(), 3);
         // 使われた科目は削除できなくなる
-        assert!(crate::db::accounts::get(&conn, supplies).unwrap().in_use);
+        assert!(crate::accounts::get(&conn, supplies).unwrap().in_use);
     }
 
     #[test]
@@ -681,7 +639,7 @@ pub(crate) mod tests {
             )
         };
         let saved = create(&db, 2026, &entry("2026-03-20", supplies, cash, 1200)).unwrap();
-        crate::db::accounts::set_active(&db.conn(), supplies, false).unwrap();
+        crate::accounts::set_active(&db.conn(), supplies, false).unwrap();
 
         assert_eq!(
             create(&db, 2026, &entry("2026-03-21", supplies, cash, 1)).unwrap_err(),
@@ -1008,7 +966,7 @@ pub(crate) mod tests {
             .unwrap_err(),
             AppError::field(ErrorCode::OutOfRange, "amount")
         );
-        crate::db::accounts::set_active(&db.conn(), supplies, false).unwrap();
+        crate::accounts::set_active(&db.conn(), supplies, false).unwrap();
         assert_eq!(
             create_simple(
                 &db,

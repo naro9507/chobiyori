@@ -5,7 +5,7 @@
 //! 締めと、締めを外したことは変更履歴に残す。
 
 use super::{audit, Database};
-use crate::db::transactions::ensure_year_open;
+use crate::transactions::ensure_year_open;
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::parse_date;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -118,9 +118,9 @@ pub fn set_year_closed(db: &Database, year: i64, closed: bool) -> AppResult<Lock
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::{account, entry};
-    use crate::db::transactions::{create, delete, update};
+    use crate::test_support::set_up_db;
+    use crate::test_support::{account, entry};
+    use crate::transactions::{create, delete, update};
 
     #[test]
     fn locked_months_block_new_changed_and_deleted_entries() {

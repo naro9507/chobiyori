@@ -1,9 +1,9 @@
 //! 入金を請求書・定期売上に結び付けて記録するコマンド（かんたん入力・受信箱から）。
 
-use crate::db::deposits::{self, DepositInput, DepositSuggestion, OpenTargets};
-use crate::db::transactions::Transaction;
-use crate::db::{inbox, Database};
 use chobiyori_core::error::AppResult;
+use chobiyori_storage::deposits::{self, DepositInput, DepositSuggestion, OpenTargets};
+use chobiyori_storage::transactions::Transaction;
+use chobiyori_storage::{inbox, Database};
 use tauri::State;
 
 /// 入金を待っている請求書と、年度の定期売上の未入金の月。

@@ -223,8 +223,8 @@ pub fn learn(conn: &Connection, merchant: &str, result: &RuleResult) -> AppResul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
 
     #[test]
     fn rules_are_saved_with_normalized_patterns_and_validated() {

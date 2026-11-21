@@ -576,16 +576,9 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::attachments::tests::jpeg;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
-
-    pub(crate) const READING: &str = r#"{
-        "date": "2026-03-05", "total": "3,240", "merchant": "テスト商店",
-        "invoiceNo": "T1234567890123",
-        "taxParts": [{"rate": 10, "amount": "2160", "tax": "196"}, {"rate": 8, "amount": "1080", "tax": "80"}],
-        "payment": "card"
-    }"#;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
+    use crate::test_support::{jpeg, READING};
 
     pub(crate) fn add_one(conn: &Connection, seed: u8) -> i64 {
         add_files(conn, &[(format!("r{seed}.jpg"), jpeg(seed))]).unwrap();
@@ -633,7 +626,7 @@ pub(crate) mod tests {
         assert!(r.checks.is_empty());
         assert_eq!(r.reduced_amount, 1080);
         assert_eq!(r.inbox_status, Some(InboxStatus::Pending));
-        let item = crate::db::inbox::get(&conn, r.inbox_item_id.unwrap()).unwrap();
+        let item = crate::inbox::get(&conn, r.inbox_item_id.unwrap()).unwrap();
         assert_eq!(item.payment_account_id, account(&conn, "204"));
         assert_eq!((item.date.as_str(), item.spend), ("2026-03-05", 3240));
     }

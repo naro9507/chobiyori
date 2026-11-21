@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 /// パスワードの最短の長さ。
 pub const PASSWORD_MIN: usize = 8;
-pub(crate) const DEVICE_BINDING: &str = "device-login-binding-v1";
+pub const DEVICE_BINDING: &str = "device-login-binding-v1";
 const PASSWORD_MAX: usize = 200;
 
 /// パスワード。`Debug` でも中身を出さない。
@@ -237,7 +237,7 @@ pub(super) fn check_current(db: &Database, current: &str) -> AppResult<Password>
     Ok(key)
 }
 
-pub(crate) fn validate_password_change(
+pub fn validate_password_change(
     db: &Database,
     current: &str,
     new: &str,
@@ -269,11 +269,11 @@ pub fn change_password(db: &Database, current: &str, new: &str) -> AppResult<()>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::input;
+    use crate::test_support::input;
 
     fn books_with_data(path: &Path, key: Option<&str>) {
         let db = Database::open(path, key).unwrap();
-        crate::db::setup::complete(&db, &input()).unwrap();
+        crate::setup::complete(&db, &input()).unwrap();
     }
 
     #[test]
@@ -374,6 +374,6 @@ mod tests {
         drop(db);
         assert!(unlock(&path, "first password").is_err());
         let db = unlock(&path, "second password").unwrap();
-        assert!(crate::db::setup::status(&db.conn()).unwrap().completed);
+        assert!(crate::setup::status(&db.conn()).unwrap().completed);
     }
 }

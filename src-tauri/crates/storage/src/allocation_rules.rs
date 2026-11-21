@@ -131,7 +131,7 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
+    use crate::test_support::set_up_db;
 
     fn input(code: &str, percent: i64) -> AllocationRuleInput {
         AllocationRuleInput {

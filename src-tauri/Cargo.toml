@@ -10,7 +10,7 @@ publish = false
 # 会計の決まりごと（chobiyori-core）を別の crate に分けている。
 # 依存のバージョンはここで 1 か所に決める（各 crate は workspace = true で使う）
 [workspace]
-members = ["crates/core"]
+members = ["crates/core", "crates/storage"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -20,6 +20,12 @@ serde_json = "1"
 # 一緒に上がる sqlite-wasm-rs 0.6.3（2026-11-10 公開）は WebAssembly 向けだけで、このアプリのビルドには入らない
 rusqlite = "=0.42.0"
 csv = "1.4.0"
+# 証憑のハッシュと、画像を API に送るときの base64
+sha2 = "0.11.1"
+base64 = "0.23.1"
+# 復旧コードの生成と、コードで保護した鍵情報の保存
+ring = "0.17.14"
+tempfile = "3.27.0"
 
 [lib]
 # Windows でバイナリ名とライブラリ名が衝突しないよう、別名にする
@@ -33,11 +39,12 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 chobiyori-core = { path = "crates/core", features = ["rusqlite"] }
+chobiyori-storage = { path = "crates/storage" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tauri-plugin-process = "2"
 tauri-plugin-notification = "=2.8.1"
-rusqlite = { workspace = true, features = ["backup", "bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { workspace = true }
 # 帳簿の出力と取込（フェーズ 3）。CSV の読み書き、Shift_JIS、Excel の読み取り、PDF の作成
 csv = { workspace = true }
 encoding_rs = "0.8.44"
@@ -59,11 +66,11 @@ lettre = { version = "0.11.24", default-features = false, features = ["builder",
 # 2.7.3（2026-11-10 公開）は 7 日たっていないので 2.7.2 に固定する
 tauri-plugin-opener = "=2.7.3"
 # 証憑のハッシュと、画像を API に送るときの base64
-sha2 = "0.11.1"
-base64 = "0.23.1"
-# 復旧コードの生成と、コードで保護した鍵情報の保存（既存の依存を使用）
-ring = "0.17.14"
-tempfile = "3.27.0"
+sha2 = { workspace = true }
+base64 = { workspace = true }
+# 復旧コードの生成と、コードで保護した鍵情報の保存
+ring = { workspace = true }
+tempfile = { workspace = true }
 
 # 自動アップデートはデスクトップだけで使う
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
@@ -88,5 +95,7 @@ panic = "abort"
 strip = true
 
 [dev-dependencies]
+# export・import のテストで、初期設定済みの DB を使う
+chobiyori-storage = { path = "crates/storage", features = ["test-support"] }
 # 取込のテストで、Excel 帳簿のフィクスチャを作る
 rust_xlsxwriter = { version = "0.102.0", default-features = false }

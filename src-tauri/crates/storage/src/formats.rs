@@ -13,30 +13,24 @@ use serde::{Deserialize, Serialize};
 /// 銀行のプリセットは、公開されている情報から様式を推測して作った。実物の明細（個人情報を伏せたもの）で
 /// 見出しを確かめるまでは、見出しが違えば自動では当てはまらず、形式エディタが開く。
 const PRESETS: &[(&str, &str)] = &[
-    ("amex", include_str!("../../presets/amex.json")),
-    (
-        "rakuten-card",
-        include_str!("../../presets/rakuten-card.json"),
-    ),
+    ("amex", include_str!("../presets/amex.json")),
+    ("rakuten-card", include_str!("../presets/rakuten-card.json")),
     (
         "rakuten-card-11",
-        include_str!("../../presets/rakuten-card-11.json"),
+        include_str!("../presets/rakuten-card-11.json"),
     ),
     (
         "rakuten-card-10",
-        include_str!("../../presets/rakuten-card-10.json"),
+        include_str!("../presets/rakuten-card-10.json"),
     ),
-    ("bank-yucho", include_str!("../../presets/bank-yucho.json")),
-    ("bank-mufg", include_str!("../../presets/bank-mufg.json")),
-    ("bank-smbc", include_str!("../../presets/bank-smbc.json")),
-    (
-        "bank-rakuten",
-        include_str!("../../presets/bank-rakuten.json"),
-    ),
-    ("bank-sbi", include_str!("../../presets/bank-sbi.json")),
+    ("bank-yucho", include_str!("../presets/bank-yucho.json")),
+    ("bank-mufg", include_str!("../presets/bank-mufg.json")),
+    ("bank-smbc", include_str!("../presets/bank-smbc.json")),
+    ("bank-rakuten", include_str!("../presets/bank-rakuten.json")),
+    ("bank-sbi", include_str!("../presets/bank-sbi.json")),
     (
         "bank-yamaguchi",
-        include_str!("../../presets/bank-yamaguchi.json"),
+        include_str!("../presets/bank-yamaguchi.json"),
     ),
 ];
 
@@ -271,22 +265,8 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
-    use chobiyori_core::statement::{AmountSign, ColumnRole, Delimiter, TextEncoding};
-
-    pub(crate) fn definition() -> FormatDefinition {
-        FormatDefinition {
-            encoding: TextEncoding::Utf8,
-            delimiter: Delimiter::Comma,
-            header_row: 1,
-            skip_rows: 0,
-            columns: vec![ColumnRole::Date, ColumnRole::Merchant, ColumnRole::Amount],
-            sign: AmountSign::SpendPositive,
-            skip_unreadable_dates: true,
-            header: vec!["日付".into(), "内容".into(), "金額".into()],
-        }
-    }
+    use crate::test_support::{account, definition, set_up_db};
+    use chobiyori_core::statement::ColumnRole;
 
     pub(crate) fn card_format(conn: &Connection) -> ImportFormat {
         create(
@@ -295,21 +275,6 @@ pub(crate) mod tests {
                 name: "テストカード".into(),
                 source_kind: SourceKind::Card,
                 payment_account_id: account(conn, "204"),
-                payment_sub_account_id: None,
-                definition: definition(),
-            },
-        )
-        .unwrap()
-    }
-
-    /// 普通預金を取込先にした銀行の形式。
-    pub(crate) fn bank_format(conn: &Connection) -> ImportFormat {
-        create(
-            conn,
-            &FormatInput {
-                name: "テスト銀行".into(),
-                source_kind: SourceKind::Bank,
-                payment_account_id: account(conn, "104"),
                 payment_sub_account_id: None,
                 definition: definition(),
             },

@@ -12,9 +12,9 @@
 //! 値が null の項目は見比べない（ファイルごと null なら、読んだ結果を出すだけ）。
 
 use chobiyori_core::receipt::{checks, parse_reading, reduced_amount, DEFAULT_MODEL};
-use chobiyori_lib::db::attachments::mime_of;
 use chobiyori_lib::receipt::gemini::Gemini;
 use chobiyori_lib::receipt::{ReadError, ReceiptReader};
+use chobiyori_storage::attachments::mime_of;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Instant;

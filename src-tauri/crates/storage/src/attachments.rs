@@ -205,14 +205,8 @@ pub(crate) fn remove_unused(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-
-    /// テスト用の小さな JPEG（中身の先頭だけそれらしくしたもの）。
-    pub(crate) fn jpeg(seed: u8) -> Vec<u8> {
-        let mut bytes = vec![0xFF, 0xD8, 0xFF, 0xE0];
-        bytes.extend(std::iter::repeat_n(seed, 64));
-        bytes
-    }
+    use crate::test_support::jpeg;
+    use crate::test_support::set_up_db;
 
     #[test]
     fn same_file_is_stored_once_with_its_hash() {

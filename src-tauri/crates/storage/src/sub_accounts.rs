@@ -127,7 +127,7 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
+    use crate::test_support::set_up_db;
 
     fn deposits_id(conn: &Connection) -> i64 {
         conn.query_row("SELECT id FROM accounts WHERE code = '104'", [], |r| {

@@ -1,12 +1,12 @@
 //! 確定申告・消費税の申告・インボイスの登録の補助（F12）のコマンド。
 //! アプリから国税庁などへは何も送らない。公表サイトは OS のブラウザで開くだけ。
 
-use crate::db::filing::{
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::filing::{
     self, CheckResult, ChecklistItem, ConsumptionReport, DeadlineNotice, IncomeGuide,
     InvoiceRegistration, NumberStatus, PartnerCheck, RegistrationInput,
 };
-use crate::db::Database;
-use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::Database;
 use tauri::State;
 
 /// 国税庁の適格請求書発行事業者公表サイト（登録番号の検索はここから）。

@@ -215,7 +215,7 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
+    use crate::test_support::set_up_db;
     use chobiyori_core::standard_accounts::GENERAL;
 
     fn input(code: &str, name: &str) -> AccountInput {

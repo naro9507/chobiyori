@@ -1,7 +1,7 @@
 //! 集計（試算表・口座残高）。合計は SQL で科目ごとに出し、残高の計算は
 //! `chobiyori_core::balance` で行う。集計値は保存しない。
 
-use crate::db::accounts;
+use crate::accounts;
 use chobiyori_core::balance::{self, Movement, Totals, TrialBalance};
 use chobiyori_core::error::AppResult;
 use chobiyori_core::journal::period_range;
@@ -47,7 +47,7 @@ pub fn trial_balance(
         })?
         .collect::<Result<_, _>>()?;
 
-    let opening = crate::db::closing::opening_map(conn, year)?;
+    let opening = crate::closing::opening_map(conn, year)?;
     // 科目の並び順（区分の順・並び順）で並べる。無効にした科目も残高があれば出す
     let movements: Vec<Movement> = accounts::list(conn)?
         .into_iter()
@@ -68,113 +68,8 @@ pub fn trial_balance(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::{account, entry};
-    use crate::db::transactions::{create, create_simple};
+    use crate::test_support::{account, books, set_up_db};
     use chobiyori_core::error::{AppError, ErrorCode};
-    use chobiyori_core::journal::{
-        EntryMode, LineInput, Side, SimpleInput, SimpleKind, TransactionInput,
-    };
-
-    /// 1 か月分（3 月）の帳簿をつける。2 月にも 1 件ある。
-    pub(crate) fn books() -> crate::db::Database {
-        let db = set_up_db();
-        let conn = db.conn();
-        let id = |code| account(&conn, code);
-        let (cash, bank, sales, supplies, utilities, wages, withheld, communication) = (
-            id("101"),
-            id("104"),
-            id("401"),
-            id("610"),
-            id("603"),
-            id("613"),
-            id("206"),
-            id("605"),
-        );
-        drop(conn);
-        let simple = |kind, date: &str, amount, account_id, payment| SimpleInput {
-            allocation_percent: None,
-            kind,
-            date: date.into(),
-            amount,
-            account_id,
-            payment_account_id: payment,
-            partner_id: None,
-            memo: String::new(),
-        };
-        // 2 月: 元手として私用のお金を入れる
-        create_simple(
-            &db,
-            2026,
-            &simple(
-                SimpleKind::OwnerContribution,
-                "2026-02-01",
-                100_000,
-                None,
-                cash,
-            ),
-        )
-        .unwrap();
-        // 3 月
-        create_simple(
-            &db,
-            2026,
-            &simple(SimpleKind::Income, "2026-03-05", 300_000, Some(sales), bank),
-        )
-        .unwrap();
-        create_simple(
-            &db,
-            2026,
-            &simple(
-                SimpleKind::Expense,
-                "2026-03-06",
-                1_200,
-                Some(supplies),
-                cash,
-            ),
-        )
-        .unwrap();
-        create_simple(
-            &db,
-            2026,
-            &simple(SimpleKind::Transfer, "2026-03-10", 50_000, Some(cash), bank),
-        )
-        .unwrap();
-        create(&db, 2026, &entry("2026-03-20", utilities, bank, 8_800)).unwrap();
-        create(&db, 2026, &entry("2026-03-21", communication, cash, 3_300)).unwrap();
-        create_simple(
-            &db,
-            2026,
-            &simple(SimpleKind::OwnerDraw, "2026-03-25", 20_000, None, bank),
-        )
-        .unwrap();
-        let line = |side, account_id, amount| LineInput {
-            sub_account_id: None,
-            tax_category: None,
-            is_qualified_invoice: false,
-            side,
-            account_id,
-            amount,
-            partner_id: None,
-            memo: String::new(),
-        };
-        create(
-            &db,
-            2026,
-            &TransactionInput {
-                date: "2026-03-31".into(),
-                entry_mode: EntryMode::Compound,
-                memo: "給料".into(),
-                lines: vec![
-                    line(Side::Debit, wages, 100_000),
-                    line(Side::Credit, bank, 95_000),
-                    line(Side::Credit, withheld, 5_000),
-                ],
-            },
-        )
-        .unwrap();
-        db
-    }
 
     fn row(tb: &TrialBalance, conn: &Connection, code: &str) -> (i64, i64, i64, i64) {
         let id = account(conn, code);

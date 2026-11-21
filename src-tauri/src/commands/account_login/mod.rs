@@ -2,12 +2,10 @@
 mod device;
 
 use super::security::{ensure_not_open, open_books, BookFiles};
-use crate::{
-    db::{unlock_guard, vault, Database},
-    receipt::secret::{KeyringItem, SecretStore},
-};
+use crate::receipt::secret::{KeyringItem, SecretStore};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::{unlock_guard, vault, Database};
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -17,7 +15,7 @@ use tauri::{AppHandle, State};
 pub struct LoginState(pub(super) tauri::async_runtime::Mutex<()>);
 
 const ITEM: KeyringItem<'static> = KeyringItem("book-device-login-v1");
-use crate::db::vault::DEVICE_BINDING as BINDING;
+use chobiyori_storage::vault::DEVICE_BINDING as BINDING;
 const SUPPORTED: bool = cfg!(any(windows, target_os = "macos"));
 
 pub(super) fn discard_device_record() {

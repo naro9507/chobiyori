@@ -3,7 +3,7 @@
 //! 取引は変更の前と後の内容を JSON で持つ。パスワードや API キーは入れない。
 //! 履歴は帳簿と一緒に暗号化される。履歴そのものは画面から消せない。
 
-use crate::db::transactions::Transaction;
+use crate::transactions::Transaction;
 use chobiyori_core::error::AppResult;
 use rusqlite::{params, Connection};
 use serde::Serialize;
@@ -27,7 +27,7 @@ pub(crate) fn transaction(
 }
 
 /// 取引以外の操作（締め・締めの解除・復元・パスワードの変更など）を残す。`detail` は短い説明の JSON。
-pub(crate) fn event(
+pub fn event(
     conn: &Connection,
     entity: &str,
     action: &str,

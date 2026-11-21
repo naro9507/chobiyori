@@ -413,8 +413,8 @@ pub fn skipped(conn: &Connection, year: i64) -> AppResult<Vec<Candidate>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
 
     fn rent(conn: &Connection) -> TemplateInput {
         TemplateInput {
@@ -566,7 +566,7 @@ mod tests {
         // 定型仕訳で使っている科目は削除できない（使っている印が付く）
         create(&conn, &rent(&conn)).unwrap();
         assert!(
-            crate::db::accounts::get(&conn, account(&conn, "616"))
+            crate::accounts::get(&conn, account(&conn, "616"))
                 .unwrap()
                 .in_use
         );

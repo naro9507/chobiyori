@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn only_future_unpaid_bills_appear_and_edits_preserve_paid_state() {
-        let db = crate::db::Database::open_in_memory().unwrap();
+        let db = crate::Database::open_in_memory().unwrap();
         let conn = db.conn();
         let mut bill = ReceivedBillInput {
             id: None,

@@ -242,24 +242,24 @@ pub fn parse(bytes: &[u8]) -> AppResult<Parsed> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::books::journal;
-    use crate::db::reports::tests::books;
-    use crate::db::reports::trial_balance;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::{accounts, partners};
     use crate::export::csv::{self as csv_out, Encoding};
     use crate::export::labels::Locale;
     use crate::export::report::Names;
     use crate::import::{commit, preview};
+    use chobiyori_storage::books::journal;
+    use chobiyori_storage::reports::trial_balance;
+    use chobiyori_storage::test_support::books;
+    use chobiyori_storage::test_support::set_up_db;
+    use chobiyori_storage::{accounts, partners};
 
-    fn exported(db: &crate::db::Database, locale: Locale, encoding: Encoding) -> Vec<u8> {
+    fn exported(db: &chobiyori_storage::Database, locale: Locale, encoding: Encoding) -> Vec<u8> {
         let conn = db.conn();
         let names = Names::new(
             accounts::list(&conn).unwrap(),
             partners::list(&conn).unwrap(),
             locale,
         )
-        .with_sub_accounts(crate::db::sub_accounts::list(&conn).unwrap());
+        .with_sub_accounts(chobiyori_storage::sub_accounts::list(&conn).unwrap());
         let text = csv_out::journal(&journal(&conn, 2026, 1, 12).unwrap(), &names, locale).unwrap();
         csv_out::encode(&text, encoding).unwrap()
     }
@@ -327,7 +327,7 @@ mod tests {
             AppError::new(ErrorCode::ImportBlocked)
         );
         assert_eq!(
-            crate::db::transactions::list(&db.conn(), 2026, None)
+            chobiyori_storage::transactions::list(&db.conn(), 2026, None)
                 .unwrap()
                 .len(),
             0
@@ -345,12 +345,12 @@ mod tests {
     }
 
     /// 課税事業者の帳簿に、普通預金の補助科目「A銀行」（コード 1）を作る。
-    fn taxable_book_with_bank_sub_account() -> (crate::db::Database, i64) {
+    fn taxable_book_with_bank_sub_account() -> (chobiyori_storage::Database, i64) {
         let db = set_up_db();
         let conn = db.conn();
         conn.execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
             .unwrap();
-        let bank = crate::db::transactions::tests::account(&conn, "104");
+        let bank = chobiyori_storage::test_support::account(&conn, "104");
         conn.execute(
             "INSERT INTO sub_accounts (account_id, code, name_ja) VALUES (?1, '1', 'A銀行')",
             [bank],
@@ -368,15 +368,15 @@ mod tests {
         let (supplies, bank) = {
             let conn = source.conn();
             (
-                crate::db::transactions::tests::account(&conn, "610"),
-                crate::db::transactions::tests::account(&conn, "104"),
+                chobiyori_storage::test_support::account(&conn, "610"),
+                chobiyori_storage::test_support::account(&conn, "104"),
             )
         };
-        let mut input = crate::db::transactions::tests::entry("2026-04-01", supplies, bank, 540);
+        let mut input = chobiyori_storage::test_support::entry("2026-04-01", supplies, bank, 540);
         input.lines[0].tax_category = Some(TaxCategory::TaxablePurchase8);
         input.lines[0].is_qualified_invoice = true;
         input.lines[1].sub_account_id = Some(sub);
-        crate::db::transactions::create(&source, 2026, &input).unwrap();
+        chobiyori_storage::transactions::create(&source, 2026, &input).unwrap();
 
         for locale in [Locale::Ja, Locale::En] {
             let bytes = exported(&source, locale, Encoding::Utf8);
@@ -384,7 +384,7 @@ mod tests {
             assert!(parsed.issues.is_empty(), "{:?}", parsed.issues);
             let (target, target_sub) = taxable_book_with_bank_sub_account();
             commit(&target, &parsed, None, &[]).unwrap();
-            let t = crate::db::transactions::list(&target.conn(), 2026, None).unwrap();
+            let t = chobiyori_storage::transactions::list(&target.conn(), 2026, None).unwrap();
             assert_eq!(
                 t[0].lines[0].tax_category,
                 Some(TaxCategory::TaxablePurchase8)
@@ -470,7 +470,7 @@ mod tests {
         assert!(p.creates_fiscal_year);
         assert_eq!(p.fiscal_year, Some(2014));
         commit(&db, &parsed, None, &[]).unwrap();
-        let years = crate::db::setup::fiscal_years(&db.conn()).unwrap();
+        let years = chobiyori_storage::setup::fiscal_years(&db.conn()).unwrap();
         assert_eq!(
             years.iter().map(|y| y.year).collect::<Vec<_>>(),
             [2026, 2014]

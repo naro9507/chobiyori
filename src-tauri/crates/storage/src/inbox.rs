@@ -723,9 +723,9 @@ pub fn delete(conn: &Connection, ids: &[i64]) -> AppResult<usize> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::formats::tests::card_format;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::{account, entry};
+    use crate::formats::tests::card_format;
+    use crate::test_support::set_up_db;
+    use crate::test_support::{account, entry};
     use chobiyori_core::rules::MatchKind;
 
     pub(crate) fn row(date: &str, spend: i64, merchant: &str) -> StatementRow {
@@ -757,12 +757,11 @@ pub(crate) mod tests {
         let db = set_up_db();
         let (bank_format, partner, plan) = {
             let conn = db.conn();
-            let format = crate::db::formats::tests::bank_format(&conn);
-            let partner =
-                crate::db::deposits::tests::partner(&conn, "1", "山田 太郎", "やまだ たろう");
-            let plan = crate::db::recurring::create(
+            let format = crate::test_support::bank_format(&conn);
+            let partner = crate::deposits::tests::partner(&conn, "1", "山田 太郎", "やまだ たろう");
+            let plan = crate::recurring::create(
                 &conn,
-                &crate::db::recurring::PlanInput {
+                &crate::recurring::PlanInput {
                     partner_id: partner,
                     name: "月謝".into(),
                     amount: 8_000,
@@ -789,7 +788,7 @@ pub(crate) mod tests {
         let items = list(&db.conn(), None).unwrap();
         let deposit = items.iter().find(|i| i.spend < 0).unwrap();
         let spend = items.iter().find(|i| i.spend > 0).unwrap();
-        let target = crate::db::deposits::DepositTarget::Plan {
+        let target = crate::deposits::DepositTarget::Plan {
             plan_id: plan,
             month: "2026-10".into(),
         };
@@ -827,7 +826,7 @@ pub(crate) mod tests {
         );
         let conn = db.conn();
         assert_eq!(get(&conn, deposit.id).unwrap().status, InboxStatus::Posted);
-        let october = crate::db::recurring::monthly(&conn, 2026, 10).unwrap();
+        let october = crate::recurring::monthly(&conn, 2026, 10).unwrap();
         assert_eq!(
             october.rows[0].cell.status,
             chobiyori_core::recurring::PaymentStatus::Paid
@@ -1108,7 +1107,7 @@ pub(crate) mod tests {
 
     #[test]
     fn points_paid_on_a_receipt_are_booked_as_expense_with_their_own_credit() {
-        use crate::db::receipts::{self, tests::add_one};
+        use crate::receipts::{self, tests::add_one};
         // ポイント 300 円で払ったレシート。税率ごとの対象額はポイントを引く前（1,100 + 216）
         const WITH_POINTS: &str = r#"{"date": "2026-11-10", "total": "1,016",
             "merchant": "ドラッグストア", "payment": "card", "points": "300",
@@ -1224,10 +1223,8 @@ pub(crate) mod tests {
 
     #[test]
     fn receipt_and_card_statement_of_the_same_purchase_become_one_transaction() {
-        use crate::db::receipts::{
-            self,
-            tests::{add_one, READING},
-        };
+        use crate::receipts::{self, tests::add_one};
+        use crate::test_support::READING;
         let db = set_up_db();
         let (receipt_id, supplies, card) = {
             let conn = db.conn();
@@ -1262,7 +1259,7 @@ pub(crate) mod tests {
         assert!(expense.iter().all(|l| l.is_qualified_invoice));
         assert_eq!(saved.entry_mode, EntryMode::Receipt);
         // 画像は証憑として取引に付く
-        let files = crate::db::attachments::list_for_transaction(&db.conn(), saved.id).unwrap();
+        let files = crate::attachments::list_for_transaction(&db.conn(), saved.id).unwrap();
         assert_eq!(files.len(), 1);
 
         // 同じ買い物がカードの明細に出る（2 日後の利用日）
@@ -1304,7 +1301,7 @@ pub(crate) mod tests {
         drop(conn);
         // 金額が違う取引には紐付けられない
         let other =
-            crate::db::transactions::create(&db, 2026, &entry("2026-03-07", supplies, card, 999))
+            crate::transactions::create(&db, 2026, &entry("2026-03-07", supplies, card, 999))
                 .unwrap();
         assert_eq!(
             link(&db, statement_id, other.id).unwrap_err(),

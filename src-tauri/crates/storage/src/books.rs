@@ -3,8 +3,8 @@
 //! どの帳簿も、保存してある仕訳から毎回作る。残高の計算は `chobiyori_core::ledger` で行う。
 //! 繰越は、期首残高と、年度の初めから期間の前までの増減。
 
-use crate::db::accounts::{self, Account};
-use crate::db::transactions::{self, Transaction};
+use crate::accounts::{self, Account};
+use crate::transactions::{self, Transaction};
 use chobiyori_core::balance::{signed, Totals};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::{period_range, Side};
@@ -130,7 +130,7 @@ pub fn partner_ledgers(
     let account = accounts::get(conn, account_id)
         .map_err(|_| AppError::field(ErrorCode::NotFound, "accountId"))?;
     let (from, to) = period_range(year, from_month, to_month)?;
-    let opening = crate::db::closing::opening_map(conn, year)?
+    let opening = crate::closing::opening_map(conn, year)?
         .get(&account_id)
         .copied()
         .unwrap_or(0);
@@ -179,7 +179,7 @@ pub fn partner_ledgers(
         }
     }
 
-    let mut keys: Vec<Option<i64>> = crate::db::partners::list(conn)?
+    let mut keys: Vec<Option<i64>> = crate::partners::list(conn)?
         .into_iter()
         .map(|p| Some(p.id))
         .collect();
@@ -218,7 +218,7 @@ fn ledgers_for(
     let (from, to) = period_range(year, from_month, to_month)?;
 
     // 繰越 = 期首残高 + 年度の初めから期間の前までの増減
-    let opening = crate::db::closing::opening_map(conn, year)?;
+    let opening = crate::closing::opening_map(conn, year)?;
     let mut stmt = conn.prepare(
         "SELECT l.account_id,
                 coalesce(sum(CASE WHEN l.side = 'debit' THEN l.amount END), 0),
@@ -282,9 +282,9 @@ fn ledgers_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::reports::tests::books;
-    use crate::db::reports::trial_balance;
-    use crate::db::transactions::tests::account;
+    use crate::reports::trial_balance;
+    use crate::test_support::account;
+    use crate::test_support::books;
 
     #[test]
     fn journal_lists_the_period_with_totals() {
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn receivables_are_split_by_partner() {
-        let db = crate::db::setup::tests::set_up_db();
+        let db = crate::test_support::set_up_db();
         let (bank, sales, ar) = {
             let conn = db.conn();
             (
@@ -425,7 +425,7 @@ mod tests {
             )
         };
         let with_partner = |date: &str, debit, credit, amount, partner| {
-            let mut e = crate::db::transactions::tests::entry(date, debit, credit, amount);
+            let mut e = crate::test_support::entry(date, debit, credit, amount);
             for l in &mut e.lines {
                 l.partner_id = Some(partner);
             }

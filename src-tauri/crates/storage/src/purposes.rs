@@ -245,7 +245,7 @@ pub fn post(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
+    use crate::test_support::set_up_db;
     fn id(conn: &Connection, code: &str) -> i64 {
         conn.query_row("SELECT id FROM accounts WHERE code=?1", [code], |r| {
             r.get(0)
@@ -287,12 +287,12 @@ mod tests {
         );
         assert!(get(&db.conn(), p.id).unwrap().in_use);
         assert_eq!(delete(&db.conn(), p.id).unwrap_err().code, ErrorCode::InUse);
-        crate::db::locks::set_month(&db, 2026, 1, true).unwrap();
+        crate::locks::set_month(&db, 2026, 1, true).unwrap();
         assert_eq!(
             post(&db, 2026, p.id, "2026-01-11", 1200).unwrap_err().code,
             ErrorCode::MonthLocked
         );
-        crate::db::locks::set_month(&db, 2026, 1, false).unwrap();
+        crate::locks::set_month(&db, 2026, 1, false).unwrap();
         set_active(&db.conn(), p.id, false).unwrap();
         assert!(post(&db, 2026, p.id, "2026-01-10", 1200).is_err());
         assert_eq!(

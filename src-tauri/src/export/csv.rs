@@ -5,11 +5,11 @@
 
 use super::labels::{self as l, Locale};
 use super::report::{Cell, Names, Report};
-use crate::db::accounts::Account;
-use crate::db::books::JournalBook;
-use crate::db::partners::Partner;
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::Side;
+use chobiyori_storage::accounts::Account;
+use chobiyori_storage::books::JournalBook;
+use chobiyori_storage::partners::Partner;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]

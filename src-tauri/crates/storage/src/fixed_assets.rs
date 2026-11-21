@@ -4,8 +4,8 @@
 //! 計算した償却は候補として見せ、利用者が「記録する」を押したときだけ仕訳にする。
 
 use super::Database;
-use crate::db::closing::account_by_line;
-use crate::db::transactions::{self, ensure_year_open};
+use crate::closing::account_by_line;
+use crate::transactions::{self, ensure_year_open};
 use chobiyori_core::depreciation::{self, Asset, Method, YearDepreciation};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::{
@@ -471,24 +471,7 @@ pub fn record(db: &Database, year: i64, asset_ids: &[i64]) -> AppResult<usize> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
-
-    pub(crate) fn pc(account_id: i64) -> FixedAssetInput {
-        FixedAssetInput {
-            name: "パソコン".into(),
-            account_id,
-            acquired_on: "2026-04-10".into(),
-            cost: 240_000,
-            useful_life: 4,
-            method: Method::StraightLine,
-            business_percent: 60,
-            book_value_year: None,
-            book_value: None,
-            disposed_on: None,
-            memo: String::new(),
-        }
-    }
+    use crate::test_support::{account, pc, set_up_db};
 
     #[test]
     fn records_the_purchase_with_the_asset() {

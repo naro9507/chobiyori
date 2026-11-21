@@ -2,18 +2,18 @@
 //!
 //! 複数の層（db・export）をまたぐので、`db` の中ではなくここに置く。
 
-use crate::db::closing::{account_by_line, save_white_deduction, statement};
-use crate::db::{setup, transactions, Database};
 use crate::export::{self, labels::Locale, ExportFormat, ExportRequest, ExportTarget};
 use chobiyori_core::closing;
 use chobiyori_core::error::ErrorCode;
 use chobiyori_core::journal::{SimpleInput, SimpleKind};
 use chobiyori_core::master::FilingType;
+use chobiyori_storage::closing::{account_by_line, save_white_deduction, statement};
+use chobiyori_storage::{setup, transactions, Database};
 
 #[test]
 fn white_deduction_flows_to_statement_guide_and_export() {
     let db = Database::open_in_memory().unwrap();
-    let mut initial = setup::tests::input();
+    let mut initial = chobiyori_storage::test_support::input();
     initial.filing_type = FilingType::White;
     setup::complete(&db, &initial).unwrap();
     let (cash, sales) = {
@@ -45,7 +45,7 @@ fn white_deduction_flows_to_statement_guide_and_export() {
         .pl
         .iter()
         .any(|l| l.key == "family_deduction" && l.amount == 500_000));
-    let guide = crate::db::filing::income_guide(&db.conn(), 2026).unwrap();
+    let guide = chobiyori_storage::filing::income_guide(&db.conn(), 2026).unwrap();
     assert_eq!(guide.income, 500_000);
     assert_eq!(guide.business_revenue, 1_000_000);
     assert!(guide
@@ -74,7 +74,7 @@ fn white_deduction_flows_to_statement_guide_and_export() {
     assert!(csv.contains("事業専従者控除額"));
     assert!(!csv.contains("青色申告特別控除"));
     assert!(!csv.contains("貸借対照表"));
-    let sales_book = crate::db::books::sales_book(&db.conn(), 2026, 1, 12).unwrap();
+    let sales_book = chobiyori_storage::books::sales_book(&db.conn(), 2026, 1, 12).unwrap();
     assert_eq!(sales_book.len(), 1);
     assert_eq!(sales_book[0].total_credit, 1_000_000);
     assert!(save_white_deduction(&db, 2026, -1).is_err());
@@ -140,7 +140,7 @@ fn white_deduction_flows_to_statement_guide_and_export() {
         .issues
         .iter()
         .any(|i| i.code == closing::StatementIssueCode::WhiteDeductionExceedsIncome));
-    crate::db::locks::set_year_closed(&db, 2026, true).unwrap();
+    chobiyori_storage::locks::set_year_closed(&db, 2026, true).unwrap();
     assert_eq!(
         save_white_deduction(&db, 2026, 50_000).unwrap_err().code,
         ErrorCode::YearClosed

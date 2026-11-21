@@ -1033,8 +1033,8 @@ pub fn record_payment(db: &Database, id: i64, input: &PaymentInput) -> AppResult
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
 
     fn line(name: &str, quantity: i64, unit_price: i64, tax_rate: i64) -> LineInput {
         LineInput {
@@ -1235,7 +1235,7 @@ mod tests {
         assert!(invoice_dates().is_empty());
 
         // 売掛金は 0 に戻り、売上は税込みの合計
-        let tb = crate::db::reports::trial_balance(&db.conn(), 2026, 1, 12).unwrap();
+        let tb = crate::reports::trial_balance(&db.conn(), 2026, 1, 12).unwrap();
         let balance = |id| {
             tb.rows
                 .iter()
@@ -1306,14 +1306,14 @@ mod tests {
         let db = set_up_db();
         let d = create(&db, &input(DocumentKind::Invoice)).unwrap();
         issue(&db, d.id, &fake_pdf).unwrap();
-        crate::db::locks::set_month(&db, 2026, 3, true).unwrap();
+        crate::locks::set_month(&db, 2026, 3, true).unwrap();
         assert_eq!(
             post_sale(&db, d.id).unwrap_err().code,
             ErrorCode::MonthLocked
         );
-        crate::db::locks::set_month(&db, 2026, 3, false).unwrap();
+        crate::locks::set_month(&db, 2026, 3, false).unwrap();
         post_sale(&db, d.id).unwrap();
-        crate::db::locks::set_month(&db, 2026, 3, true).unwrap();
+        crate::locks::set_month(&db, 2026, 3, true).unwrap();
         assert_eq!(cancel(&db, d.id).unwrap_err().code, ErrorCode::MonthLocked);
         assert_eq!(
             get(&db.conn(), d.id).unwrap().status,

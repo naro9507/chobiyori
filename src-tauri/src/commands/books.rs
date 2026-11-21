@@ -1,9 +1,9 @@
 //! 帳簿（仕訳帳・総勘定元帳・出納帳・経費帳）のコマンド。どれも仕訳から計算する。
 
-use crate::db::books::{self, JournalBook};
-use crate::db::Database;
 use chobiyori_core::error::AppResult;
 use chobiyori_core::ledger::Ledger;
+use chobiyori_storage::books::{self, JournalBook};
+use chobiyori_storage::Database;
 use tauri::State;
 
 #[tauri::command]

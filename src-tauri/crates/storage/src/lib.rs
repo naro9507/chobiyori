@@ -32,6 +32,9 @@ pub mod transactions;
 pub mod unlock_guard;
 pub mod vault;
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
+
 use chobiyori_core::error::{AppError, AppResult};
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
@@ -39,7 +42,7 @@ use std::sync::{Mutex, MutexGuard};
 
 /// スキーマの変更。番号順に 1 回だけ当てる。適用済みの番号は `PRAGMA user_version` に持つ。
 /// 一度配布したファイルは書き換えず、変更は新しいファイルとして足す。
-pub(crate) const MIGRATIONS: &[&str] = &[
+pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_journal.sql"),
     include_str!("migrations/0003_templates.sql"),
@@ -112,7 +115,7 @@ impl Database {
         Self::init(Connection::open_in_memory()?)
     }
 
-    pub(crate) fn init(conn: Connection) -> AppResult<Self> {
+    pub fn init(conn: Connection) -> AppResult<Self> {
         configure(&conn)?;
         migrate(&conn)?;
         Ok(Self {
@@ -129,7 +132,7 @@ impl Database {
     }
 
     /// 暗号化の鍵。暗号化していなければ None。
-    pub(crate) fn key(&self) -> Option<vault::Password> {
+    pub fn key(&self) -> Option<vault::Password> {
         self.key.lock().unwrap_or_else(|p| p.into_inner()).clone()
     }
 
@@ -146,7 +149,7 @@ impl Database {
                 .unwrap_or_else(|p| p.into_inner())
     }
 
-    pub(crate) fn mark_backed_up(&self, conn: &Connection) {
+    pub fn mark_backed_up(&self, conn: &Connection) {
         *self
             .backed_up_changes
             .lock()

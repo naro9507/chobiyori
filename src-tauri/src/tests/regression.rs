@@ -1,9 +1,3 @@
-use crate::db::setup::tests::{input, set_up_db};
-use crate::db::transactions::tests::{account, entry};
-use crate::db::{
-    backup, books, closing, documents, filing, fixed_assets, locks, recurring, reports, setup,
-    transactions, Database,
-};
 use crate::export::{csv, labels::Locale, report::Names};
 use crate::import::{self, journal_csv};
 use chobiyori_core::closing::OpeningRow;
@@ -12,6 +6,12 @@ use chobiyori_core::{
     depreciation::Method,
     document::{DocumentKind, LineInput},
     master::TaxCategory,
+};
+use chobiyori_storage::test_support::{account, entry};
+use chobiyori_storage::test_support::{input, set_up_db};
+use chobiyori_storage::{
+    backup, books, closing, documents, filing, fixed_assets, locks, recurring, reports, setup,
+    transactions, Database,
 };
 
 fn opening(account_id: i64, amount: i64) -> OpeningRow {
@@ -258,7 +258,7 @@ fn invoice_discount_preserves_the_tax_buckets() {
 fn depreciation_postings_protect_the_closed_year_from_asset_edits() {
     let db = set_up_db();
     let (tools, _) = pair(&db, "115", "101");
-    let mut asset = fixed_assets::tests::pc(tools);
+    let mut asset = chobiyori_storage::test_support::pc(tools);
     let id = fixed_assets::create(&db.conn(), &asset).unwrap().id;
     assert_eq!(fixed_assets::record(&db, 2026, &[id]).unwrap(), 1);
     locks::set_year_closed(&db, 2026, true).unwrap();
@@ -284,7 +284,7 @@ fn depreciation_postings_protect_the_closed_year_from_asset_edits() {
 fn small_asset_threshold_changes_in_april_2026() {
     let db = set_up_db();
     let (tools, _) = pair(&db, "115", "101");
-    let mut a = fixed_assets::tests::pc(tools);
+    let mut a = chobiyori_storage::test_support::pc(tools);
     a.cost = 350_000;
     a.method = Method::SmallAsset;
     assert!(fixed_assets::create(&db.conn(), &a).is_ok());
@@ -300,7 +300,7 @@ fn small_asset_threshold_changes_in_april_2026() {
 fn small_asset_annual_limit_also_applies_across_batches() {
     let db = set_up_db();
     let (tools, _) = pair(&db, "115", "101");
-    let mut a = fixed_assets::tests::pc(tools);
+    let mut a = chobiyori_storage::test_support::pc(tools);
     a.cost = 290_000;
     a.business_percent = 100;
     a.method = Method::SmallAsset;
@@ -328,7 +328,7 @@ fn small_asset_annual_limit_also_applies_across_batches() {
 fn restore_does_not_depend_on_the_old_temporary_filename() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("books.db");
-    let db = crate::db::vault::create(&path, "test password").unwrap();
+    let db = chobiyori_storage::vault::create(&path, "test password").unwrap();
     setup::complete(&db, &input()).unwrap();
     let file = backup::create(&db, dir.path(), backup::BackupKind::Manual).unwrap();
     let old = path.with_extension("db.replaced");
@@ -336,7 +336,7 @@ fn restore_does_not_depend_on_the_old_temporary_filename() {
     backup::restore(&db, &dir.path().join(file), None, dir.path()).unwrap();
     assert!(old.is_dir());
     assert!(setup::status(&db.conn()).unwrap().completed);
-    let reopened = crate::db::vault::unlock(&path, "test password").unwrap();
+    let reopened = chobiyori_storage::vault::unlock(&path, "test password").unwrap();
     assert!(setup::status(&reopened.conn()).unwrap().completed);
 }
 
@@ -400,7 +400,7 @@ fn csv_roundtrip_preserves_a_literal_leading_apostrophe() {
     transactions::create(&db, 2026, &t).unwrap();
     let conn = db.conn();
     let names = Names::new(
-        crate::db::accounts::list(&conn).unwrap(),
+        chobiyori_storage::accounts::list(&conn).unwrap(),
         Vec::new(),
         Locale::En,
     );
@@ -416,14 +416,14 @@ fn csv_roundtrip_preserves_a_literal_leading_apostrophe() {
 
 #[test]
 fn statement_cannot_be_matched_to_another_bank_subaccount() {
-    use crate::db::{formats, inbox};
     use chobiyori_core::statement::StatementRow;
+    use chobiyori_storage::inbox;
     let db = set_up_db();
     let (bank, expense) = pair(&db, "104", "610");
     let (a, b, format) = {
         let conn = db.conn();
         conn.execute("INSERT INTO sub_accounts (id, account_id, code, name_ja) VALUES (1, ?1, 'A', 'Bank A'), (2, ?1, 'B', 'Bank B')", [bank]).unwrap();
-        let mut format = formats::tests::bank_format(&conn);
+        let mut format = chobiyori_storage::test_support::bank_format(&conn);
         format.payment_account_id = Some(bank);
         format.payment_sub_account_id = Some(1);
         (1, 2, format)
@@ -510,7 +510,7 @@ fn small_asset_special_treatment_is_rejected_in_white_filing() {
     initial.filing_type = FilingType::White;
     setup::complete(&db, &initial).unwrap();
     let (tools, _) = pair(&db, "115", "101");
-    let mut a = fixed_assets::tests::pc(tools);
+    let mut a = chobiyori_storage::test_support::pc(tools);
     a.cost = 250_000;
     a.business_percent = 100;
     a.method = Method::SmallAsset;
@@ -542,7 +542,7 @@ fn statement_import_rejects_more_than_100000_csv_records() {
 
 #[test]
 fn attachment_is_shared_and_can_be_detached_independently() {
-    use crate::db::attachments;
+    use chobiyori_storage::attachments;
     let db = set_up_db();
     let (cash, sales) = pair(&db, "101", "401");
     let a = transactions::create(&db, 2026, &entry("2026-04-01", cash, sales, 500)).unwrap();
@@ -583,7 +583,7 @@ fn migration_preserves_legacy_attachment_and_balanced_opening() {
     use rusqlite::Connection;
     let conn = Connection::open_in_memory().unwrap();
     conn.pragma_update(None, "foreign_keys", true).unwrap();
-    for sql in &crate::db::MIGRATIONS[..11] {
+    for sql in &chobiyori_storage::MIGRATIONS[..11] {
         conn.execute_batch(sql).unwrap();
     }
     conn.execute_batch(
@@ -607,7 +607,7 @@ fn migration_preserves_legacy_attachment_and_balanced_opening() {
             Some(&500)
         );
         assert_eq!(
-            crate::db::attachments::list_for_transaction(&conn, 1).unwrap()[0].id,
+            chobiyori_storage::attachments::list_for_transaction(&conn, 1).unwrap()[0].id,
             1
         );
         assert!(!closing::opening(&conn, 2026).unwrap().confirmed);

@@ -1,11 +1,11 @@
 //! 明細のファイル（CSV・TSV・Excel）を「文字列の表」にする。読み方は `chobiyori_core::statement`。
 
-use crate::db::formats::ImportFormat;
 use calamine::{Data, Reader};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::statement::{
     self, Delimiter, FormatDefinition, HeaderDiff, Statement, TextEncoding,
 };
+use chobiyori_storage::formats::ImportFormat;
 use std::io::Cursor;
 
 /// 表に読む行の上限。カードの明細なら 1 年分でも数千行
@@ -204,7 +204,7 @@ pub(crate) mod tests {
             ("2026/10/05", "ｱｽｸﾙ", "-1,080", ""),
             ("2026/10/07", "HOTEL PARIS", "15,000", "EUR 90.00"),
         ]);
-        let presets = crate::db::formats::presets();
+        let presets = chobiyori_storage::formats::presets();
         let amex = matching_format(&bytes, "activity.csv", &presets).unwrap();
         assert_eq!(amex.preset.as_deref(), Some("amex"));
         let s = read_with(&bytes, "activity.csv", &amex.definition)
@@ -250,7 +250,7 @@ pub(crate) mod tests {
                 "12月,620,620,580,580",
             ),
         ];
-        let presets = crate::db::formats::presets();
+        let presets = chobiyori_storage::formats::presets();
         for (key, suffix, tail) in cases {
             let csv = format!(
                 "{prefix}{suffix}\r\n2026/10/03,文具店（テスト）,本人,2回払い,\"1,180\",20,1200,{tail}\r\n2026/10/04,返品（テスト）,本人,1回払い,-300,0,-300,{tail}\r\n,合計\r\n",
@@ -326,7 +326,7 @@ pub(crate) mod tests {
 
     #[test]
     fn each_bank_preset_reads_its_own_anonymized_statement() {
-        let presets = crate::db::formats::presets();
+        let presets = chobiyori_storage::formats::presets();
         let banks: Vec<_> = presets
             .iter()
             .filter(|p| p.preset.as_deref().is_some_and(|k| k.starts_with("bank-")))

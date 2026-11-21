@@ -8,9 +8,9 @@
 
 use super::labels::amount as yen;
 use super::pdf::{Measure, PdfFont};
-use crate::db::documents::Document;
 use chobiyori_core::document::{DocumentKind, TaxMode};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::documents::Document;
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::num::NormalizedF32;
@@ -652,8 +652,8 @@ fn fill(gray: u8) -> Fill {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::documents::{Document, Issuer, Send};
     use chobiyori_core::document::{totals, DisplayStatus, DocumentStatus, LineInput};
+    use chobiyori_storage::documents::{Document, Issuer, Send};
 
     pub(crate) fn sample(mode: TaxMode, lines: usize) -> Document {
         let lines: Vec<LineInput> = (0..lines)

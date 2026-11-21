@@ -280,7 +280,7 @@ fn year_status(conn: &Connection, year: i64) -> AppResult<TaxStatus> {
 }
 
 /// 年度で課税として扱う最初の日。
-pub(crate) fn taxable_from(conn: &Connection, year: i64) -> AppResult<Option<String>> {
+pub fn taxable_from(conn: &Connection, year: i64) -> AppResult<Option<String>> {
     let (status, start) = conn
         .query_row(
             "SELECT tax_status, invoice_tax_start FROM fiscal_years WHERE year = ?1",
@@ -864,9 +864,9 @@ pub fn partner_checks(conn: &Connection, today: &str) -> AppResult<Vec<PartnerCh
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
-    use crate::db::transactions::{create, get};
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
+    use crate::transactions::{create, get};
     use chobiyori_core::journal::{EntryMode, LineInput, Side, TransactionInput};
 
     fn line(side: Side, account_id: i64, amount: i64, tax: Option<TaxCategory>) -> LineInput {
@@ -945,7 +945,7 @@ mod tests {
             Some(TaxCategory::TaxableSales10)
         );
         // 締めた月がある年度は、税区分を付け直せないので変えない
-        crate::db::locks::set_month(&db, 2026, 3, true).unwrap();
+        crate::locks::set_month(&db, 2026, 3, true).unwrap();
         let err = set_tax_status(&db, 2026, TaxStatus::Standard).unwrap_err();
         assert_eq!(err.code, ErrorCode::MonthLocked);
         assert_eq!(

@@ -1,9 +1,9 @@
 //! 初期設定と事業者情報のコマンド。
 
-use crate::db::setup::{self, BusinessProfile, FiscalYear, SetupInput, SetupStatus};
-use crate::db::Database;
 use chobiyori_core::error::AppResult;
 use chobiyori_core::master::FilingType;
+use chobiyori_storage::setup::{self, BusinessProfile, FiscalYear, SetupInput, SetupStatus};
+use chobiyori_storage::Database;
 use tauri::State;
 
 /// 初期設定が済んでいるか。済んでいなければ画面は初期設定ウィザードを出す。

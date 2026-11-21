@@ -333,8 +333,8 @@ pub fn suggest(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::setup::tests::set_up_db;
-    use crate::db::transactions::tests::account;
+    use crate::test_support::account;
+    use crate::test_support::set_up_db;
 
     pub(crate) fn partner(conn: &Connection, code: &str, name: &str, kana: &str) -> i64 {
         conn.execute(

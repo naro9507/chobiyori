@@ -1,19 +1,19 @@
 //! 帳票の形（見出し・列・行）。PDF と CSV の両方を、この形から作る。
 //!
-//! 帳簿のデータ（`db::books`）に科目名などを当てはめて表にする。ページ割りもここで決める。
+//! 帳簿のデータ（`chobiyori_storage::books`）に科目名などを当てはめて表にする。ページ割りもここで決める。
 
 use super::labels::{self as l, Locale};
-use crate::db::accounts::Account;
-use crate::db::books::JournalBook;
-use crate::db::closing::StatementAmounts;
-use crate::db::partners::Partner;
-use crate::db::sub_accounts::SubAccount;
 use chobiyori_core::balance::TrialBalance;
 use chobiyori_core::closing::Side as BsSide;
 use chobiyori_core::depreciation::Method;
 use chobiyori_core::journal::Side;
 use chobiyori_core::ledger::Ledger;
 use chobiyori_core::master::AccountCategory;
+use chobiyori_storage::accounts::Account;
+use chobiyori_storage::books::JournalBook;
+use chobiyori_storage::closing::StatementAmounts;
+use chobiyori_storage::partners::Partner;
+use chobiyori_storage::sub_accounts::SubAccount;
 use std::collections::HashMap;
 use std::ops::Range;
 
