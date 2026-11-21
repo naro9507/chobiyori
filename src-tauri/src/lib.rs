@@ -124,6 +124,7 @@ pub fn run() {
             commands::filing_calendar_sync::filing_calendar_connection,
             commands::filing_calendar_sync::connect_filing_calendar,
             commands::filing_calendar_sync::disconnect_filing_calendar,
+            commands::filing_calendar_sync::set_filing_calendar_sync_enabled,
             commands::filing_calendar_sync::sync_filing_calendar,
             commands::import::choose_import_file,
             commands::import::preview_import,

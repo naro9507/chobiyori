@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CircleCheck, Loader2 } from "lucide-react"
+import { Switch } from "radix-ui"
 import { useId } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,7 +20,8 @@ import { today, useFilingDeadlines } from "./filing-api"
 
 const providers = ["google", "outlook"] as const
 type Provider = (typeof providers)[number]
-type Connection = "unavailable" | "disconnected" | "connected"
+type Connection = "unavailable" | "disconnected" | "connected" | "paused"
+type CalendarOperation = "connect" | "disconnect" | "pause" | "resume"
 
 const statusLabels = {
 	authorizing: "calendarAuthorizationPending",
@@ -47,8 +49,9 @@ function useCalendarSync(provider: Provider, background = false) {
 		staleTime: Number.POSITIVE_INFINITY,
 		retry: false,
 	})
-	const connected = connection.data === "connected"
-	const deadlines = useFilingDeadlines(connected, true)
+	const syncEnabled = connection.data === "connected"
+	const connected = syncEnabled || connection.data === "paused"
+	const deadlines = useFilingDeadlines(syncEnabled, true)
 	const plan = deadlines.data
 		?.filter((notice) => !notice.submitted && notice.daysLeft >= 0)
 		.map(({ kind, fiscalYear, date, estimated }) => [
@@ -65,13 +68,13 @@ function useCalendarSync(provider: Provider, background = false) {
 				locale,
 				today: today(),
 			}),
-		enabled: connected && deadlines.isSuccess,
+		enabled: syncEnabled && deadlines.isSuccess,
 		retry: false,
 		refetchOnWindowFocus: false,
-		refetchInterval: background && connected ? 15 * 60 * 1000 : false,
+		refetchInterval: background && syncEnabled ? 15 * 60 * 1000 : false,
 		refetchIntervalInBackground: true,
 	})
-	return { connection, connected, sync, deadlines }
+	return { connection, connected, syncEnabled, sync, deadlines }
 }
 
 function CalendarSyncWorker({ provider }: { provider: Provider }) {
@@ -88,18 +91,31 @@ export function FilingCalendarSyncWorker() {
 function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	const t = useTranslations("filing")
 	const titleId = useId()
+	const syncToggleId = useId()
 	const errorMessage = useErrorMessage()
 	const locale = useSettingsStore((state) => state.locale)
 	const queryClient = useQueryClient()
-	const { connection, connected, sync, deadlines } = useCalendarSync(provider)
+	const { connection, connected, syncEnabled, sync, deadlines } =
+		useCalendarSync(provider)
 	const change = useMutation({
-		mutationFn: (operation: "connect" | "disconnect") =>
-			operation === "connect"
-				? callCommand<null>("connect_filing_calendar", { provider, locale })
-				: callCommand<null>("disconnect_filing_calendar", { provider }),
+		mutationFn: (operation: CalendarOperation) => {
+			if (operation === "connect") {
+				return callCommand<null>("connect_filing_calendar", {
+					provider,
+					locale,
+				})
+			}
+			if (operation === "disconnect") {
+				return callCommand<null>("disconnect_filing_calendar", { provider })
+			}
+			return callCommand<null>("set_filing_calendar_sync_enabled", {
+				provider,
+				enabled: operation === "resume",
+			})
+		},
 		onSuccess: async (_, operation) => {
 			await queryClient.invalidateQueries({ queryKey: connectionKey(provider) })
-			if (operation === "connect" && connected) {
+			if (operation === "connect" && syncEnabled) {
 				void queryClient.invalidateQueries(
 					{ queryKey: syncKey(provider) },
 					{ cancelRefetch: false }
@@ -110,20 +126,25 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	const error =
 		change.error ??
 		connection.error ??
-		(connected ? (deadlines.error ?? sync.error) : null)
+		(syncEnabled ? (deadlines.error ?? sync.error) : null)
 	const reauthorize =
-		isAppError(sync.error) && sync.error.code === "calendarAuth"
+		syncEnabled && isAppError(sync.error) && sync.error.code === "calendarAuth"
 	const authorizing = change.isPending && change.variables === "connect"
-	let status: keyof typeof statusLabels = connection.data ?? "loading"
+	const updatingSync =
+		change.isPending &&
+		(change.variables === "pause" || change.variables === "resume")
+	let status: keyof typeof statusLabels =
+		connection.data === "paused" ? "connected" : (connection.data ?? "loading")
 	if (connection.isError) status = "unknown"
 	if (connected && reauthorize) status = "reauthorize"
 	if (authorizing) status = "authorizing"
 	const name = t(provider === "google" ? "calendarGoogle" : "calendarOutlook")
-	const syncStatus = sync.isFetching
-		? t("calendarSyncing")
-		: sync.isSuccess && deadlines.isSuccess
-			? t("calendarSyncCompleted")
-			: null
+	let syncStatus: string | null = null
+	if (updatingSync) syncStatus = t("calendarSyncUpdating")
+	else if (!syncEnabled) syncStatus = t("calendarSyncPaused")
+	else if (sync.isFetching) syncStatus = t("calendarSyncing")
+	else if (sync.isSuccess && deadlines.isSuccess)
+		syncStatus = t("calendarSyncCompleted")
 
 	return (
 		<fieldset
@@ -156,7 +177,25 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 					{t("calendarAuthorizing")}
 				</p>
 			)}
-			{status === "connected" && syncStatus && (
+			{connected && (
+				<div className="flex w-fit items-center gap-2">
+					<Switch.Root
+						id={syncToggleId}
+						checked={syncEnabled}
+						disabled={change.isPending}
+						onCheckedChange={(checked) =>
+							change.mutate(checked ? "resume" : "pause")
+						}
+						className="inline-flex h-6 w-10 shrink-0 items-center rounded-full bg-muted p-0.5 outline-none ring-1 ring-input ring-inset focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:ring-primary"
+					>
+						<Switch.Thumb className="block size-5 rounded-full bg-muted-foreground motion-safe:transition-transform data-[state=checked]:translate-x-4 data-[state=checked]:bg-primary-foreground" />
+					</Switch.Root>
+					<label htmlFor={syncToggleId} className="font-medium text-sm">
+						{t("calendarSyncEnabled")}
+					</label>
+				</div>
+			)}
+			{(status === "connected" || updatingSync) && syncStatus && (
 				<p role="status" className="text-muted-foreground text-sm">
 					{syncStatus}
 				</p>
@@ -178,7 +217,10 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 							type="button"
 							variant="outline"
 							disabled={
-								change.isPending || sync.isFetching || !deadlines.isSuccess
+								!syncEnabled ||
+								change.isPending ||
+								sync.isFetching ||
+								!deadlines.isSuccess
 							}
 							onClick={() => void sync.refetch()}
 						>

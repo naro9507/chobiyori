@@ -201,6 +201,7 @@ let notices: DeadlineNotice[]
 let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
 let calendarConnections: Set<string>
+let pausedCalendars: Set<string>
 let calendarAuthorization: Promise<void> | undefined
 let calendarSync: Promise<void> | undefined
 let calendarAccessExpired: boolean
@@ -212,6 +213,7 @@ beforeEach(() => {
 	scheduleResult = "ready"
 	calendarResult = "saved"
 	calendarConnections = new Set()
+	pausedCalendars = new Set()
 	calendarAuthorization = undefined
 	calendarSync = undefined
 	calendarAccessExpired = false
@@ -307,15 +309,19 @@ beforeEach(() => {
 					linked: null,
 				}
 			case "filing_calendar_connection":
-				return calendarConnections.has(args?.provider ?? "")
-					? "connected"
-					: "disconnected"
+				if (!calendarConnections.has(args.provider)) return "disconnected"
+				return pausedCalendars.has(args.provider) ? "paused" : "connected"
 			case "connect_filing_calendar":
 				await calendarAuthorization
 				calendarConnections.add(args?.provider ?? "")
 				return null
 			case "disconnect_filing_calendar":
 				calendarConnections.delete(args?.provider ?? "")
+				pausedCalendars.delete(args?.provider ?? "")
+				return null
+			case "set_filing_calendar_sync_enabled":
+				if (args.enabled) pausedCalendars.delete(args.provider)
+				else pausedCalendars.add(args.provider)
 				return null
 			case "sync_filing_calendar":
 				await calendarSync
@@ -683,6 +689,69 @@ describe("インボイスの登録と期限", () => {
 		expect(
 			outlook.getByRole("button", { name: "連携を解除" })
 		).toBeInTheDocument()
+	})
+
+	it("サービスごとに同期を一時停止し、再認証せずに再開できる", async () => {
+		calendarConnections.add("google")
+		calendarConnections.add("outlook")
+		const user = userEvent.setup()
+		const { unmount } = renderAt("/settings?view=external")
+		const providerSettings = async (name: string) =>
+			within(await screen.findByRole("group", { name }))
+		const google = await providerSettings("Google カレンダー")
+		const outlook = await providerSettings("Outlook")
+		const googleSwitch = await google.findByRole("switch", {
+			name: "申告期限を同期",
+		})
+		expect(googleSwitch).toBeChecked()
+		expect(
+			await google.findByText("申告期限の同期が完了しました。")
+		).toBeInTheDocument()
+		expect(
+			await outlook.findByText("申告期限の同期が完了しました。")
+		).toBeInTheDocument()
+		const syncs = (provider: string) =>
+			mocks.callCommand.mock.calls.filter(
+				([command, args]) =>
+					command === "sync_filing_calendar" && args?.provider === provider
+			).length
+		const previousGoogleSyncs = syncs("google")
+		const previousOutlookSyncs = syncs("outlook")
+
+		await user.click(googleSwitch)
+		expect(await google.findByText(/同期はオフです/)).toBeInTheDocument()
+		expect(googleSwitch).not.toBeChecked()
+		expect(google.getByText("連携済み")).toBeInTheDocument()
+		expect(google.getByRole("button", { name: "今すぐ同期" })).toBeDisabled()
+		expect(
+			outlook.getByRole("switch", { name: "申告期限を同期" })
+		).toBeChecked()
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"set_filing_calendar_sync_enabled",
+			{ provider: "google", enabled: false }
+		)
+		unmount()
+
+		renderAt("/settings?view=external")
+		const reopened = await providerSettings("Google カレンダー")
+		expect(await reopened.findByText(/同期はオフです/)).toBeInTheDocument()
+		await waitFor(() =>
+			expect(syncs("outlook")).toBeGreaterThan(previousOutlookSyncs)
+		)
+		expect(syncs("google")).toBe(previousGoogleSyncs)
+		await user.click(reopened.getByRole("switch", { name: "申告期限を同期" }))
+		expect(
+			await reopened.findByText("申告期限の同期が完了しました。")
+		).toBeInTheDocument()
+		expect(syncs("google")).toBeGreaterThan(previousGoogleSyncs)
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"set_filing_calendar_sync_enabled",
+			{ provider: "google", enabled: true }
+		)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"connect_filing_calendar",
+			{ provider: "google", locale: "ja" }
+		)
 	})
 
 	it("認証が切れたカレンダーは再連携が必要だと表示する", async () => {

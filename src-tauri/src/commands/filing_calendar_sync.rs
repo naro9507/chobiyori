@@ -29,12 +29,15 @@ pub enum ConnectionStatus {
     Unavailable,
     Disconnected,
     Connected,
+    Paused,
 }
 
 #[derive(Deserialize, Serialize)]
 struct Connection {
     refresh_token: String,
     account_key: String,
+    #[serde(default)]
+    paused: bool,
 }
 
 #[derive(Default)]
@@ -91,10 +94,10 @@ pub async fn filing_calendar_connection(provider: Provider) -> AppResult<Connect
     if OAuth::configured(provider).is_none() {
         return Ok(ConnectionStatus::Unavailable);
     }
-    Ok(if provider.connection()?.is_some() {
-        ConnectionStatus::Connected
-    } else {
-        ConnectionStatus::Disconnected
+    Ok(match provider.connection()? {
+        Some(connection) if connection.paused => ConnectionStatus::Paused,
+        Some(_) => ConnectionStatus::Connected,
+        None => ConnectionStatus::Disconnected,
     })
 }
 
@@ -113,10 +116,26 @@ pub async fn connect_filing_calendar(
         .filter(|token| !token.is_empty())
         .ok_or_else(|| AppError::new(ErrorCode::CalendarAuth))?;
     let account_key = oauth.account_key(&client, &token.access_token).await?;
+    let paused = provider
+        .connection()?
+        .is_some_and(|connection| connection.paused);
     provider.save(&Connection {
         refresh_token,
         account_key,
+        paused,
     })
+}
+
+#[tauri::command]
+pub async fn set_filing_calendar_sync_enabled(
+    state: State<'_, CalendarSyncState>,
+    provider: Provider,
+    enabled: bool,
+) -> AppResult<()> {
+    let _guard = provider.lock(&state).lock().await;
+    let mut connection = provider.connection()?.ok_or_else(failed)?;
+    connection.paused = !enabled;
+    provider.save(&connection)
 }
 
 #[tauri::command]
@@ -143,6 +162,9 @@ pub async fn sync_filing_calendar(
     let Some(mut connection) = provider.connection()? else {
         return Ok(());
     };
+    if connection.paused {
+        return Ok(());
+    }
     let deadlines = filing::upcoming_deadlines(&db.conn(), &today)?
         .into_iter()
         .filter(|notice| !notice.submitted && notice.days_left >= 0)
@@ -190,4 +212,24 @@ pub async fn sync_filing_calendar(
         return Err(failed());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_connections_sync_until_paused_and_keep_their_credentials() {
+        let mut connection: Connection =
+            serde_json::from_str(r#"{"refresh_token":"test-token","account_key":"test-key"}"#)
+                .unwrap();
+        assert!(!connection.paused);
+
+        connection.paused = true;
+        let saved = serde_json::to_vec(&connection).unwrap();
+        let restored: Connection = serde_json::from_slice(&saved).unwrap();
+        assert!(restored.paused);
+        assert_eq!(restored.refresh_token, "test-token");
+        assert_eq!(restored.account_key, "test-key");
+    }
 }
