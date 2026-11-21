@@ -1,0 +1,24 @@
+# Renovate の PR だけ、CI（ci.yml の check）が通ったら自動でマージする。
+# 事前に必要な設定: リポジトリの「Allow auto-merge」を有効にし、
+# ブランチ保護で check を必須にする（必須にしないと CI を待たずにマージされる）。
+name: Auto merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# PR のコードはチェックアウトしない（pull_request_target で書き込み権限を使うため）
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 自動マージを有効にする
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
