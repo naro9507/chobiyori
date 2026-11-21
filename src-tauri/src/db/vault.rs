@@ -237,13 +237,20 @@ pub(super) fn check_current(db: &Database, current: &str) -> AppResult<Password>
     Ok(key)
 }
 
+pub(crate) fn validate_password_change(
+    db: &Database,
+    current: &str,
+    new: &str,
+) -> AppResult<Option<Password>> {
+    let current = check_current(db, current)?;
+    let new = validate_new(new).map_err(|e| AppError::field(e.code, "newPassword"))?;
+    Ok((current != new).then_some(new))
+}
+
 /// パスワードを変える。いまのパスワードが合っていなければ変えない。
 pub fn change_password(db: &Database, current: &str, new: &str) -> AppResult<()> {
     let conn = db.conn();
-    let current = check_current(db, current)?;
-    let new = validate_new(new).map_err(|e| AppError::field(e.code, "newPassword"))?;
-    if current != new {
-        conn.execute("DELETE FROM settings WHERE key=?1", [DEVICE_BINDING])?;
+    if let Some(new) = validate_password_change(db, current, new)? {
         let path = db
             .path()
             .ok_or_else(|| AppError::new(ErrorCode::BooksLocked))?;
@@ -357,12 +364,12 @@ mod tests {
         assert_eq!(
             db.conn()
                 .query_row(
-                    "SELECT count(*) FROM settings WHERE key=?1",
+                    "SELECT value FROM settings WHERE key=?1",
                     [DEVICE_BINDING],
-                    |row| row.get::<_, i64>(0)
+                    |row| row.get::<_, String>(0)
                 )
                 .unwrap(),
-            0
+            "old"
         );
         drop(db);
         assert!(unlock(&path, "first password").is_err());

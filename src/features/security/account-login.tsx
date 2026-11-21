@@ -19,6 +19,8 @@ import { useSettingsStore } from "@/stores/settings-store"
 
 type Provider = "google" | "outlook"
 type LoginStatus = {
+	supported: boolean
+	enabled: boolean
 	google: boolean
 	microsoft: boolean
 	linked: Provider | null
@@ -42,10 +44,14 @@ export function AccountLoginSettings() {
 	const client = useQueryClient()
 	const errorMessage = useErrorMessage()
 	const change = useMutation({
-		mutationFn: (provider: Provider | null) =>
-			provider
-				? callCommand<void>("link_login", { provider, password, locale })
-				: callCommand<void>("unlink_login", { password }),
+		mutationFn: (action: Provider | "device" | "disable") =>
+			action === "disable"
+				? callCommand<void>("unlink_login", { password })
+				: callCommand<void>("link_login", {
+						provider: action === "device" ? null : action,
+						password,
+						locale,
+					}),
 		onSuccess: () => {
 			setPassword("")
 			return client.invalidateQueries({ queryKey: loginKey })
@@ -63,26 +69,35 @@ export function AccountLoginSettings() {
 			</Card>
 		)
 	if (!status.data) return null
-	const { google, microsoft, linked } = status.data
-	const available = google || microsoft || !!linked
-	const authorizing = change.isPending && change.variables != null
-	let setupLabel = t("deviceNotLinked")
-	if (linked)
-		setupLabel = t(linked === "google" ? "linkedGoogle" : "linkedMicrosoft")
-	if (authorizing) setupLabel = t("deviceAuthorizing")
+	const { supported, enabled, google, microsoft, linked } = status.data
+	const disabled = !password || change.isPending
+	const pendingAction = change.isPending ? change.variables : undefined
+	const browserAuth = pendingAction === "google" || pendingAction === "outlook"
+	const authenticating = browserAuth || pendingAction === "device"
+	let setupLabel = t("deviceNotEnabled")
+	if (enabled) {
+		setupLabel = t(
+			linked === "google"
+				? "linkedGoogle"
+				: linked === "outlook"
+					? "linkedMicrosoft"
+					: "deviceEnabled"
+		)
+	}
+	if (authenticating) setupLabel = t("deviceAuthorizing")
 
 	return (
 		<Card>
 			<CardHeader>
 				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 					<CardTitle>{t("deviceTitle")}</CardTitle>
-					{available && (
+					{supported && (
 						<Badge
 							role="status"
-							variant={linked && !authorizing ? "success" : "outline"}
+							variant={enabled && !authenticating ? "success" : "outline"}
 						>
-							{linked && !authorizing && <CircleCheck aria-hidden="true" />}
-							{authorizing && (
+							{enabled && !authenticating && <CircleCheck aria-hidden="true" />}
+							{authenticating && (
 								<Loader2
 									aria-hidden="true"
 									className="motion-safe:animate-spin"
@@ -96,20 +111,30 @@ export function AccountLoginSettings() {
 				<CardDescription>{t("deviceCalendarHint")}</CardDescription>
 			</CardHeader>
 			<CardContent className="flex max-w-md flex-col gap-3">
-				{available ? (
+				{supported ? (
 					<>
 						<p className="text-muted-foreground text-sm">{t("deviceNote")}</p>
 						<Field label={t("devicePassword")} hint={t("devicePasswordHint")}>
 							<Input
 								type="password"
 								autoComplete="current-password"
+								disabled={change.isPending}
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 							/>
 						</Field>
+						{(!enabled || linked) && (
+							<Button
+								disabled={disabled}
+								onClick={() => change.mutate("device")}
+							>
+								{t(linked ? "deviceSwitch" : "deviceEnable")}
+							</Button>
+						)}
 						{google && (
 							<Button
-								disabled={!password || change.isPending}
+								variant="outline"
+								disabled={disabled}
 								onClick={() => change.mutate("google")}
 							>
 								{t("linkGoogle")}
@@ -117,17 +142,18 @@ export function AccountLoginSettings() {
 						)}
 						{microsoft && (
 							<Button
-								disabled={!password || change.isPending}
+								variant="outline"
+								disabled={disabled}
 								onClick={() => change.mutate("outlook")}
 							>
 								{t("linkMicrosoft")}
 							</Button>
 						)}
-						{linked && (
+						{enabled && (
 							<Button
 								variant="outline"
-								disabled={!password || change.isPending}
-								onClick={() => change.mutate(null)}
+								disabled={disabled}
+								onClick={() => change.mutate("disable")}
 							>
 								{t("unlinkAccount")}
 							</Button>
@@ -136,9 +162,13 @@ export function AccountLoginSettings() {
 				) : (
 					<p>{t("deviceUnavailable")}</p>
 				)}
-				{authorizing && (
+				{authenticating && (
 					<p className="text-muted-foreground text-sm">
-						{t("deviceAuthorizationHint")}
+						{t(
+							browserAuth
+								? "deviceAuthorizationHint"
+								: "deviceAuthenticationHint"
+						)}
 					</p>
 				)}
 				{change.error && (
@@ -172,26 +202,26 @@ export function DeviceUnlock({
 			callCommand<void>("open_with_login", { online, locale }),
 		onSuccess: () => client.invalidateQueries(),
 	})
-	const provider = status.linked
+	const { enabled, linked } = status
 	const start = open.mutate
 	useEffect(() => {
-		if (!provider || autoStarted.current) return
+		if (!enabled || autoStarted.current) return
 		autoStarted.current = true
 		start(false)
-	}, [provider, autoStarted, start])
-	if (!provider) return null
+	}, [enabled, autoStarted, start])
+	if (!enabled) return null
 	return (
 		<div className="mb-5 flex flex-col gap-2">
 			<Button disabled={open.isPending} onClick={() => open.mutate(false)}>
 				{t("deviceOpen")}
 			</Button>
-			{status[provider === "google" ? "google" : "microsoft"] && (
+			{linked && status[linked === "google" ? "google" : "microsoft"] && (
 				<Button
 					variant="outline"
 					disabled={open.isPending}
 					onClick={() => open.mutate(true)}
 				>
-					{t(provider === "google" ? "openGoogle" : "openMicrosoft")}
+					{t(linked === "google" ? "openGoogle" : "openMicrosoft")}
 				</Button>
 			)}
 			{open.error && <p role="alert">{errorMessage(open.error)}</p>}

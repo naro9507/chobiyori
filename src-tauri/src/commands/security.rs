@@ -4,7 +4,7 @@
 //! コマンドは動かない（画面はパスワードの画面だけを出す）。
 
 use super::files;
-use crate::db::audit::{self, AuditEntry};
+use crate::db::audit::{self, AuditFilters, AuditPage};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
 use crate::db::recovery;
@@ -122,10 +122,15 @@ pub async fn change_password(
     new: String,
 ) -> AppResult<()> {
     let _guard = login.0.lock().await;
+    let updated = if vault::validate_password_change(&db, &current, &new)?.is_some() {
+        super::account_login::prepare_password_change(&db, &current, &new).await?
+    } else {
+        None
+    };
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     vault::change_password(&db, &current, &new)?;
-    if current != new {
-        super::account_login::discard_device_record();
+    if let Some(updated) = updated {
+        super::account_login::finish_password_change(&updated);
     }
     audit::event(&db.conn(), "books", "change_password", None, None)
 }
@@ -347,7 +352,19 @@ pub async fn set_year_closed(
 pub async fn list_history(
     db: State<'_, Database>,
     fiscal_year: Option<i64>,
-    limit: Option<i64>,
-) -> AppResult<Vec<AuditEntry>> {
-    audit::list(&db.conn(), fiscal_year, limit.unwrap_or(200))
+    page: i64,
+    query: Option<String>,
+    start_at: Option<i64>,
+    end_before: Option<i64>,
+) -> AppResult<AuditPage> {
+    audit::list(
+        &db.conn(),
+        fiscal_year,
+        page,
+        AuditFilters {
+            query: query.as_deref(),
+            start_at,
+            end_before,
+        },
+    )
 }

@@ -14,6 +14,8 @@ import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
 import type {
 	FormatDefinition,
+	FormatInput,
+	ImportFormat,
 	InboxItem,
 	StatementImport,
 	StatementPreview,
@@ -61,6 +63,7 @@ const accounts = [
 	account(2, "204", "未払金", "liability", { isPaymentAccount: true }),
 	account(3, "610", "消耗品費", "expense"),
 	account(4, "607", "接待交際費", "expense"),
+	account(5, "104", "普通預金", "asset", { isPaymentAccount: true }),
 ]
 
 function item(
@@ -365,6 +368,116 @@ describe("取込受信箱", () => {
 		const alert = await screen.findByText(/見出しが、保存した形式と違います/)
 		expect(alert).toBeInTheDocument()
 		expect(screen.getByText("ポイント")).toBeInTheDocument()
+	})
+
+	it("明細を開かずにテンプレートを保存・編集し、次の取り込みで選べる", async () => {
+		const base = mocks.callCommand.getMockImplementation()
+		let saved: ImportFormat | null = null
+		mocks.callCommand.mockImplementation(async (command: string, args) => {
+			switch (command) {
+				case "list_import_formats":
+					return saved ? [saved] : []
+				case "save_import_format":
+					saved = { ...(args.input as FormatInput), id: 5, preset: null }
+					return saved
+				case "preview_statement":
+					return {
+						...preview,
+						sample: [
+							{
+								row: 2,
+								date: "2026-10-01",
+								merchant: "入金テスト",
+								spend: -1080,
+								memo: "",
+							},
+						],
+					}
+				default:
+					return base?.(command, args)
+			}
+		})
+		const user = userEvent.setup()
+		renderPage()
+		await user.click(await screen.findByRole("link", { name: "取込の設定" }))
+		await user.click(
+			screen.getByRole("button", { name: "新しいテンプレートを作る" })
+		)
+		await user.type(screen.getByLabelText("テンプレート名"), "テスト銀行")
+		await user.selectOptions(screen.getByLabelText("明細の種類"), "bank")
+		await user.selectOptions(
+			screen.getByLabelText("取込先の口座・カード"),
+			"104 普通預金"
+		)
+		const rows = screen.getByLabelText("先頭行の扱い")
+		expect(rows).toHaveValue("data")
+		await user.selectOptions(rows, "skip")
+		expect(screen.getByLabelText("読み飛ばす行数")).toHaveValue("1")
+		await user.selectOptions(screen.getByLabelText("1 列目の役割"), "date")
+		await user.selectOptions(screen.getByLabelText("2 列目の役割"), "merchant")
+		await user.selectOptions(
+			screen.getByLabelText("3 列目の役割"),
+			"withdrawal"
+		)
+		await user.click(screen.getByRole("button", { name: "列を追加" }))
+		await user.selectOptions(screen.getByLabelText("4 列目の役割"), "deposit")
+		await user.click(screen.getByRole("button", { name: "保存する" }))
+		expect(
+			await screen.findByText("「テスト銀行」を保存しました。")
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("save_import_format", {
+			id: null,
+			input: expect.objectContaining({
+				name: "テスト銀行",
+				sourceKind: "bank",
+				definition: expect.objectContaining({
+					headerRow: 0,
+					header: [],
+					skipRows: 1,
+					columns: ["date", "merchant", "withdrawal", "deposit"],
+				}),
+			}),
+		})
+		await user.click(
+			screen.getByRole("button", { name: "「テスト銀行」を編集" })
+		)
+		expect(screen.getByLabelText("読み飛ばす行数")).toHaveValue("1")
+		await user.selectOptions(screen.getByLabelText("区切り文字"), "tab")
+		await user.click(screen.getByRole("button", { name: "保存する" }))
+		expect(
+			await screen.findByText("「テスト銀行」を保存しました。")
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("save_import_format", {
+			id: 5,
+			input: expect.objectContaining({
+				definition: expect.objectContaining({ delimiter: "tab", skipRows: 1 }),
+			}),
+		})
+		expect(mocks.callCommand).not.toHaveBeenCalledWith("open_statement")
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"import_statement",
+			expect.anything()
+		)
+
+		await user.click(screen.getByRole("link", { name: "確認待ちに戻る" }))
+		await user.click(
+			await screen.findByRole("link", { name: "銀行・カードの明細を取り込む" })
+		)
+		await user.click(
+			screen.getByRole("button", { name: "明細のファイルを選ぶ" })
+		)
+		await user.selectOptions(
+			await screen.findByLabelText("使用するテンプレート"),
+			"テスト銀行"
+		)
+		expect(await screen.findByText("入金テスト")).toBeInTheDocument()
+		await user.click(screen.getByRole("button", { name: "受信箱に入れる" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("import_statement", {
+			formatId: 5,
+		})
+		expect(
+			await screen.findByText(/1 件を受信箱に入れました/)
+		).toBeInTheDocument()
 	})
 
 	it("口座の入金は合う請求書や定期売上を候補に出し、選んで確定する", async () => {

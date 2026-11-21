@@ -206,11 +206,42 @@ export type HistoryTransaction = {
 	lines: { side: "debit" | "credit"; accountId: number; amount: number }[]
 }
 
-export function useHistory(fiscalYear: number | null) {
+type HistoryPage = {
+	entries: HistoryEntry[]
+	total: number
+	page: number
+	pageSize: number
+}
+
+export type HistoryFilters = {
+	query: string
+	startAt: number | null
+	endBefore: number | null
+}
+
+export function useHistory(
+	fiscalYear: number | null,
+	{ query, startAt, endBefore }: HistoryFilters,
+	page: number
+) {
 	return useQuery({
-		queryKey: ["history", fiscalYear],
+		queryKey: ["history", fiscalYear, query, startAt, endBefore, page],
 		queryFn: () =>
-			callCommand<HistoryEntry[]>("list_history", { fiscalYear, limit: 200 }),
+			callCommand<HistoryPage>("list_history", {
+				fiscalYear,
+				query,
+				startAt,
+				endBefore,
+				page,
+			}),
+		enabled: fiscalYear !== null,
+		placeholderData: (previousData, previousQuery) =>
+			previousQuery?.queryKey[1] === fiscalYear &&
+			previousQuery.queryKey[2] === query &&
+			previousQuery.queryKey[3] === startAt &&
+			previousQuery.queryKey[4] === endBefore
+				? previousData
+				: undefined,
 		retry: false,
 	})
 }

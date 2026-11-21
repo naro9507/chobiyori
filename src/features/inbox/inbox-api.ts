@@ -27,6 +27,7 @@ export type FormatDefinition = {
 	encoding: TextEncoding
 	delimiter: Delimiter
 	headerRow: number
+	skipRows?: number
 	columns: ColumnRole[]
 	sign: AmountSign
 	skipUnreadableDates: boolean

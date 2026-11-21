@@ -20,7 +20,13 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 
 const free = { retryAfter: 0, attemptsLeft: 5 }
 let book: BookStatus
-let linked: "google" | null
+let deviceLogin: {
+	supported: boolean
+	enabled: boolean
+	google: boolean
+	microsoft: boolean
+	linked: "google" | "outlook" | null
+}
 let loginAuthorization: Promise<void> | undefined
 let deviceOk: boolean
 let locks: LockStatus
@@ -40,7 +46,13 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
 	book = { state: "encrypted", unlocked: false, ...free }
-	linked = null
+	deviceLogin = {
+		supported: true,
+		enabled: false,
+		google: true,
+		microsoft: true,
+		linked: null,
+	}
 	loginAuthorization = undefined
 	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
@@ -49,10 +61,17 @@ beforeEach(() => {
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "login_status":
-					return { google: true, microsoft: true, linked }
+					return deviceLogin
 				case "link_login":
 					await loginAuthorization
-					linked = "google"
+					deviceLogin = {
+						...deviceLogin,
+						enabled: true,
+						linked: args?.provider as typeof deviceLogin.linked,
+					}
+					return null
+				case "unlink_login":
+					deviceLogin = { ...deviceLogin, enabled: false, linked: null }
 					return null
 				case "open_with_login":
 					if (deviceOk) {
@@ -133,7 +152,7 @@ describe("起動時のパスワード", () => {
 	})
 
 	it("端末ログインを設定していれば、起動時に 1 回だけ自動で本人確認を始める", async () => {
-		linked = "google"
+		deviceLogin = { ...deviceLogin, enabled: true, linked: "google" }
 		const user = userEvent.setup()
 		renderApp()
 		expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -167,13 +186,17 @@ describe("起動時のパスワード", () => {
 		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
 	})
 
-	it("本人確認ができれば、パスワードを入れずに帳簿を開く", async () => {
-		linked = "google"
+	it("アカウント連携なしで端末の本人確認ができれば、帳簿を開く", async () => {
+		deviceLogin = { ...deviceLogin, enabled: true }
 		deviceOk = true
 		renderApp()
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
+			online: false,
+			locale: "ja",
+		})
 		expect(mocks.callCommand).not.toHaveBeenCalledWith(
 			"unlock_books",
 			expect.anything()
@@ -303,30 +326,83 @@ describe("起動時のパスワード", () => {
 	})
 })
 
-it("端末ログインの成功を本人確認から戻ったあとで表示する", async () => {
-	let finishAuthorization!: () => void
-	loginAuthorization = new Promise((resolve) => {
-		finishAuthorization = resolve
+describe("端末ログインの設定", () => {
+	it("OAuth が使えないビルドでも、端末ログインを設定・解除できる", async () => {
+		deviceLogin = { ...deviceLogin, google: false, microsoft: false }
+		let finishAuthorization!: () => void
+		loginAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
+		const user = userEvent.setup()
+		render(
+			<AppProviders>
+				<AccountLoginSettings />
+			</AppProviders>
+		)
+		const enable = await screen.findByRole("button", {
+			name: "この端末で有効にする",
+		})
+		expect(screen.getByRole("status")).toHaveTextContent("未設定")
+		const password = screen.getByLabelText("現在のパスワード")
+		expect(enable).toBeDisabled()
+		await user.type(password, "correct horse")
+		await user.click(enable)
+		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
+			provider: null,
+			password: "correct horse",
+			locale: "ja",
+		})
+		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
+		expect(
+			screen.getByText(
+				"Windows Hello / Touch ID の画面で本人確認を行ってください。"
+			)
+		).toBeInTheDocument()
+		expect(screen.queryByText(/ブラウザで本人確認/)).not.toBeInTheDocument()
+		await act(async () => finishAuthorization())
+		expect(await screen.findByText("この端末で有効")).toHaveAttribute(
+			"role",
+			"status"
+		)
+		expect(password).toHaveValue("")
+
+		await user.type(password, "correct horse")
+		await user.click(screen.getByRole("button", { name: "設定を解除" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("unlink_login", {
+			password: "correct horse",
+		})
+		expect(
+			await screen.findByRole("button", { name: "この端末で有効にする" })
+		).toBeDisabled()
+		expect(screen.getByRole("status")).toHaveTextContent("未設定")
 	})
-	const user = userEvent.setup()
-	render(
-		<AppProviders>
-			<AccountLoginSettings />
-		</AppProviders>
-	)
-	expect(await screen.findByRole("status")).toHaveTextContent("未設定")
-	await user.type(screen.getByLabelText("現在のパスワード"), "correct horse")
-	await user.click(
-		screen.getByRole("button", { name: "Google アカウントで設定" })
-	)
-	expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
-	expect(
-		screen.queryByText("設定済み（Google アカウント）")
-	).not.toBeInTheDocument()
-	await act(async () => finishAuthorization())
-	expect(
-		await screen.findByText("設定済み（Google アカウント）")
-	).toBeInTheDocument()
+
+	it("アカウントを使う場合はブラウザと端末の本人確認を案内する", async () => {
+		let finishAuthorization!: () => void
+		loginAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
+		const user = userEvent.setup()
+		render(
+			<AppProviders>
+				<AccountLoginSettings />
+			</AppProviders>
+		)
+		expect(await screen.findByRole("status")).toHaveTextContent("未設定")
+		await user.type(screen.getByLabelText("現在のパスワード"), "correct horse")
+		await user.click(
+			screen.getByRole("button", { name: "Google アカウントで設定" })
+		)
+		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
+		expect(screen.getByText(/ブラウザで本人確認.*Touch ID/)).toBeInTheDocument()
+		expect(
+			screen.queryByText("設定済み（Google アカウント）")
+		).not.toBeInTheDocument()
+		await act(async () => finishAuthorization())
+		expect(
+			await screen.findByText("設定済み（Google アカウント）")
+		).toBeInTheDocument()
+	})
 })
 
 describe("月締め", () => {
