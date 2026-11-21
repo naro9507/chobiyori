@@ -298,6 +298,14 @@ beforeEach(() => {
 			}
 			case "filing_deadlines":
 				return notices
+			case "login_status":
+				return {
+					supported: true,
+					enabled: false,
+					google: true,
+					microsoft: true,
+					linked: null,
+				}
 			case "filing_calendar_connection":
 				return calendarConnections.has(args?.provider ?? "")
 					? "connected"
@@ -612,11 +620,25 @@ describe("インボイスの登録と期限", () => {
 		})
 		const user = userEvent.setup()
 		renderAt("/settings?view=business")
+		await user.click(
+			await screen.findByRole("link", { name: "カレンダー同期の設定を開く" })
+		)
+		const external = within(
+			await screen.findByRole("region", { name: "外部アカウント連携" })
+		)
+		expect(
+			await external.findByRole("group", {
+				name: "アカウントによる本人確認（任意）",
+			})
+		).toBeInTheDocument()
+		expect(
+			external.queryByRole("group", { name: "Windows Hello / Touch ID で開く" })
+		).toBeNull()
 		const google = within(
-			await screen.findByRole("group", { name: "Google カレンダー" })
+			await external.findByRole("group", { name: "Google カレンダー" })
 		)
 		const outlook = within(
-			await screen.findByRole("group", { name: "Outlook" })
+			await external.findByRole("group", { name: "Outlook" })
 		)
 		expect(await google.findByText("未連携")).toBeInTheDocument()
 		await user.click(google.getByRole("button", { name: "連携する" }))
@@ -667,7 +689,7 @@ describe("インボイスの登録と期限", () => {
 		calendarConnections.add("google")
 		calendarAccessExpired = true
 		const user = userEvent.setup()
-		renderAt("/settings?view=business")
+		renderAt("/settings?view=external")
 		const google = within(
 			await screen.findByRole("group", { name: "Google カレンダー" })
 		)

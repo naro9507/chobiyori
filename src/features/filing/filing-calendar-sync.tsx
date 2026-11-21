@@ -3,6 +3,13 @@ import { CircleCheck, Loader2 } from "lucide-react"
 import { useId } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card"
 import { useTranslations } from "@/i18n/use-translations"
 import { isAppError } from "@/lib/errors"
 import { callCommand, isTauri } from "@/lib/tauri"
@@ -124,9 +131,9 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 			className="space-y-2 rounded-lg border p-3"
 		>
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-				<h4 id={titleId} className="font-medium">
+				<h3 id={titleId} className="font-medium">
 					{name}
-				</h4>
+				</h3>
 				<Badge
 					role="status"
 					variant={
@@ -204,15 +211,16 @@ export function FilingCalendarSyncSettings() {
 	if (!isTauri()) return null
 
 	return (
-		<div className="space-y-3 border-t pt-4">
-			<h3 className="font-medium">{t("calendarSyncTitle")}</h3>
-			<p className="text-muted-foreground text-sm">{t("calendarSyncHint")}</p>
-			<p className="text-muted-foreground text-sm">
-				{t("calendarDeviceLoginHint")}
-			</p>
-			{providers.map((provider) => (
-				<CalendarConnectionSettings key={provider} provider={provider} />
-			))}
-		</div>
+		<Card>
+			<CardHeader>
+				<CardTitle>{t("calendarSyncTitle")}</CardTitle>
+				<CardDescription>{t("calendarSyncHint")}</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-3">
+				{providers.map((provider) => (
+					<CalendarConnectionSettings key={provider} provider={provider} />
+				))}
+			</CardContent>
+		</Card>
 	)
 }

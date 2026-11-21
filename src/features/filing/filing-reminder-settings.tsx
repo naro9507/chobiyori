@@ -1,12 +1,14 @@
+import { Link } from "@tanstack/react-router"
 import { useId } from "react"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { HelpTip } from "@/components/ui/help-tip"
 import { LabeledCheckbox } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
+import { isTauri } from "@/lib/tauri"
+import { cn } from "@/lib/utils"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 import { FilingCalendarExport } from "./filing-calendar-export"
-import { FilingCalendarSyncSettings } from "./filing-calendar-sync"
 
 export function FilingReminderSettings() {
 	const t = useTranslations("filing")
@@ -94,7 +96,15 @@ export function FilingReminderSettings() {
 						</div>
 					)}
 				</div>
-				<FilingCalendarSyncSettings />
+				{isTauri() && (
+					<Link
+						to="/settings"
+						search={{ view: "external" }}
+						className={cn(buttonVariants({ variant: "link" }), "h-auto p-0")}
+					>
+						{t("calendarSyncSettingsLink")}
+					</Link>
+				)}
 				<FilingCalendarExport />
 			</CardContent>
 		</Card>

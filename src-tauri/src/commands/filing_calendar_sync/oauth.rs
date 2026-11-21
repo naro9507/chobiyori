@@ -311,14 +311,14 @@ mod tests {
                 "code=opaque-code&state=correct",
                 Locale::Ja,
                 Flow::Calendar,
-                "カレンダー同期で「連携済み」",
+                "外部アカウント連携 → カレンダー同期で「連携済み」",
                 true,
             ),
             (
                 "code=opaque-code&state=correct",
                 Locale::Ja,
                 Flow::LinkLogin,
-                "「アカウントによる本人確認」で連携状態を確認",
+                "外部アカウント連携の「アカウントによる本人確認」で連携状態を確認",
                 true,
             ),
             (

@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
-import { AccountLoginSettings } from "@/features/security/account-login"
+import {
+	AccountLoginSettings,
+	DeviceLoginSettings,
+} from "@/features/security/account-login"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -336,7 +339,7 @@ describe("端末ログインの設定", () => {
 		const user = userEvent.setup()
 		render(
 			<AppProviders>
-				<AccountLoginSettings />
+				<DeviceLoginSettings />
 			</AppProviders>
 		)
 		const enable = await screen.findByRole("button", {
@@ -383,10 +386,11 @@ describe("端末ログインの設定", () => {
 		const user = userEvent.setup()
 		render(
 			<AppProviders>
+				<DeviceLoginSettings />
 				<AccountLoginSettings />
 			</AppProviders>
 		)
-		const account = within(
+		const notEnabledAccount = within(
 			await screen.findByRole("group", {
 				name: "アカウントによる本人確認（任意）",
 			})
@@ -394,14 +398,19 @@ describe("端末ログインの設定", () => {
 		const device = within(
 			screen.getByRole("group", { name: "Windows Hello / Touch ID で開く" })
 		)
-		expect(account.getByRole("status")).toHaveTextContent("未連携")
-		expect(account.queryByRole("button", { name: "Google と連携" })).toBeNull()
+		expect(notEnabledAccount.getByRole("status")).toHaveTextContent("未連携")
+		expect(
+			notEnabledAccount.queryByRole("button", { name: "Google と連携" })
+		).toBeNull()
 		const devicePassword = device.getByLabelText("現在のパスワード")
 		await user.type(devicePassword, "correct horse")
 		await user.click(
 			device.getByRole("button", { name: "この端末で有効にする" })
 		)
 		const deviceStatus = await device.findByText("この端末で有効")
+		const account = within(
+			screen.getByRole("group", { name: "アカウントによる本人確認（任意）" })
+		)
 		expect(account.getByRole("status")).toHaveTextContent("未連携")
 
 		let finishAuthorization!: () => void

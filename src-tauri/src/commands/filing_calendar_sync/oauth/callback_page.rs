@@ -26,12 +26,12 @@ const RETURN_TO_APP: Text = Text {
 fn next_step(flow: Flow) -> Text {
     match flow {
         Flow::Calendar => Text {
-            ja: "設定 → 事業者情報・申告 → カレンダー同期で「連携済み」と表示されれば完了です。",
-            en: "Check for “Connected” under Settings → Business details and tax filing → Calendar sync.",
+            ja: "設定 → 外部アカウント連携 → カレンダー同期で「連携済み」と表示されれば完了です。",
+            en: "Check for “Connected” under Settings → External account connections → Calendar sync.",
         },
         Flow::LinkLogin => Text {
-            ja: "Windows Hello / Touch ID で本人確認を行い、設定 → 帳簿のパスワード・ロック解除の「アカウントによる本人確認」で連携状態を確認してください。",
-            en: "Verify with Windows Hello / Touch ID, then check the link status under Settings → Book password and unlock options → Account verification.",
+            ja: "Windows Hello / Touch ID で本人確認を行い、設定 → 外部アカウント連携の「アカウントによる本人確認」で連携状態を確認してください。",
+            en: "Verify with Windows Hello / Touch ID, then check the link status under Settings → External account connections → Account verification.",
         },
         Flow::Unlock => Text {
             ja: "Windows Hello / Touch ID の画面が出たら、本人確認を行って帳簿を開いてください。",
