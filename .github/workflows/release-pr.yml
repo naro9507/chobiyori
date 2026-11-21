@@ -1,0 +1,93 @@
+name: Prepare release PR
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: prepare-release-pr
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 変更メモの有無を確認
+        id: changesets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          head=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "この実行より新しいコミットが main にあります。"
+            exit 0
+          fi
+          files=$(git ls-files -- '.changeset/*.md' ':!.changeset/README.md')
+          if [[ -n "$files" ]]; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: steps.changesets.outputs.pending == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.changesets.outputs.pending == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.changesets.outputs.pending == 'true'
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: steps.changesets.outputs.pending == 'true'
+        with:
+          toolchain: stable
+      # release:prepare が Cargo.lock の版をオフラインで更新する。
+      - run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+        if: steps.changesets.outputs.pending == 'true'
+
+      - name: リリース準備 PR を作成・更新
+        id: release
+        if: steps.changesets.outputs.pending == 'true'
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          version-script: pnpm release:prepare
+          commit-message: リリースに向けてバージョンを更新する
+          pr-title: 帳日和のリリース準備
+          create-github-releases: false
+          push-git-tags: false
+
+      - name: PR にタグ付けの手順と変更点を記載
+        if: steps.release.outputs.pr-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.release.outputs.pr-number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          {
+            echo "## 帳日和 v$version のリリース準備"
+            echo
+            echo "この PR を main にマージしたあと、マージ結果のコミットに \`v$version\` タグを付けてプッシュします。"
+            echo "[リリース手順](https://github.com/$GH_REPO/blob/main/docs/RELEASE.md#リリースの手順)"
+            echo
+            echo "## 変更点"
+            echo
+            node scripts/release-notes.mjs "v$version"
+          } > "$RUNNER_TEMP/release-pr.md"
+          gh api -X PATCH "repos/$GH_REPO/pulls/$PR_NUMBER" \
+            -F "body=@$RUNNER_TEMP/release-pr.md" --jq .html_url
