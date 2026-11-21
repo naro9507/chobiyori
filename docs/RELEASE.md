@@ -29,24 +29,9 @@ Google のデスクトップ用クライアントシークレットは実行フ�
 
 ## 変更点の書き方
 
-変更点は、リポジトリ直下の `CHANGELOG.md` だけに書く。ここに書いた文が、次の 3 か所にそのまま表示される。
+利用者に伝える変更がある PR では、`pnpm changeset` を実行する。バージョンの上げ方（patch / minor / major）を選び、変更点を日本語で書いて、生成された `.changeset/*.md` を PR に含める。
 
-| 表示する場所 | いつ |
-|---|---|
-| 新しいバージョンのお知らせ | 更新する前 |
-| 「バージョン ○○ に更新しました」 | 更新したあと、最初に起動したとき |
-| 設定画面の「変更履歴」 | いつでも |
-
-```markdown
-## 0.2.0 - 2026-12-01
-
-- 仕訳を入力できるようになりました。
-- 科目の検索を速くしました。
-```
-
-- 見出しは「## バージョン - 日付」にし、新しい版を上に足す。
-- 変更点は「- 」で始まる 1 行ずつ書く。利用者が読むので、使う人の言葉で書く。
-- 変更点は日本語だけで書く。英語表示のときも日本語で表示される。
+リリース準備時に Changesets が変更メモを集め、`CHANGELOG.md` と `package.json` を更新する。タグをプッシュすると、Actions がその版の変更点を GitHub のリリースノートに入れる。同じ内容がアプリの更新前後の案内と、設定画面の「変更履歴」に表示される。
 
 更新ファイルには署名が付いていて、アプリは公開鍵で確かめてから入れ替える。署名が合わない更新は適用しない。
 
@@ -78,11 +63,12 @@ pnpm tauri signer generate -w ~/.tauri/chobiyori-updater.key
 ## リリースの手順
 
 ```bash
-pnpm version:set 0.2.0          # バージョンを変え、CHANGELOG.md に見出しを足す
-# CHANGELOG.md の「（変更点を書く）」を、実際の変更点に書き換える
-git commit -am "v0.2.0"
-git tag v0.2.0
-git push --atomic origin main v0.2.0
+pnpm release:prepare           # Changesets で版を上げ、Cargo の版もそろえる
+git diff
+git add -A -- .changeset CHANGELOG.md package.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+git commit -m "v0.2.7"         # package.json に入ったバージョンを使う
+git tag -a v0.2.7 -m "v0.2.7"
+git push --atomic origin main v0.2.7
 ```
 
 1. Actions で「CI」と「Build installers」の結果を確認する。
@@ -91,9 +77,9 @@ git push --atomic origin main v0.2.0
 
 バージョンは必ず前より大きい番号にする。同じか小さい番号では、更新として扱われない。
 
-`CHANGELOG.md` にその版の変更点がない、または「（変更点を書く）」のままだと、ビルドは止まる。テストも、いちばん新しい版がアプリのバージョンと一致しているかを確かめる。
+`CHANGELOG.md` にその版の変更点がないと、ビルドは止まる。テストも、いちばん新しい版がアプリのバージョンと一致しているかを確かめる。
 
-公開したあとに Release の本文を書き換えても、アプリに出る変更点は変わらない。変更点を直すときは `CHANGELOG.md` を直して、次の版で出す。
+公開したあとに Release の本文を書き換えても、アプリに出る変更点は変わらない。アプリに表示する変更点を補足するときは、次の版の変更メモに書く。
 
 ## 注意
 
