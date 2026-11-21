@@ -64,7 +64,7 @@ pnpm tauri signer generate -w ~/.tauri/chobiyori-updater.key
 
 GitHub の Settings → Actions → General で「Allow GitHub Actions to create and approve pull requests」を有効にする。リリース準備 PR の CI に承認ボタンが出た場合は、リポジトリの書き込み権限を持つ人が「Approve workflows to run」を押す。
 
-1. 「帳日和 vX.Y.Z のリリース」PR（本文はタグ名だけ）の CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
+1. 「vX.Y.Z」PR（タイトルも本文もタグ名だけ）の CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
 2. マージすると、Actions の「Tag release」がマージ結果のコミットに `vX.Y.Z` タグを付け、配布ビルドを始める。タグが作成済みなら何もしない。
 
 Actions で「CI」と「Build installers」の結果を確認する。「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。

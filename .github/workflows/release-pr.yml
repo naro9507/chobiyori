@@ -65,7 +65,7 @@ jobs:
         with:
           version-script: pnpm release:prepare
           commit-message: リリースに向けてバージョンを更新する
-          pr-title: 帳日和のリリース
+          pr-title: リリース
           create-github-releases: false
           push-git-tags: false
 
@@ -80,4 +80,4 @@ jobs:
           set -euo pipefail
           tag="v$(node -p "require('./package.json').version")"
           gh api -X PATCH "repos/$GH_REPO/pulls/$PR_NUMBER" \
-            -f "title=帳日和 $tag のリリース" -f "body=$tag" --jq .html_url
+            -f "title=$tag" -f "body=$tag" --jq .html_url
