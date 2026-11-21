@@ -30,18 +30,22 @@ export function InboxPage() {
 	const activeView = views.find((item) => item === view)
 
 	return (
-		<Page screen="inbox">
-			{activeView && (
-				<Link
-					id="tutorial-review"
-					to="/inbox"
-					className={buttonVariants({ variant: "ghost", size: "icon" })}
-					aria-label={t("backToReview")}
-					title={t("backToReview")}
-				>
-					<ArrowLeft aria-hidden="true" />
-				</Link>
-			)}
+		<Page
+			screen="inbox"
+			leadingAction={
+				activeView && (
+					<Link
+						id="tutorial-review"
+						to="/inbox"
+						className={buttonVariants({ variant: "ghost", size: "icon" })}
+						aria-label={t("backToReview")}
+						title={t("backToReview")}
+					>
+						<ArrowLeft aria-hidden="true" />
+					</Link>
+				)
+			}
+		>
 			{!activeView && (
 				<div className="flex flex-wrap items-center gap-2">
 					<Button asChild>

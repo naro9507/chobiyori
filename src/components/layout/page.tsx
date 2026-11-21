@@ -12,10 +12,12 @@ import { useTranslations } from "@/i18n/use-translations"
  */
 export function Page({
 	screen,
+	leadingAction,
 	actions,
 	children,
 }: {
 	screen: ScreenId
+	leadingAction?: ReactNode
 	actions?: ReactNode
 	children?: ReactNode
 }) {
@@ -41,6 +43,7 @@ export function Page({
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-8 py-8">
 			<header className="flex flex-wrap items-end justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-1">
+					{leadingAction}
 					<h1
 						id={`screen-${screen}-title`}
 						tabIndex={-1}

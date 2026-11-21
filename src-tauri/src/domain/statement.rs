@@ -92,6 +92,9 @@ pub struct FormatDefinition {
     pub delimiter: Delimiter,
     /// 見出しの行（1 から）。0 なら見出しがない
     pub header_row: usize,
+    /// 見出しを照合せずに先頭から読み飛ばす行数。
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub skip_rows: usize,
     /// 列ごとの役割。列の数より短ければ、残りは読まない
     pub columns: Vec<ColumnRole>,
     pub sign: AmountSign,
@@ -104,7 +107,15 @@ pub struct FormatDefinition {
     pub header: Vec<String>,
 }
 
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
 impl FormatDefinition {
+    fn data_start(&self) -> usize {
+        self.header_row.max(self.skip_rows)
+    }
+
     fn column(&self, role: ColumnRole) -> Option<usize> {
         self.columns.iter().position(|r| *r == role)
     }
@@ -331,7 +342,7 @@ pub fn read(table: &[Vec<String>], def: &FormatDefinition) -> Statement {
     let foreign = def.column(ColumnRole::ForeignAmount);
     let user = def.column(ColumnRole::User);
 
-    for (index, cells) in table.iter().enumerate().skip(def.header_row) {
+    for (index, cells) in table.iter().enumerate().skip(def.data_start()) {
         let row = index + 1;
         let note = |problem| RowNote { row, problem };
         if cells.iter().all(|c| c.trim().is_empty()) {
@@ -465,6 +476,7 @@ pub fn check_header(table: &[Vec<String>], def: &FormatDefinition) -> Result<(),
     let same = if def.header_row == 0 {
         let width = table
             .iter()
+            .skip(def.data_start())
             .find(|r| r.iter().any(|c| !c.trim().is_empty()))
             .map_or(0, Vec::len);
         width >= def.columns.len()
@@ -649,6 +661,7 @@ pub fn guess(
         encoding,
         delimiter,
         header_row,
+        skip_rows: 0,
         header: header_of(table, header_row),
         columns,
         sign: AmountSign::SpendPositive,
@@ -753,6 +766,26 @@ mod tests {
             .records()
             .map(|r| r.unwrap().iter().map(str::to_string).collect())
             .collect()
+    }
+
+    #[test]
+    fn positional_format_can_include_or_skip_the_first_data_row() {
+        let rows = table("2026/10/01,文具店,1080\n2026/10/02,交通費,500");
+        let mut def = guess(&rows, TextEncoding::Utf8, Delimiter::Comma);
+        assert_eq!(def.header_row, 0);
+        assert_eq!(read(&rows, &def).rows[0].row, 1);
+
+        def.skip_rows = 1;
+        assert!(check_header(&rows, &def).is_ok());
+        let statement = read(&rows, &def);
+        assert_eq!(statement.rows.len(), 1);
+        assert_eq!(statement.rows[0].row, 2);
+        assert_eq!(statement.rows[0].spend, 500);
+
+        let rows = table("取引明細\n2026/10/02,交通費,500");
+        assert!(check_header(&rows, &def).is_ok());
+        assert!(check_header(&table("取引明細\n2026/10/02,交通費"), &def).is_err());
+        assert!(check_header(&table("取引明細"), &def).is_err());
     }
 
     #[test]
