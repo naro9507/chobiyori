@@ -87,7 +87,11 @@ impl FormatFile {
         Self {
             app: APP.into(),
             kind: KIND.into(),
-            version: 1,
+            version: if format.definition.skip_rows == 0 {
+                1
+            } else {
+                2
+            },
             name: format.name.clone(),
             source_kind: format.source_kind,
             definition: format.definition.clone(),
@@ -98,7 +102,11 @@ impl FormatFile {
     pub fn parse(text: &str) -> AppResult<Self> {
         let file: FormatFile = serde_json::from_str(text.trim_start_matches('\u{feff}'))
             .map_err(|_| AppError::new(ErrorCode::FileRead))?;
-        if (file.app != APP && file.app != LEGACY_APP) || file.kind != KIND || file.version != 1 {
+        if (file.app != APP && file.app != LEGACY_APP)
+            || file.kind != KIND
+            || !matches!(file.version, 1 | 2)
+            || (file.version == 1 && file.definition.skip_rows != 0)
+        {
             return Err(AppError::new(ErrorCode::FileRead));
         }
         Ok(file)
@@ -272,6 +280,7 @@ pub(crate) mod tests {
             encoding: TextEncoding::Utf8,
             delimiter: Delimiter::Comma,
             header_row: 1,
+            skip_rows: 0,
             columns: vec![ColumnRole::Date, ColumnRole::Merchant, ColumnRole::Amount],
             sign: AmountSign::SpendPositive,
             skip_unreadable_dates: true,
@@ -337,6 +346,23 @@ pub(crate) mod tests {
         file.app = "dcs-accounting".into();
         assert!(FormatFile::parse(&serde_json::to_string(&file).unwrap()).is_ok());
         file.app = "another-app".into();
+        assert!(FormatFile::parse(&serde_json::to_string(&file).unwrap()).is_err());
+    }
+
+    #[test]
+    fn positional_skip_rows_use_a_format_version_that_preserves_the_setting() {
+        let mut format = presets().remove(0);
+        format.definition.header_row = 0;
+        format.definition.header.clear();
+        format.definition.skip_rows = 2;
+
+        let mut file = FormatFile::of(&format);
+        assert_eq!(file.version, 2);
+        assert_eq!(
+            FormatFile::parse(&serde_json::to_string(&file).unwrap()).unwrap(),
+            file
+        );
+        file.version = 1;
         assert!(FormatFile::parse(&serde_json::to_string(&file).unwrap()).is_err());
     }
 
