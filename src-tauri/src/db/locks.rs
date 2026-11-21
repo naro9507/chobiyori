@@ -185,7 +185,7 @@ mod tests {
         assert!(!s.year_closed);
         create(&db, 2026, &entry("2026-05-01", supplies, cash, 1)).unwrap();
 
-        let log = audit::list(&db.conn(), Some(2026), 1, None).unwrap();
+        let log = audit::list(&db.conn(), Some(2026), 1, audit::AuditFilters::default()).unwrap();
         let actions: Vec<(&str, &str)> = log
             .entries
             .iter()

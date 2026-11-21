@@ -8,6 +8,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
+import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { useTranslations } from "@/i18n/use-translations"
@@ -16,6 +17,7 @@ import { useErrorMessage } from "@/lib/use-error-message"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
 	type HistoryEntry,
+	type HistoryFilters,
 	type HistoryTransaction,
 	useHistory,
 } from "./security-api"
@@ -42,6 +44,12 @@ function describe(t: HistoryTransaction) {
 	return [t.date, formatAmount(total(t)), t.memo].filter(Boolean).join("  ")
 }
 
+const emptyFilters: HistoryFilters = {
+	query: "",
+	startAt: null,
+	endBefore: null,
+}
+
 /**
  * データ: 変更履歴。取引の追加・取込・変更・削除と、締め・締めの解除・復元・パスワードの変更。
  * 新しい順に表示する。履歴は画面から消せない。
@@ -55,13 +63,38 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("history")
 	const errorMessage = useErrorMessage()
 	const [input, setInput] = useState("")
-	const [query, setQuery] = useState("")
+	const [start, setStart] = useState("")
+	const [end, setEnd] = useState("")
+	const [filters, setFilters] = useState(emptyFilters)
 	const [page, setPage] = useState(1)
-	const history = useHistory(fiscalYear, query, page)
+	const history = useHistory(fiscalYear, filters, page)
 	const results = history.data
 	const pageCount = results ? Math.ceil(results.total / results.pageSize) : 0
-	const search = (value: string) => {
-		setQuery(value.trim())
+	const isFiltered =
+		filters.query !== "" ||
+		filters.startAt !== null ||
+		filters.endBefore !== null
+	const startAt = start ? new Date(start).getTime() / 1000 : null
+	const endAt = end ? new Date(end).getTime() / 1000 : null
+	const invalidRange =
+		Number.isNaN(startAt) ||
+		Number.isNaN(endAt) ||
+		(startAt !== null && endAt !== null && startAt > endAt)
+	const search = () => {
+		if (invalidRange) return
+		setFilters({
+			query: input.trim(),
+			startAt,
+			// 分まで入力するので、終了に指定した分の履歴も含める。
+			endBefore: endAt === null ? null : endAt + 60,
+		})
+		setPage(1)
+	}
+	const clearSearch = () => {
+		setInput("")
+		setStart("")
+		setEnd("")
+		setFilters(emptyFilters)
 		setPage(1)
 	}
 	const locale = useSettingsStore((state) => state.locale)
@@ -140,10 +173,10 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				<form
-					className="flex flex-wrap items-center gap-2"
+					className="flex flex-wrap items-end gap-2"
 					onSubmit={(event) => {
 						event.preventDefault()
-						search(input)
+						search()
 					}}
 				>
 					<Input
@@ -154,20 +187,32 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 						value={input}
 						onChange={(event) => setInput(event.target.value)}
 					/>
-					<Button type="submit" variant="outline">
+					<Field label={t("startAt")} className="min-w-44">
+						<Input
+							type="datetime-local"
+							value={start}
+							onChange={(event) => setStart(event.target.value)}
+						/>
+					</Field>
+					<Field label={t("endAt")} className="min-w-44">
+						<Input
+							type="datetime-local"
+							value={end}
+							onChange={(event) => setEnd(event.target.value)}
+						/>
+					</Field>
+					<Button type="submit" variant="outline" disabled={invalidRange}>
 						{t("search")}
 					</Button>
-					{(input || query) && (
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={() => {
-								setInput("")
-								search("")
-							}}
-						>
+					{(input || start || end || isFiltered) && (
+						<Button type="button" variant="ghost" onClick={clearSearch}>
 							{t("clearSearch")}
 						</Button>
+					)}
+					{invalidRange && (
+						<p role="alert" className="basis-full text-destructive text-sm">
+							{t("invalidRange")}
+						</p>
 					)}
 				</form>
 				{history.isPending && history.fetchStatus !== "idle" && (
@@ -186,7 +231,7 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 				)}
 				{results?.total === 0 && (
 					<p role="status" className="text-muted-foreground text-sm">
-						{t(query ? "noMatches" : "empty")}
+						{t(isFiltered ? "noMatches" : "empty")}
 					</p>
 				)}
 				{results && results.entries.length > 0 && (

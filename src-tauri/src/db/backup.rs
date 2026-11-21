@@ -431,7 +431,13 @@ mod tests {
         let path = db.path().unwrap().to_path_buf();
         drop(db);
         let db = vault::unlock(&path, "correct horse").unwrap();
-        let log = super::super::audit::list(&db.conn(), None, 1, None).unwrap();
+        let log = super::super::audit::list(
+            &db.conn(),
+            None,
+            1,
+            super::super::audit::AuditFilters::default(),
+        )
+        .unwrap();
         assert_eq!(log.entries[0].action, "restore");
     }
 

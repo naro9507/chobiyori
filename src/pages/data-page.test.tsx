@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -15,6 +15,19 @@ import { useSettingsStore } from "@/stores/settings-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
 let historyEntries: (HistoryEntry & { after: HistoryTransaction })[]
+
+function historyEntry(id: number, memo: string, at: string) {
+	return {
+		id,
+		entity: "transaction",
+		entityId: id,
+		action: "create",
+		fiscalYear: 2026,
+		before: null,
+		after: { date: "2026-01-01", memo, lines: [] },
+		at,
+	}
+}
 
 vi.mock("@/lib/tauri", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/tauri")>()),
@@ -116,7 +129,13 @@ beforeEach(() => {
 	mocks.callCommand.mockImplementation(
 		async (
 			command: string,
-			args?: { mapping?: AccountMapping[]; query?: string; page?: number }
+			args?: {
+				mapping?: AccountMapping[]
+				query?: string
+				startAt?: number | null
+				endBefore?: number | null
+				page?: number
+			}
 		) => {
 			switch (command) {
 				case "setup_status":
@@ -147,9 +166,14 @@ beforeEach(() => {
 				case "export_report":
 					return "勘定科目.csv"
 				case "list_history": {
-					const entries = historyEntries.filter((entry) =>
-						entry.after.memo.includes(args?.query ?? "")
-					)
+					const entries = historyEntries.filter((entry) => {
+						const at = Date.parse(entry.at) / 1000
+						return (
+							entry.after.memo.includes(args?.query ?? "") &&
+							at >= (args?.startAt ?? -Infinity) &&
+							at < (args?.endBefore ?? Infinity)
+						)
+					})
 					const page = args?.page ?? 1
 					return {
 						entries: entries.slice((page - 1) * 50, page * 50),
@@ -246,20 +270,13 @@ describe("データ", () => {
 	})
 
 	it("変更履歴を50件ずつ表示し、検索すると1ページ目に戻る", async () => {
-		historyEntries = Array.from({ length: 52 }, (_, index) => ({
-			id: 52 - index,
-			entity: "transaction",
-			entityId: 52 - index,
-			action: "create",
-			fiscalYear: 2026,
-			before: null,
-			after: {
-				date: "2026-01-01",
-				memo: index === 51 ? "古い仕入れ" : "取引のメモ",
-				lines: [],
-			},
-			at: "2026-01-01T00:00:00Z",
-		}))
+		historyEntries = Array.from({ length: 52 }, (_, index) =>
+			historyEntry(
+				52 - index,
+				index === 51 ? "古い仕入れ" : "取引のメモ",
+				"2026-01-01T00:00:00Z"
+			)
+		)
 		const user = userEvent.setup()
 		renderPage()
 
@@ -285,6 +302,8 @@ describe("データ", () => {
 			fiscalYear: 2026,
 			page: 1,
 			query: "古い仕入れ",
+			startAt: null,
+			endBefore: null,
 		})
 		await user.clear(search)
 		await user.type(search, "一致しない{Enter}")
@@ -295,5 +314,60 @@ describe("データ", () => {
 		expect(
 			await screen.findByText("全 52 件 · 1 / 2 ページ")
 		).toBeInTheDocument()
+	})
+
+	it("記録日時とキーワードを組み合わせ、終了の分まで検索する", async () => {
+		const minute = "2026-01-01T10:30"
+		const startAt = Date.parse(minute) / 1000
+		historyEntries = [
+			historyEntry(
+				3,
+				"範囲外の備品",
+				new Date((startAt + 60) * 1000).toISOString()
+			),
+			historyEntry(2, "交通費", new Date(startAt * 1000).toISOString()),
+			historyEntry(
+				1,
+				"範囲内の備品",
+				new Date((startAt + 59) * 1000).toISOString()
+			),
+		]
+		const user = userEvent.setup()
+		renderPage()
+		await screen.findByText("全 3 件 · 1 / 1 ページ")
+
+		const start = screen.getByLabelText("記録日時（開始）")
+		const end = screen.getByLabelText("記録日時（終了）")
+		const submit = screen.getByRole("button", { name: "検索" })
+		fireEvent.change(start, { target: { value: minute } })
+		fireEvent.change(end, { target: { value: minute } })
+		await user.type(
+			screen.getByRole("searchbox", { name: "変更履歴を検索" }),
+			"備品"
+		)
+		await user.click(submit)
+
+		expect(
+			await screen.findByText("全 1 件 · 1 / 1 ページ")
+		).toBeInTheDocument()
+		expect(screen.getByText(/範囲内の備品/)).toBeInTheDocument()
+		expect(screen.queryByText(/範囲外の備品|交通費/)).toBeNull()
+		expect(mocks.callCommand).toHaveBeenCalledWith("list_history", {
+			fiscalYear: 2026,
+			page: 1,
+			query: "備品",
+			startAt,
+			endBefore: startAt + 60,
+		})
+
+		fireEvent.change(end, { target: { value: "2026-01-01T10:29" } })
+		expect(submit).toBeDisabled()
+		expect(screen.getByText(/終了は開始以降/)).toBeInTheDocument()
+		await user.click(screen.getByRole("button", { name: "クリア" }))
+		expect(
+			await screen.findByText("全 3 件 · 1 / 1 ページ")
+		).toBeInTheDocument()
+		expect(start).toHaveValue("")
+		expect(end).toHaveValue("")
 	})
 })

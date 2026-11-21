@@ -213,19 +213,33 @@ type HistoryPage = {
 	pageSize: number
 }
 
+export type HistoryFilters = {
+	query: string
+	startAt: number | null
+	endBefore: number | null
+}
+
 export function useHistory(
 	fiscalYear: number | null,
-	query: string,
+	{ query, startAt, endBefore }: HistoryFilters,
 	page: number
 ) {
 	return useQuery({
-		queryKey: ["history", fiscalYear, query, page],
+		queryKey: ["history", fiscalYear, query, startAt, endBefore, page],
 		queryFn: () =>
-			callCommand<HistoryPage>("list_history", { fiscalYear, query, page }),
+			callCommand<HistoryPage>("list_history", {
+				fiscalYear,
+				query,
+				startAt,
+				endBefore,
+				page,
+			}),
 		enabled: fiscalYear !== null,
 		placeholderData: (previousData, previousQuery) =>
 			previousQuery?.queryKey[1] === fiscalYear &&
-			previousQuery.queryKey[2] === query
+			previousQuery.queryKey[2] === query &&
+			previousQuery.queryKey[3] === startAt &&
+			previousQuery.queryKey[4] === endBefore
 				? previousData
 				: undefined,
 		retry: false,

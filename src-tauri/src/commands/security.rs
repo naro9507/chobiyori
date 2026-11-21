@@ -4,7 +4,7 @@
 //! コマンドは動かない（画面はパスワードの画面だけを出す）。
 
 use super::files;
-use crate::db::audit::{self, AuditPage};
+use crate::db::audit::{self, AuditFilters, AuditPage};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
 use crate::db::recovery;
@@ -349,6 +349,17 @@ pub async fn list_history(
     fiscal_year: Option<i64>,
     page: i64,
     query: Option<String>,
+    start_at: Option<i64>,
+    end_before: Option<i64>,
 ) -> AppResult<AuditPage> {
-    audit::list(&db.conn(), fiscal_year, page, query.as_deref())
+    audit::list(
+        &db.conn(),
+        fiscal_year,
+        page,
+        AuditFilters {
+            query: query.as_deref(),
+            start_at,
+            end_before,
+        },
+    )
 }
