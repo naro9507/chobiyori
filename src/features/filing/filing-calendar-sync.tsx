@@ -207,6 +207,9 @@ export function FilingCalendarSyncSettings() {
 		<div className="space-y-3 border-t pt-4">
 			<h3 className="font-medium">{t("calendarSyncTitle")}</h3>
 			<p className="text-muted-foreground text-sm">{t("calendarSyncHint")}</p>
+			<p className="text-muted-foreground text-sm">
+				{t("calendarDeviceLoginHint")}
+			</p>
 			{providers.map((provider) => (
 				<CalendarConnectionSettings key={provider} provider={provider} />
 			))}

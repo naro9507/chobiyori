@@ -93,6 +93,7 @@ export function AccountLoginSettings() {
 					)}
 				</div>
 				<CardDescription>{t("deviceDescription")}</CardDescription>
+				<CardDescription>{t("deviceCalendarHint")}</CardDescription>
 			</CardHeader>
 			<CardContent className="flex max-w-md flex-col gap-3">
 				{available ? (
