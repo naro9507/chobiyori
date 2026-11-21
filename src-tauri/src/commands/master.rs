@@ -1,8 +1,8 @@
 //! マスタ（勘定科目・補助科目・取引先・家事按分ルール）のコマンド。
 //! どのマスタも「一覧・追加・変更・有効/無効・削除」の 5 つをそろえる。
 
-use crate::db::{accounts, allocation_rules, partners, sub_accounts, Database};
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
+use chobiyori_storage::{accounts, allocation_rules, partners, sub_accounts, Database};
 use tauri::State;
 
 // 勘定科目
@@ -164,35 +164,35 @@ pub async fn delete_allocation_rule(db: State<'_, Database>, id: i64) -> AppResu
 #[tauri::command]
 pub async fn list_purposes(
     db: State<'_, Database>,
-) -> AppResult<Vec<crate::db::purposes::Purpose>> {
-    crate::db::purposes::list(&db.conn())
+) -> AppResult<Vec<chobiyori_storage::purposes::Purpose>> {
+    chobiyori_storage::purposes::list(&db.conn())
 }
 #[tauri::command]
 pub async fn create_purpose(
     db: State<'_, Database>,
-    input: crate::db::purposes::PurposeInput,
-) -> AppResult<crate::db::purposes::Purpose> {
-    crate::db::purposes::create(&db.conn(), &input)
+    input: chobiyori_storage::purposes::PurposeInput,
+) -> AppResult<chobiyori_storage::purposes::Purpose> {
+    chobiyori_storage::purposes::create(&db.conn(), &input)
 }
 #[tauri::command]
 pub async fn update_purpose(
     db: State<'_, Database>,
     id: i64,
-    input: crate::db::purposes::PurposeInput,
-) -> AppResult<crate::db::purposes::Purpose> {
-    crate::db::purposes::update(&db.conn(), id, &input)
+    input: chobiyori_storage::purposes::PurposeInput,
+) -> AppResult<chobiyori_storage::purposes::Purpose> {
+    chobiyori_storage::purposes::update(&db.conn(), id, &input)
 }
 #[tauri::command]
 pub async fn set_purpose_active(
     db: State<'_, Database>,
     id: i64,
     active: bool,
-) -> AppResult<crate::db::purposes::Purpose> {
-    crate::db::purposes::set_active(&db.conn(), id, active)
+) -> AppResult<chobiyori_storage::purposes::Purpose> {
+    chobiyori_storage::purposes::set_active(&db.conn(), id, active)
 }
 #[tauri::command]
 pub async fn delete_purpose(db: State<'_, Database>, id: i64) -> AppResult<()> {
-    crate::db::purposes::delete(&db.conn(), id)
+    chobiyori_storage::purposes::delete(&db.conn(), id)
 }
 #[tauri::command]
 pub async fn post_purpose(
@@ -201,6 +201,6 @@ pub async fn post_purpose(
     id: i64,
     date: String,
     amount: i64,
-) -> AppResult<crate::db::transactions::Transaction> {
-    crate::db::purposes::post(&db, fiscal_year, id, &date, amount)
+) -> AppResult<chobiyori_storage::transactions::Transaction> {
+    chobiyori_storage::purposes::post(&db, fiscal_year, id, &date, amount)
 }

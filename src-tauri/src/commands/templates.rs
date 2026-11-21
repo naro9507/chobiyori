@@ -1,9 +1,9 @@
 //! 定型仕訳（毎月の取引のひな形）と、毎月の候補のコマンド。
 
-use crate::db::templates::{self, Candidate, PostInput, Template, TemplateInput};
-use crate::db::transactions::Transaction;
-use crate::db::Database;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
+use chobiyori_storage::templates::{self, Candidate, PostInput, Template, TemplateInput};
+use chobiyori_storage::transactions::Transaction;
+use chobiyori_storage::Database;
 use tauri::State;
 
 #[tauri::command]

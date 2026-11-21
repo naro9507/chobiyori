@@ -1,0 +1,24 @@
+[package]
+name = "chobiyori-storage"
+# 配布する版は src-tauri/Cargo.toml の [package] で決める（scripts/sync-rust-version.mjs）
+version = "0.0.0"
+description = "帳日和の帳簿のデータベース（SQLite + SQLCipher）。スキーマ、マスタと仕訳の読み書き、暗号化、バックアップ"
+edition = "2021"
+rust-version = "1.92"
+license = "ISC"
+publish = false
+
+[features]
+# 他の crate のテストから使うヘルパー（初期設定済みの DB など）を公開する
+test-support = []
+
+[dependencies]
+chobiyori-core = { path = "../core", features = ["rusqlite"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# 同梱の SQLCipher で帳簿を暗号化する（バージョンの理由は workspace の定義を参照）
+rusqlite = { workspace = true, features = ["backup", "bundled-sqlcipher-vendored-openssl"] }
+sha2 = { workspace = true }
+base64 = { workspace = true }
+ring = { workspace = true }
+tempfile = { workspace = true }

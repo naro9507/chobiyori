@@ -1,5 +1,5 @@
 use super::{failed, plan::Deadline, Provider};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use reqwest::{Client, RequestBuilder, Response, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::{json, Value};

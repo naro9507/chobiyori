@@ -4,13 +4,13 @@
 //! DB アクセス・会計の計算・取込や出力はすべてこちら側に置く。
 
 mod commands;
-pub mod db;
-pub mod domain;
-pub mod error;
 pub mod export;
 pub mod import;
 pub mod mail;
 pub mod receipt;
+
+#[cfg(test)]
+mod tests;
 
 use tauri::Manager;
 

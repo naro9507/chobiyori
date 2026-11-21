@@ -4,7 +4,7 @@
 //!
 //! 1. 読む: ファイルを「下書きの取引」（`Draft`）に直す（`journal_csv`・`excel_book`）
 //! 2. 確かめる・書き込む（このモジュール）: 科目と取引先を当てはめ、取引の検証
-//!    （`domain::journal::validate`）と重複の判定をする。プレビューでは何も書き込まない。
+//!    （`chobiyori_core::journal::validate`）と重複の判定をする。プレビューでは何も書き込まない。
 //!    直すところ（`Issue`）が 1 つでも残っていれば、取り込まない。
 //!
 //! 同じ取引（日付と明細行が同じ）がすでに帳簿にあれば、重複として飛ばす。
@@ -14,15 +14,15 @@ pub mod excel_book;
 pub mod journal_csv;
 pub mod statement_file;
 
-use crate::db::accounts::{self, Account};
-use crate::db::partners::{self, Partner};
-use crate::db::transactions::{self, DbMasters, Transaction};
-use crate::db::Database;
-use crate::domain::journal::{
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
     self, AllowedInactive, EntryMode, LineInput, MasterLookup, Side, TransactionInput,
 };
-use crate::domain::string_enum;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::string_enum;
+use chobiyori_storage::accounts::{self, Account};
+use chobiyori_storage::partners::{self, Partner};
+use chobiyori_storage::transactions::{self, DbMasters, Transaction};
+use chobiyori_storage::Database;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -50,7 +50,7 @@ pub struct DraftLine {
     pub memo: String,
     /// 補助科目のコード（科目の下で探す）
     pub sub_account: Option<String>,
-    pub tax_category: Option<crate::domain::master::TaxCategory>,
+    pub tax_category: Option<chobiyori_core::master::TaxCategory>,
     pub is_qualified_invoice: bool,
 }
 
@@ -245,7 +245,7 @@ struct Plan {
 struct Masters {
     accounts: Vec<Account>,
     partners: Vec<Partner>,
-    sub_accounts: Vec<crate::db::sub_accounts::SubAccount>,
+    sub_accounts: Vec<chobiyori_storage::sub_accounts::SubAccount>,
 }
 
 impl MasterLookup for Masters {
@@ -408,7 +408,7 @@ fn plan(
     let masters = Masters {
         accounts: accounts::list(conn)?,
         partners: partners::list(conn)?,
-        sub_accounts: crate::db::sub_accounts::list(conn)?,
+        sub_accounts: chobiyori_storage::sub_accounts::list(conn)?,
     };
     let mut issues = parsed.issues.clone();
     // 年度: 指定がなければ、最初の取引の日付の年
@@ -441,7 +441,7 @@ fn plan(
         _ => HashMap::new(),
     };
     let locked_months = current
-        .map(|year| crate::db::locks::status(conn, year))
+        .map(|year| chobiyori_storage::locks::status(conn, year))
         .transpose()?
         .map(|status| status.locked_months)
         .unwrap_or_default();

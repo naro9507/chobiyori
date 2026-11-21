@@ -3,7 +3,7 @@
 //! 画面の文言は `i18n` に置くが、ファイルの見出しは取込で読み戻す形式でもあるので、
 //! ここで日本語と英語を固定して持つ。仕訳の CSV の見出しは取込でどちらの言語でも読める。
 
-use crate::domain::master::{AccountCategory, TaxCategory};
+use chobiyori_core::master::{AccountCategory, TaxCategory};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -230,7 +230,7 @@ pub fn period(from: &str, to: &str, locale: Locale) -> String {
 }
 
 fn japanese_date(date: &str) -> String {
-    match crate::domain::journal::parse_date(date) {
+    match chobiyori_core::journal::parse_date(date) {
         Some((y, m, d)) => format!("{y}年{m}月{d}日"),
         None => date.to_string(),
     }
@@ -238,7 +238,7 @@ fn japanese_date(date: &str) -> String {
 
 /// 帳簿の行の日付。年は見出しにあるので月と日だけにする。
 pub fn short_date(date: &str) -> String {
-    match crate::domain::journal::parse_date(date) {
+    match chobiyori_core::journal::parse_date(date) {
         Some((_, m, d)) => format!("{m:>2}/{d:02}"),
         None => date.to_string(),
     }

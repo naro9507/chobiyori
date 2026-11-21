@@ -2,7 +2,7 @@
 
 ## 仕組み
 
-1. `v0.2.0` のようなタグをプッシュすると、GitHub Actions が Windows と macOS のインストーラを作る。
+1. リリース準備 PR をマージすると、Actions が `v0.2.0` のようなタグを付け、Windows と macOS のインストーラを作る。手でタグをプッシュしても同じビルドが始まる。
 2. 同時に、GitHub の Release が下書きで作られる。インストーラと、自動アップデート用のファイル（`latest.json` と署名）が添付される。
 3. タグのコミットで CI と両 OS のビルドが成功し、更新ファイルと署名がそろうと、Latest として自動公開する。公開後、利用者のアプリが起動時（と 1 時間ごと）に `latest.json` を確かめ、新しいバージョンを変更点とともに知らせる。
 4. 利用者が「今すぐ更新」を押すと、ダウンロードして入れ替え、アプリを再起動する。
@@ -31,7 +31,7 @@ Google のデスクトップ用クライアントシークレットは実行フ�
 
 利用者に伝える変更がある PR では、`pnpm changeset` を実行する。バージョンの上げ方（patch / minor / major）を選び、変更点を日本語で書いて、生成された `.changeset/*.md` を PR に含める。
 
-変更メモが `main` に入ると、Actions の「Prepare release PR」が Changesets を実行する。`CHANGELOG.md` と `package.json` を更新し、Cargo のバージョンもそろえた「帳日和のリリース準備」PR を作る。変更メモが増えると同じ PR を更新する。タグをプッシュすると、Actions がその版の変更点を GitHub のリリースノートに入れる。同じ内容がアプリの更新前後の案内と、設定画面の「変更履歴」に表示される。
+変更メモが `main` に入ると、Actions の「Prepare release PR」が Changesets を実行する。`CHANGELOG.md` と `package.json` を更新し、Cargo のバージョンもそろえた「帳日和のリリース準備」PR を作る。変更メモが増えると同じ PR を更新する。タグが付くと、Actions がその版の変更点を GitHub のリリースノートに入れる。同じ内容がアプリの更新前後の案内と、設定画面の「変更履歴」に表示される。
 
 更新ファイルには署名が付いていて、アプリは公開鍵で確かめてから入れ替える。署名が合わない更新は適用しない。
 
@@ -64,14 +64,8 @@ pnpm tauri signer generate -w ~/.tauri/chobiyori-updater.key
 
 GitHub の Settings → Actions → General で「Allow GitHub Actions to create and approve pull requests」を有効にする。リリース準備 PR の CI に承認ボタンが出た場合は、リポジトリの書き込み権限を持つ人が「Approve workflows to run」を押す。
 
-1. 「帳日和のリリース準備」PR の変更点と CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
-2. マージ結果のコミットに、PR の `package.json` に入ったバージョンのタグを付けてプッシュする。タグをプッシュすると配布ビルドが始まる。
-
-```bash
-git fetch origin main
-git tag -a v0.2.7 <マージ結果のコミットSHA> -m "v0.2.7"
-git push origin v0.2.7
-```
+1. 「vX.Y.Z」PR（タイトルも本文もタグ名だけ）の CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
+2. マージすると、Actions の「Tag release」がマージ結果のコミットに `vX.Y.Z` タグを付け、配布ビルドを始める。タグが作成済みなら何もしない。
 
 Actions で「CI」と「Build installers」の結果を確認する。「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。
 
