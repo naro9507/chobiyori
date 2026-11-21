@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
+import { AccountLoginSettings } from "@/features/security/account-login"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -19,7 +20,13 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 
 const free = { retryAfter: 0, attemptsLeft: 5 }
 let book: BookStatus
-let linked: "google" | null
+let deviceLogin: {
+	supported: boolean
+	enabled: boolean
+	google: boolean
+	microsoft: boolean
+	linked: "google" | "outlook" | null
+}
 let deviceOk: boolean
 let locks: LockStatus
 
@@ -38,7 +45,13 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
 	book = { state: "encrypted", unlocked: false, ...free }
-	linked = null
+	deviceLogin = {
+		supported: true,
+		enabled: false,
+		google: true,
+		microsoft: true,
+		linked: null,
+	}
 	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
 	mocks.callCommand.mockReset()
@@ -46,7 +59,17 @@ beforeEach(() => {
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "login_status":
-					return { google: true, microsoft: true, linked }
+					return deviceLogin
+				case "link_login":
+					deviceLogin = {
+						...deviceLogin,
+						enabled: true,
+						linked: args?.provider as typeof deviceLogin.linked,
+					}
+					return null
+				case "unlink_login":
+					deviceLogin = { ...deviceLogin, enabled: false, linked: null }
+					return null
 				case "open_with_login":
 					if (deviceOk) {
 						book = { state: "encrypted", unlocked: true, ...free }
@@ -126,7 +149,7 @@ describe("起動時のパスワード", () => {
 	})
 
 	it("端末ログインを設定していれば、起動時に 1 回だけ自動で本人確認を始める", async () => {
-		linked = "google"
+		deviceLogin = { ...deviceLogin, enabled: true, linked: "google" }
 		const user = userEvent.setup()
 		renderApp()
 		expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -160,13 +183,17 @@ describe("起動時のパスワード", () => {
 		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
 	})
 
-	it("本人確認ができれば、パスワードを入れずに帳簿を開く", async () => {
-		linked = "google"
+	it("アカウント連携なしで端末の本人確認ができれば、帳簿を開く", async () => {
+		deviceLogin = { ...deviceLogin, enabled: true }
 		deviceOk = true
 		renderApp()
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login", {
+			online: false,
+			locale: "ja",
+		})
 		expect(mocks.callCommand).not.toHaveBeenCalledWith(
 			"unlock_books",
 			expect.anything()
@@ -293,6 +320,43 @@ describe("起動時のパスワード", () => {
 		await user.click(screen.getByRole("button", { name: "復旧コードを閉じる" }))
 		expect(screen.queryByLabelText("復旧コード")).toBeNull()
 		expect(screen.getByLabelText("いまのパスワード")).toHaveValue("")
+	})
+})
+
+describe("端末ログインの設定", () => {
+	it("OAuth が使えないビルドでも、端末ログインを設定・解除できる", async () => {
+		deviceLogin = { ...deviceLogin, google: false, microsoft: false }
+		const user = userEvent.setup()
+		render(
+			<AppProviders>
+				<AccountLoginSettings />
+			</AppProviders>
+		)
+		const enable = await screen.findByRole("button", {
+			name: "この端末で有効にする",
+		})
+		const password = screen.getByLabelText("現在のパスワード")
+		expect(enable).toBeDisabled()
+		await user.type(password, "correct horse")
+		await user.click(enable)
+		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
+			provider: null,
+			password: "correct horse",
+			locale: "ja",
+		})
+		expect(await screen.findByRole("status")).toHaveTextContent(
+			"この端末で有効です。"
+		)
+		expect(password).toHaveValue("")
+
+		await user.type(password, "correct horse")
+		await user.click(screen.getByRole("button", { name: "設定を解除" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("unlink_login", {
+			password: "correct horse",
+		})
+		expect(
+			await screen.findByRole("button", { name: "この端末で有効にする" })
+		).toBeDisabled()
 	})
 })
 

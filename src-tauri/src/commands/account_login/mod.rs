@@ -1,5 +1,5 @@
-//! A provider proves identity during enrollment or online login. The device can
-//! unlock offline, but both routes require fresh access to the platform key.
+//! Device unlock requires access to the platform key. An optional provider can
+//! also verify the linked account during enrollment and online unlock.
 mod device;
 
 use super::filing_calendar_sync::{http_client, oauth::OAuth, Provider};
@@ -32,20 +32,22 @@ pub(super) fn discard_device_record() {
 
 #[derive(Serialize, Deserialize)]
 struct Record {
-    provider: Provider,
+    provider: Option<Provider>,
     envelope: device::Envelope,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Credential {
     binding: String,
-    provider: Provider,
-    account: String,
+    provider: Option<Provider>,
+    account: Option<String>,
     password: String,
 }
 
 #[derive(Serialize)]
 pub struct LoginStatus {
+    supported: bool,
+    enabled: bool,
     google: bool,
     microsoft: bool,
     linked: Option<Provider>,
@@ -64,20 +66,19 @@ fn expired() -> AppError {
 
 fn record() -> AppResult<Option<Record>> {
     ITEM.get_bytes()?
-        .map(|bytes| serde_json::from_slice(&bytes).map_err(|_| failed()))
+        .map(|bytes| serde_json::from_slice(&bytes).map_err(|_| device::failed()))
         .transpose()
 }
 
 #[tauri::command]
 pub async fn login_status() -> AppResult<LoginStatus> {
+    let record = if SUPPORTED { record()? } else { None };
     Ok(LoginStatus {
+        supported: SUPPORTED,
+        enabled: record.is_some(),
         google: SUPPORTED && OAuth::login(Provider::Google).is_some(),
         microsoft: SUPPORTED && OAuth::login(Provider::Outlook).is_some(),
-        linked: if SUPPORTED {
-            record()?.map(|r| r.provider)
-        } else {
-            None
-        },
+        linked: record.and_then(|r| r.provider),
     })
 }
 
@@ -107,7 +108,7 @@ pub async fn link_login(
     state: State<'_, LoginState>,
     db: State<'_, Database>,
     password: String,
-    provider: Provider,
+    provider: Option<Provider>,
     locale: Locale,
 ) -> AppResult<()> {
     let _guard = state.0.lock().await;
@@ -115,7 +116,10 @@ pub async fn link_login(
     if !SUPPORTED {
         return Err(device::failed());
     }
-    let account = identify(provider, locale).await?;
+    let account = match provider {
+        Some(provider) => Some(identify(provider, locale).await?),
+        None => None,
+    };
     let binding = URL_SAFE_NO_PAD.encode(device::random::<32>()?);
     let data = serde_json::to_vec(&Credential {
         binding: binding.clone(),
@@ -123,12 +127,13 @@ pub async fn link_login(
         account,
         password: password.clone(),
     })
-    .map_err(|_| failed())?;
+    .map_err(|_| device::failed())?;
     let envelope = tauri::async_runtime::spawn_blocking(move || device::seal(data))
         .await
         .map_err(|_| device::failed())??;
     verify_password(&db, &password)?;
-    let record = serde_json::to_vec(&Record { provider, envelope }).map_err(|_| failed())?;
+    let record =
+        serde_json::to_vec(&Record { provider, envelope }).map_err(|_| device::failed())?;
     db.transaction(|tx| {
         tx.execute(
             "INSERT OR REPLACE INTO settings(key,value) VALUES (?1,?2)",
@@ -152,8 +157,15 @@ pub async fn unlink_login(
     })
 }
 
-fn authorize(credential: &Credential, provider: Provider, account: Option<&str>) -> AppResult<()> {
-    if provider != credential.provider || account.is_some_and(|id| id != credential.account) {
+fn authorize(
+    credential: &Credential,
+    provider: Option<Provider>,
+    account: Option<&str>,
+) -> AppResult<()> {
+    if provider != credential.provider
+        || provider.is_some() != credential.account.is_some()
+        || account.is_some_and(|id| Some(id) != credential.account.as_deref())
+    {
         return Err(mismatch());
     }
     Ok(())
@@ -172,16 +184,16 @@ pub async fn open_with_login(
     if vault::state(&files.path)? != vault::BookState::Encrypted {
         return Err(expired());
     }
-    let record = record()?.ok_or_else(failed)?;
+    let record = record()?.ok_or_else(device::failed)?;
     let account = if online {
-        Some(identify(record.provider, locale).await?)
+        Some(identify(record.provider.ok_or_else(failed)?, locale).await?)
     } else {
         None
     };
     let bytes = tauri::async_runtime::spawn_blocking(move || device::open(&record.envelope))
         .await
         .map_err(|_| device::failed())??;
-    let credential: Credential = serde_json::from_slice(&bytes).map_err(|_| failed())?;
+    let credential: Credential = serde_json::from_slice(&bytes).map_err(|_| device::failed())?;
     authorize(&credential, record.provider, account.as_deref())?;
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     ensure_not_open(&app)?;
@@ -213,16 +225,29 @@ pub async fn open_with_login(
 mod tests {
     use super::*;
     #[test]
-    fn online_unlock_checks_provider_and_subject() {
+    fn linked_credentials_from_previous_versions_check_provider_and_subject() {
+        let credential: Credential = serde_json::from_str(
+            r#"{"provider":"google","account":"owner","binding":"device","password":"sample"}"#,
+        )
+        .unwrap();
+        let google = Some(Provider::Google);
+        assert!(authorize(&credential, google, Some("owner")).is_ok());
+        assert!(authorize(&credential, google, Some("other")).is_err());
+        assert!(authorize(&credential, Some(Provider::Outlook), Some("owner")).is_err());
+        assert!(authorize(&credential, google, None).is_ok());
+        assert!(authorize(&credential, None, None).is_err());
+    }
+
+    #[test]
+    fn device_only_credentials_require_no_account() {
         let credential = Credential {
-            provider: Provider::Google,
-            account: "owner".into(),
+            provider: None,
+            account: None,
             binding: "device".into(),
             password: "sample".into(),
         };
-        assert!(authorize(&credential, Provider::Google, Some("owner")).is_ok());
-        assert!(authorize(&credential, Provider::Google, Some("other")).is_err());
-        assert!(authorize(&credential, Provider::Outlook, Some("owner")).is_err());
-        assert!(authorize(&credential, Provider::Google, None).is_ok());
+        assert!(authorize(&credential, None, None).is_ok());
+        assert!(authorize(&credential, Some(Provider::Google), None).is_err());
+        assert!(authorize(&credential, None, Some("owner")).is_err());
     }
 }
