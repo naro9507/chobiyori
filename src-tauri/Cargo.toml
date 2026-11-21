@@ -58,8 +58,8 @@ tauri-plugin-dialog = "2.8.4"
 # 自動アップデートと同じ版・同じ機能を使う（新しい crate を増やさない）
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
-# API キーは OS の資格情報ストア（Windows の資格情報マネージャー・macOS のキーチェーン）に置く
-keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
+# 資格情報を各 OS のストアに保管するための共通 API
+keyring = { package = "keyring-core", version = "1.0.1" }
 # 請求書のメール送信（フェーズ 9）。SMTP、TLS は rustls（ring）で、証明書は OS のものを使う
 lettre = { version = "0.11.24", default-features = false, features = ["builder", "smtp-transport", "rustls", "ring", "rustls-platform-verifier"] }
 # メールソフト（mailto:）と、保存した PDF のフォルダを開く。Rust 側からだけ使い、画面に権限は渡さない。
@@ -76,15 +76,20 @@ tempfile = { workspace = true }
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-updater = "2"
 
-# アプリ終了後にも申告期限を通知する OS の予約 API
 [target.'cfg(windows)'.dependencies]
+windows-native-keyring-store = { version = "1.1.0", default-features = false }
+# アプリ終了後にも申告期限を通知する OS の予約 API
 windows = { version = "=0.62.2", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 block2 = "=0.6.2"
 objc2 = "=0.6.5"
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSBundle", "NSError", "NSString"] }
 objc2-user-notifications = { version = "=0.3.2", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSettings", "UNNotificationTrigger", "UNUserNotificationCenter"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+linux-keyutils-keyring-store = "1.0.0"
 
 [profile.release]
 # 配布サイズとメモリ使用量を抑える

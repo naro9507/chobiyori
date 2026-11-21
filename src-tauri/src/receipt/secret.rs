@@ -1,7 +1,17 @@
 //! API キーの保管。OS の資格情報ストア（Windows の資格情報マネージャー、macOS のキーチェーン）に置く。
 //! DB・ファイル・ログ・画面には出さない（画面には「登録済みかどうか」だけを返す）。
 
+use std::sync::{Arc, LazyLock};
+
+#[cfg(target_os = "macos")]
+use apple_native_keyring_store::keychain::Store as NativeStore;
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+use keyring::mock::Store as NativeStore;
+#[cfg(target_os = "linux")]
+use linux_keyutils_keyring_store::Store as NativeStore;
+#[cfg(windows)]
+use windows_native_keyring_store::Store as NativeStore;
 
 const SERVICE: &str = "jp.dcs.accounting";
 const GEMINI_KEY: &str = "gemini-api-key";
@@ -27,7 +37,27 @@ fn entry() -> AppResult<keyring::Entry> {
 }
 
 fn entry_for(name: &str) -> AppResult<keyring::Entry> {
-    keyring::Entry::new(SERVICE, name).map_err(|_| AppError::new(ErrorCode::SecretStore))
+    static STORE: LazyLock<AppResult<Arc<keyring::CredentialStore>>> = LazyLock::new(|| {
+        let store = NativeStore::new().map_err(|_| AppError::new(ErrorCode::SecretStore))?;
+        Ok(store)
+    });
+
+    // keyring v3 が保存した項目を引き続き参照する。
+    #[cfg(target_os = "linux")]
+    let description = format!("keyring-rs:{name}@{SERVICE}");
+    #[cfg(target_os = "linux")]
+    let modifiers = Some(std::collections::HashMap::from([(
+        "description",
+        description.as_str(),
+    )]));
+    #[cfg(not(target_os = "linux"))]
+    let modifiers = None;
+
+    STORE
+        .as_ref()
+        .map_err(Clone::clone)?
+        .build(SERVICE, name, modifiers.as_ref())
+        .map_err(|_| AppError::new(ErrorCode::SecretStore))
 }
 
 impl KeyringItem<'_> {
