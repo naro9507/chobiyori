@@ -1147,7 +1147,7 @@
 		"linkedUnlockTitle": "Open your books",
 		"linkedUnlockDescription": "Authenticate with Windows Hello / Touch ID, or open with your password.",
 		"deviceTitle": "Open with Windows Hello / Touch ID",
-		"deviceDescription": "Set up with your books password and device authentication. Once enabled, Windows Hello / Touch ID can open your books at startup, even offline. Linking a Google or Microsoft account is optional.",
+		"deviceDescription": "Set up with your books password and device authentication. Once enabled, Windows Hello / Touch ID can open your books at startup, even offline.",
 		"devicePassword": "Current password",
 		"deviceEnable": "Enable on this device",
 		"deviceSwitch": "Switch to device authentication only",
