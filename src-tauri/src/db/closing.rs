@@ -766,6 +766,23 @@ pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<Car
     })
 }
 
+/// 白色の事業専従者控除。対象と金額を利用者が確認した値だけを保存する。
+pub fn save_white_deduction(db: &Database, year: i64, amount: i64) -> AppResult<StatementAmounts> {
+    if !(0..=AMOUNT_MAX).contains(&amount) {
+        return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+    }
+    db.transaction(|tx| {
+        ensure_year_open(tx, year)?;
+        if year_info(tx, year)?.filing_type != FilingType::White {return Err(AppError::field(ErrorCode::InvalidFormat, "filingType"));}
+        if amount > statement(tx, year)?.statement.income_before_deduction.max(0) {
+            return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+        }
+        tx.execute("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![format!("white_deduction_{year}"),amount.to_string()])?;
+        crate::db::audit::event(tx,"whiteDeduction","update",Some(year),Some(serde_json::json!({"amount":amount})))?;
+        statement(tx, year)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1051,168 +1068,6 @@ mod tests {
         assert_eq!(
             next_year.assets[0].depreciation.unwrap().opening_book_value,
             195_000
-        );
-    }
-}
-
-/// 白色の事業専従者控除。対象と金額を利用者が確認した値だけを保存する。
-pub fn save_white_deduction(db: &Database, year: i64, amount: i64) -> AppResult<StatementAmounts> {
-    if !(0..=AMOUNT_MAX).contains(&amount) {
-        return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
-    }
-    db.transaction(|tx| {
-        ensure_year_open(tx, year)?;
-        if year_info(tx, year)?.filing_type != FilingType::White {return Err(AppError::field(ErrorCode::InvalidFormat, "filingType"));}
-        if amount > statement(tx, year)?.statement.income_before_deduction.max(0) {
-            return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
-        }
-        tx.execute("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![format!("white_deduction_{year}"),amount.to_string()])?;
-        crate::db::audit::event(tx,"whiteDeduction","update",Some(year),Some(serde_json::json!({"amount":amount})))?;
-        statement(tx, year)
-    })
-}
-
-#[cfg(test)]
-mod white_integration_tests {
-    use super::*;
-    use crate::db::setup;
-    use crate::export::{self, labels::Locale, ExportFormat, ExportRequest, ExportTarget};
-    use chobiyori_core::journal::{SimpleInput, SimpleKind};
-
-    #[test]
-    fn white_deduction_flows_to_statement_guide_and_export() {
-        let db = Database::open_in_memory().unwrap();
-        let mut initial = setup::tests::input();
-        initial.filing_type = FilingType::White;
-        setup::complete(&db, &initial).unwrap();
-        let (cash, sales) = {
-            let conn = db.conn();
-            (
-                account_by_line(&conn, "bs.cash").unwrap(),
-                account_by_line(&conn, "pl.sales").unwrap(),
-            )
-        };
-        transactions::create_simple(
-            &db,
-            2026,
-            &SimpleInput {
-                kind: SimpleKind::Income,
-                date: "2026-01-10".into(),
-                amount: 1_000_000,
-                account_id: Some(sales),
-                payment_account_id: cash,
-                partner_id: None,
-                memo: "Sale".into(),
-                allocation_percent: None,
-            },
-        )
-        .unwrap();
-        let result = save_white_deduction(&db, 2026, 500_000).unwrap();
-        assert_eq!(result.statement.income, 500_000);
-        assert!(result
-            .statement
-            .pl
-            .iter()
-            .any(|l| l.key == "family_deduction" && l.amount == 500_000));
-        let guide = crate::db::filing::income_guide(&db.conn(), 2026).unwrap();
-        assert_eq!(guide.income, 500_000);
-        assert_eq!(guide.business_revenue, 1_000_000);
-        assert!(guide
-            .sections
-            .iter()
-            .find(|s| s.key == "return")
-            .unwrap()
-            .items
-            .iter()
-            .any(|i| i.key == "return_income" && i.value == 500_000));
-        let file = export::build(
-            &db.conn(),
-            &ExportRequest {
-                target: ExportTarget::Statement,
-                format: ExportFormat::Csv,
-                encoding: export::csv::Encoding::Utf8,
-                locale: Locale::Ja,
-                fiscal_year: 2026,
-                from_month: 1,
-                to_month: 12,
-            },
-        )
-        .unwrap();
-        assert!(file.name.contains("収支内訳書"));
-        let csv = String::from_utf8(file.bytes).unwrap();
-        assert!(csv.contains("事業専従者控除額"));
-        assert!(!csv.contains("青色申告特別控除"));
-        assert!(!csv.contains("貸借対照表"));
-        let sales_book = crate::db::books::sales_book(&db.conn(), 2026, 1, 12).unwrap();
-        assert_eq!(sales_book.len(), 1);
-        assert_eq!(sales_book[0].total_credit, 1_000_000);
-        assert!(save_white_deduction(&db, 2026, -1).is_err());
-        assert!(save_white_deduction(&db, 2026, 1_000_001).is_err());
-        // No.2210: 家事部分を経費に含めない。割合30%は検証用の入力例。
-        let utilities = account_by_line(&db.conn(), "pl.utilities").unwrap();
-        let payment = transactions::create_simple(
-            &db,
-            2026,
-            &SimpleInput {
-                kind: SimpleKind::Expense,
-                date: "2026-02-01".into(),
-                amount: 120_000,
-                account_id: Some(utilities),
-                payment_account_id: cash,
-                partner_id: None,
-                memo: "Shared utility expense".into(),
-                allocation_percent: Some(30),
-            },
-        )
-        .unwrap();
-        assert!(payment
-            .lines
-            .iter()
-            .any(|l| l.account_id == utilities && l.amount == 36_000));
-        let drawings = account_by_line(&db.conn(), "bs.owner_drawings").unwrap();
-        assert!(payment
-            .lines
-            .iter()
-            .any(|l| l.account_id == drawings && l.amount == 84_000));
-        // 要件を満たす配偶者1人の例: min(860,000, 964,000 / 2)。
-        save_white_deduction(&db, 2026, 482_000).unwrap();
-        let s = statement(&db.conn(), 2026).unwrap();
-        assert_eq!(s.statement.income_before_deduction, 964_000);
-        assert_eq!(s.statement.income, 482_000);
-        // 所得が後から変わった場合も、保存値を黙って変更せず再計算を促す。
-        transactions::create_simple(
-            &db,
-            2026,
-            &SimpleInput {
-                kind: SimpleKind::Expense,
-                date: "2026-02-02".into(),
-                amount: 964_001,
-                account_id: Some(utilities),
-                payment_account_id: cash,
-                partner_id: None,
-                memo: String::new(),
-                allocation_percent: None,
-            },
-        )
-        .unwrap();
-        assert!(save_white_deduction(&db, 2026, 1).is_err());
-        assert!(statement(&db.conn(), 2026)
-            .unwrap()
-            .statement
-            .issues
-            .iter()
-            .any(|i| i.code == closing::StatementIssueCode::WhiteDeductionExceedsIncome));
-        save_white_deduction(&db, 2026, 0).unwrap();
-        assert!(!statement(&db.conn(), 2026)
-            .unwrap()
-            .statement
-            .issues
-            .iter()
-            .any(|i| i.code == closing::StatementIssueCode::WhiteDeductionExceedsIncome));
-        crate::db::locks::set_year_closed(&db, 2026, true).unwrap();
-        assert_eq!(
-            save_white_deduction(&db, 2026, 50_000).unwrap_err().code,
-            ErrorCode::YearClosed
         );
     }
 }

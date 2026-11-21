@@ -5,18 +5,10 @@
 
 use super::{ReadError, ReceiptReader};
 use base64::Engine;
-use chobiyori_core::receipt::{response_schema, PROMPT};
+use chobiyori_core::receipt::{response_schema, valid_model, PROMPT};
 use serde_json::Value;
 use std::time::Duration;
 
-/// 設定がないときのモデル。
-///
-/// 2026-11-20 に試験用レシート 12 種類で比べて決めた（`scripts/receipt-dogfood`）。
-/// - gemini-2.5-flash: 新しく作った API キーでは 404（「新しい利用者には提供しない」）
-/// - gemini-3.8-flash / gemini-3.5-flash: 読めたものは全問正解。ただし 1 枚 5〜110 秒かかり、
-///   無料枠は 1 日 20 回まで
-/// - gemini-3.5-flash-lite: 12 枚すべて全問正解（75 項目）、1 枚およそ 1 秒
-pub const DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
 const ENDPOINT: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 pub struct Gemini {
@@ -39,15 +31,6 @@ impl Gemini {
             .map_err(|_| ReadError::Offline)?;
         Ok(Self { client, key, model })
     }
-}
-
-/// モデル名に使える文字だけか（URL に入れるため）。
-pub fn valid_model(model: &str) -> bool {
-    !model.is_empty()
-        && model.len() <= 80
-        && model
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
 }
 
 /// 送る中身。
@@ -244,12 +227,5 @@ mod tests {
                 retry_after: Some(30)
             }
         );
-    }
-
-    #[test]
-    fn model_names_are_safe_for_the_url() {
-        assert!(valid_model("gemini-2.5-flash"));
-        assert!(!valid_model("../x"));
-        assert!(!valid_model(""));
     }
 }

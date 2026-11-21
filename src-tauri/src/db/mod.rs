@@ -39,7 +39,7 @@ use std::sync::{Mutex, MutexGuard};
 
 /// スキーマの変更。番号順に 1 回だけ当てる。適用済みの番号は `PRAGMA user_version` に持つ。
 /// 一度配布したファイルは書き換えず、変更は新しいファイルとして足す。
-const MIGRATIONS: &[&str] = &[
+pub(crate) const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_journal.sql"),
     include_str!("migrations/0003_templates.sql"),
@@ -112,7 +112,7 @@ impl Database {
         Self::init(Connection::open_in_memory()?)
     }
 
-    fn init(conn: Connection) -> AppResult<Self> {
+    pub(crate) fn init(conn: Connection) -> AppResult<Self> {
         configure(&conn)?;
         migrate(&conn)?;
         Ok(Self {
@@ -200,9 +200,6 @@ fn migrate(conn: &Connection) -> AppResult<()> {
 pub(crate) fn flag(value: bool) -> i64 {
     i64::from(value)
 }
-
-#[cfg(test)]
-mod regression_tests;
 
 #[cfg(test)]
 mod tests {

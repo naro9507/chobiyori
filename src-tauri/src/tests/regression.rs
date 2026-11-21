@@ -582,7 +582,7 @@ fn migration_preserves_legacy_attachment_and_balanced_opening() {
     use rusqlite::Connection;
     let conn = Connection::open_in_memory().unwrap();
     conn.pragma_update(None, "foreign_keys", true).unwrap();
-    for sql in &super::MIGRATIONS[..11] {
+    for sql in &crate::db::MIGRATIONS[..11] {
         conn.execute_batch(sql).unwrap();
     }
     conn.execute_batch(
@@ -606,7 +606,7 @@ fn migration_preserves_legacy_attachment_and_balanced_opening() {
             Some(&500)
         );
         assert_eq!(
-            super::attachments::list_for_transaction(&conn, 1).unwrap()[0].id,
+            crate::db::attachments::list_for_transaction(&conn, 1).unwrap()[0].id,
             1
         );
         assert!(!closing::opening(&conn, 2026).unwrap().confirmed);

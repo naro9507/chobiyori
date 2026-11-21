@@ -10,6 +10,9 @@ pub mod import;
 pub mod mail;
 pub mod receipt;
 
+#[cfg(test)]
+mod tests;
+
 use tauri::Manager;
 
 /// 帳簿のファイル名。アプリのデータフォルダに置く。

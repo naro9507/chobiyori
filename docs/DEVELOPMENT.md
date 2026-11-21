@@ -67,14 +67,14 @@ chobiyori/
 │   ├── src/
 │   │   ├── commands/           # 画面から呼ぶコマンド
 │   │   ├── db/                 # DB の接続、スキーマ（migrations/）、マスタの読み書き
-│   │   ├── domain/             # 会計の決まりごと（区分・入力の検証・按分・標準科目・元帳の残高）
 │   │   ├── export/             # 帳簿の CSV・PDF 出力
 │   │   ├── import/             # 仕訳 CSV・Excel 帳簿・カードや口座の明細の取込
 │   │   ├── receipt/            # レシートの読み取り（Gemini API）と API キーの保管
 │   │   ├── mail.rs             # 請求書などのメール送信（SMTP）
-│   │   ├── error.rs            # 画面に返すエラー
+│   │   ├── tests/              # 複数の層（db・export・import）をまたぐテスト
 │   │   ├── lib.rs              # アプリの組み立て
 │   │   └── main.rs
+│   ├── crates/core/            # 会計の決まりごと（区分・入力の検証・按分・標準科目・計算・データ）と、画面に返すエラー（error.rs）
 │   ├── capabilities/           # 画面に許可する操作
 │   ├── icons/                  # アプリのアイコン
 │   └── tauri.conf.json
@@ -96,7 +96,7 @@ chobiyori/
 3. 画面側は `src/features/<機能>/` に、`callCommand` で呼ぶ関数と TanStack Query のフックを置く。
 4. 返す型は Rust 側で `#[serde(rename_all = "camelCase")]` を付け、TypeScript の型と名前をそろえる。
 
-計算や検証のロジックは `cargo test` でテストする。
+計算や検証のロジックは `crates/core` に置き、`cargo test` でテストする（`cargo test -p chobiyori-core` で `core` だけを実行できる）。`core` は `tauri`・`rusqlite`・`reqwest` に依存させない。
 
 ## データベース
 
@@ -119,13 +119,13 @@ chobiyori/
 
 ## 家事按分・定型仕訳・税区分
 
-- 家事按分の計算は `domain/allocation.rs`。経費の行を事業分と家事分（事業主貸）に分ける `split_line` を、かんたん入力（`db/transactions.rs`）と定型仕訳（`db/templates.rs`）で使う。端数処理は科目の按分ルールに従う。
-- 税区分は `domain::journal::validate` で決める（入力 → 科目の既定 → 対象外。免税の年度はいつも対象外）。年度の消費税の扱いは `DbMasters::load` が読む。
-- 定型仕訳の候補の月は `domain/template.rs` で計算する。候補を出すだけで、`post_template` を呼ぶまで取引は作らない。
+- 家事按分の計算は `crates/core/src/allocation.rs`。経費の行を事業分と家事分（事業主貸）に分ける `split_line` を、かんたん入力（`db/transactions.rs`）と定型仕訳（`db/templates.rs`）で使う。端数処理は科目の按分ルールに従う。
+- 税区分は `chobiyori_core::journal::validate` で決める（入力 → 科目の既定 → 対象外。免税の年度はいつも対象外）。年度の消費税の扱いは `DbMasters::load` が読む。
+- 定型仕訳の候補の月は `crates/core/src/template.rs` で計算する。候補を出すだけで、`post_template` を呼ぶまで取引は作らない。
 
 ## 帳簿の出力と取込
 
-- 帳簿（仕訳帳・総勘定元帳・出納帳・経費帳）は `db/books.rs` で仕訳から作り、残高の計算は `domain/ledger.rs` に置く。
+- 帳簿（仕訳帳・総勘定元帳・出納帳・経費帳）は `db/books.rs` で仕訳から作り、残高の計算は `crates/core/src/ledger.rs` に置く。
 - 出力は `export/`。帳簿を `report.rs` の表の形（見出し・列・行・ページ割り）にし、`csv.rs` と `pdf.rs` で書く。ファイルの見出しの言葉は `labels.rs` に日本語と英語で持つ（仕訳の CSV は取込で読み戻す形なので、画面の文言とは分ける）。
 - PDF は `krilla` で作る。日本語のフォントはアプリに同梱せず、PC のフォント（Windows は游ゴシック・メイリオ・MS ゴシック、macOS はヒラギノ角ゴシック、Linux は IPA フォント・Noto Sans CJK）を探して、使った文字だけを埋め込む。見つからないときは `fontNotFound` を返す。
 - PDF の中身のテストは、日本語のフォントがない環境では飛ばす（ページ割りと繰越の計算はフォントなしで確かめる）。Linux では `sudo apt-get install -y fonts-ipafont-gothic` で入る。CI でも入れている。
@@ -135,49 +135,49 @@ chobiyori/
 
 ## 取込受信箱（カード・口座の明細）
 
-- 明細の読み方は「取込形式」というデータ（`domain/statement.rs` の `FormatDefinition`）で持つ。カード会社ごとの分岐をコードに書かない。同梱のプリセットは `src-tauri/presets/*.json` に、利用者が書き出す形式のファイルと同じ形で置き、`db/formats.rs` の `PRESETS` に登録する。
+- 明細の読み方は「取込形式」というデータ（`crates/core/src/statement.rs` の `FormatDefinition`）で持つ。カード会社ごとの分岐をコードに書かない。同梱のプリセットは `src-tauri/presets/*.json` に、利用者が書き出す形式のファイルと同じ形で置き、`db/formats.rs` の `PRESETS` に登録する。
 - ファイルは `import/statement_file.rs` で「文字列の表」にしてから読む（CSV・TSV・Excel）。保存した形式と見出しが違えば、読まずに違いを返す。
 - 受信箱（`db/inbox.rs`）は候補をためるだけで、確定したときに初めて取引を作る。状態（確認待ち・確定済み・対象外）は保存した値から決め、確定した取引を消すと確認待ちに戻る。
-- 自動仕訳ルールは `domain/rules.rs`（店名をそろえる・照合する）と `db/rules.rs`。ルールがないときは、前に同じ店で確定した取引から候補を出す。
+- 自動仕訳ルールは `crates/core/src/rules.rs`（店名をそろえる・照合する）と `db/rules.rs`。ルールがないときは、前に同じ店で確定した取引から候補を出す。
 - プリセットを足すときは、実物の明細（個人情報を伏せたもの）で確かめ、匿名化したフィクスチャのテストを足す。
 - 銀行のプリセット（`bank-*.json`、6 つ）は実物が手に入らず、見出しを推測して作った。`import::statement_file` のテストは、推測した見出しで作ったフィクスチャを読むだけである。実物の明細で見出しが違えば、JSON を直してフィクスチャも実物に合わせる。
 
 ## レシートの読み取りと証憑
 
 - 読み取りは `src-tauri/src/receipt/`。外の AI を呼ぶ部分は `ReceiptReader` の向こうに置き、Gemini の実装は `gemini.rs`。テストでは本物の API を呼ばず、決まった返事を返す偽物を使う（`commands/receipts.rs` のテスト）。
-- 返ってきた値の読み直しと自己検算は `domain/receipt.rs`（AI に頼む JSON の形もここ）。返事は信じず、合わない項目は `Check` として画面に出す。
+- 返ってきた値の読み直しと自己検算は `crates/core/src/receipt.rs`（AI に頼む JSON の形もここ）。返事は信じず、合わない項目は `Check` として画面に出す。
 - API キーは `receipt/secret.rs` で OS の資格情報ストア（`keyring`。Windows の資格情報マネージャー、macOS のキーチェーン、Linux の keyutils）に置く。DB・ファイル・ログに書かず、画面には「登録済みかどうか」だけを返す。テストではメモリの中の偽物を使う。
 - HTTP は `reqwest`（自動アップデートと同じ版・機能。TLS は rustls と ring）。送るのはレシートの画像と固定の指示の文だけ。ログに画像・キー・金額・名前を出さない。
 - 証憑（画像・PDF）は `db/attachments.rs`。中身は DB の BLOB に置く（帳簿と一緒に暗号化される）。レシートの状態は `db/receipts.rs`、受信箱との紐付けと突合は `db/inbox.rs`。
 
 ## 請求書などの書類とメール
 
-- 計算（明細の金額、税率ごとの消費税、状態、番号、メールのひな形の差し込み）は `domain/document.rs`。DB の読み書き・発行・取り消し・売上と入金の記帳は `db/documents.rs`。
+- 計算（明細の金額、税率ごとの消費税、状態、番号、メールのひな形の差し込み）は `crates/core/src/document.rs`。DB の読み書き・発行・取り消し・売上と入金の記帳は `db/documents.rs`。
 - 紙面の配置は `export/document.rs` の `layout()` で 1 回だけ計算し、PDF（krilla）とプレビュー（画面の SVG）の両方がその結果を描く。見た目を変えるときは `layout()` だけを直す。プレビューの紙は画面の配色に合わせず白地に黒で固定する（PDF と同じ見た目にするための例外）。
 - メールは `mail.rs`。送る部分は `MailSender` の向こうに置き、テストでは偽物を使う（本物の SMTP は呼ばない）。パスワードは `receipt/secret.rs` の `KeyringItem` で OS の資格情報ストアに置く。ログにアドレス・金額・パスワード・本文を出さない（エラーは SMTP の応答コードだけ）。
 - メールソフトとフォルダを開くのは `tauri-plugin-opener` の関数（`open_url`・`reveal_item_in_dir`）を Rust から呼ぶ。プラグインとしては登録せず、画面には許可を足していない。
 
 ## 決算
 
-- 計算は `domain/depreciation.rs`（減価償却）と `domain/closing.rs`（期首残高の貸借、決算書の金額、元入金の繰越）。DB の読み書きは `db/closing.rs`（期首残高・棚卸・チェックリスト・決算書・年度の繰越）と `db/fixed_assets.rs`（固定資産台帳と償却の記録）。
-- 償却率・耐用年数の例・決算書の様式は `domain/data/*.json` に年度ごとのデータとして持ち、コードで書き分けない。様式が改定されたら、`from_year` を付けた新しい様式を足す。
+- 計算は `crates/core/src/depreciation.rs`（減価償却）と `crates/core/src/closing.rs`（期首残高の貸借、決算書の金額、元入金の繰越）。DB の読み書きは `db/closing.rs`（期首残高・棚卸・チェックリスト・決算書・年度の繰越）と `db/fixed_assets.rs`（固定資産台帳と償却の記録）。
+- 償却率・耐用年数の例・決算書の様式は `crates/core/src/data/*.json` に年度ごとのデータとして持ち、コードで書き分けない。様式が改定されたら、`from_year` を付けた新しい様式を足す。
 - 減価償却と棚卸の仕訳は、利用者が「記録する」を押したときだけ作る。償却費・売上原価は保存せず、毎回計算する。
 - 期首残高（`opening_balances`）は、試算表（`db/reports.rs`）と元帳の繰越（`db/books.rs`）に足す。
 - 欄の番号・控除額・償却率の正しさは、最新の様式と税理士に確認すること。
 
 ## 確定申告・消費税・インボイスの登録の補助
 
-- 計算は `domain/filing.rs`（期限、チェックディジット、免税と課税の切り替え、消費税の額）、帳簿からの集計と記録は `db/filing.rs`、コマンドは `commands/filing.rs`。
-- 期限・2 割特例の期間・みなし仕入率は `domain/data/filing.json` に年度ごとに持つ。毎年見直し、足した年の期限が土日でないことはテストで確かめる。
+- 計算は `crates/core/src/filing.rs`（期限、チェックディジット、免税と課税の切り替え、消費税の額）、帳簿からの集計と記録は `db/filing.rs`、コマンドは `commands/filing.rs`。
+- 期限・2 割特例の期間・みなし仕入率は `crates/core/src/data/filing.json` に年度ごとに持つ。毎年見直し、足した年の期限が土日でないことはテストで確かめる。
 - その日の取引を免税として扱うかは `db::transactions::date_is_exempt`（年度の区分と登録日から決める）を使う。年度だけで判断しない。
 - アプリから国税庁へは何も送らない。公表サイトは `open_invoice_site` で開くだけで、開く先は Rust 側に固定してある。
 - どの画面にも、金額の入れ先・特例の条件・期限は税理士か税務署で確かめるよう添える（`AccountantNote`）。
 
 ## 定期売上と売掛帳・買掛帳
 
-- 定期売上は `db/recurring.rs`（プラン・休みの月・入金の記録）と `domain/recurring.rs`（月ごとの予定額と状態の判定）。予定と入金の突き合わせは保存せず、プランと `recurring_payments` から毎回作る。
+- 定期売上は `db/recurring.rs`（プラン・休みの月・入金の記録）と `crates/core/src/recurring.rs`（月ごとの予定額と状態の判定）。予定と入金の突き合わせは保存せず、プランと `recurring_payments` から毎回作る。
 - 入金は `transactions::insert_kind` で記録するので、検証・締め・変更履歴は他の入力と同じに働く。
-- 売掛帳・買掛帳は `db/books.rs` の `partner_ledgers`。売掛金・買掛金の科目の明細行を取引先ごとに分け、`domain/ledger` で残高を出す。
+- 売掛帳・買掛帳は `db/books.rs` の `partner_ledgers`。売掛金・買掛金の科目の明細行を取引先ごとに分け、`crates/core/src/ledger.rs` で残高を出す。
 
 ## UI 部品
 

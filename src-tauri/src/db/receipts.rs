@@ -5,9 +5,10 @@
 
 use super::attachments::{self, Attachment};
 use super::inbox::InboxStatus;
-use crate::receipt::gemini::{valid_model, DEFAULT_MODEL};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
-use chobiyori_core::receipt::{self, Check, PaymentMethod, PointsAs, ReceiptReading};
+use chobiyori_core::receipt::{
+    self, valid_model, Check, PaymentMethod, PointsAs, ReceiptReading, DEFAULT_MODEL,
+};
 use chobiyori_core::string_enum;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};

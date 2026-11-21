@@ -11,9 +11,9 @@
 //! "invoiceNo": "T...", "payment": "cash", "taxParts": { "8": 1080 }, "checks": [] } }` の形。
 //! 値が null の項目は見比べない（ファイルごと null なら、読んだ結果を出すだけ）。
 
-use chobiyori_core::receipt::{checks, parse_reading, reduced_amount};
+use chobiyori_core::receipt::{checks, parse_reading, reduced_amount, DEFAULT_MODEL};
 use chobiyori_lib::db::attachments::mime_of;
-use chobiyori_lib::receipt::gemini::{Gemini, DEFAULT_MODEL};
+use chobiyori_lib::receipt::gemini::Gemini;
 use chobiyori_lib::receipt::{ReadError, ReceiptReader};
 use serde_json::Value;
 use std::path::PathBuf;

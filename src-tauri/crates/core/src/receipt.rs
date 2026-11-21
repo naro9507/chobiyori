@@ -11,6 +11,25 @@ use super::string_enum;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// 読み取りに使うモデルの決まりごと。モデル名は設定で変えられる（提供側の改廃に備える）。
+/// 設定がないときのモデル。
+///
+/// 2026-11-20 に試験用レシート 12 種類で比べて決めた（`scripts/receipt-dogfood`）。
+/// - gemini-2.5-flash: 新しく作った API キーでは 404（「新しい利用者には提供しない」）
+/// - gemini-3.8-flash / gemini-3.5-flash: 読めたものは全問正解。ただし 1 枚 5〜110 秒かかり、
+///   無料枠は 1 日 20 回まで
+/// - gemini-3.5-flash-lite: 12 枚すべて全問正解（75 項目）、1 枚およそ 1 秒
+pub const DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
+
+/// モデル名に使える文字だけか（URL に入れるため）。
+pub fn valid_model(model: &str) -> bool {
+    !model.is_empty()
+        && model.len() <= 80
+        && model
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
+}
+
 string_enum! {
     /// 支払方法。貸方の口座を決めるのに使う。
     pub enum PaymentMethod {
@@ -326,6 +345,13 @@ pub fn split_by_rate(total: i64, reduced: i64) -> Vec<(TaxCategory, i64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_names_are_safe_for_the_url() {
+        assert!(valid_model("gemini-2.5-flash"));
+        assert!(!valid_model("../x"));
+        assert!(!valid_model(""));
+    }
 
     const GOOD: &str = r#"{
         "date": "令和8年3月5日", "total": "¥3,240", "merchant": "テスト商店",
