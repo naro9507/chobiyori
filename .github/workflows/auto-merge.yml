@@ -1,4 +1,4 @@
-# Renovate と Dependabot の PR だけ、CI（ci.yml の check）が通ったら自動でマージする。
+# Renovate の PR だけ、CI（ci.yml の check）が通ったら自動でマージする。
 # 事前に必要な設定: リポジトリの「Allow auto-merge」を有効にし、
 # ブランチ保護で check を必須にする（必須にしないと CI を待たずにマージされる）。
 name: Auto merge
@@ -14,9 +14,7 @@ permissions:
 
 jobs:
   auto-merge:
-    if: >-
-      github.event.pull_request.user.login == 'renovate[bot]' ||
-      github.event.pull_request.user.login == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'renovate[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: 自動マージを有効にする
