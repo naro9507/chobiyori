@@ -65,11 +65,11 @@ jobs:
         with:
           version-script: pnpm release:prepare
           commit-message: リリースに向けてバージョンを更新する
-          pr-title: 帳日和のリリース準備
+          pr-title: リリース
           create-github-releases: false
           push-git-tags: false
 
-      - name: PR にタグ付けの手順と変更点を記載
+      - name: PR のタイトルと本文をタグ名にする
         if: steps.release.outputs.pr-number != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,16 +78,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version=$(node -p "require('./package.json').version")
-          {
-            echo "## 帳日和 v$version のリリース準備"
-            echo
-            echo "この PR を main にマージしたあと、マージ結果のコミットに \`v$version\` タグを付けてプッシュします。"
-            echo "[リリース手順](https://github.com/$GH_REPO/blob/main/docs/RELEASE.md#リリースの手順)"
-            echo
-            echo "## 変更点"
-            echo
-            node scripts/release-notes.mjs "v$version"
-          } > "$RUNNER_TEMP/release-pr.md"
+          tag="v$(node -p "require('./package.json').version")"
           gh api -X PATCH "repos/$GH_REPO/pulls/$PR_NUMBER" \
-            -F "body=@$RUNNER_TEMP/release-pr.md" --jq .html_url
+            -f "title=$tag" -f "body=$tag" --jq .html_url

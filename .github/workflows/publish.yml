@@ -18,7 +18,8 @@ jobs:
   publish:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.event == 'push' &&
+      ((github.event.workflow_run.event == 'push' ||
+        github.event.workflow_run.event == 'workflow_dispatch') &&
        github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
     env:
@@ -35,10 +36,12 @@ jobs:
           [[ -n "$tag" ]] || exit 0
           sha=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)
           runs=$(gh api -X GET "repos/$GH_REPO/actions/runs" \
-            -f event=push -f head_sha="$sha" -F per_page=100)
+            -f head_sha="$sha" -F per_page=100)
+          # タグのプッシュまたは Tag release からの直接実行（workflow_dispatch）だけを見る
           check_run() {
             jq -r --arg path ".github/workflows/$1" --arg branch "$2" '
-              [.workflow_runs[] | select(.path == $path and .head_branch == $branch)]
+              [.workflow_runs[] | select(.path == $path and .head_branch == $branch
+                and (.event == "push" or .event == "workflow_dispatch"))]
               | max_by(.run_number).conclusion // "pending"
             ' <<< "$runs"
           }
