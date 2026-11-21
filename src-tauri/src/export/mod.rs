@@ -1,7 +1,7 @@
 //! 帳簿の出力（CSV・PDF）。
 //!
 //! 帳簿のデータを `report` で表の形にし、`csv` と `pdf` で書き出す。
-//! 帳簿のデータは `db::books`・`db::reports` から読み、ここでは計算しない。
+//! 帳簿のデータは `chobiyori_storage::books`・`chobiyori_storage::reports` から読み、ここでは計算しない。
 
 pub mod csv;
 pub mod document;
@@ -10,9 +10,9 @@ pub mod labels;
 pub mod pdf;
 pub mod report;
 
-use crate::db::{accounts, books, partners, reports, setup, sub_accounts};
-use crate::domain::journal::period_range;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::period_range;
+use chobiyori_storage::{accounts, books, partners, reports, setup, sub_accounts};
 use labels::Locale;
 use report::{Context, LedgerKind, Names, Report};
 use rusqlite::Connection;
@@ -184,7 +184,7 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
             &ctx,
         ),
         ExportTarget::Statement => report::statement(
-            &crate::db::closing::statement(conn, year)?,
+            &chobiyori_storage::closing::statement(conn, year)?,
             &names()?,
             &Context {
                 from: format!("{year:04}-01-01"),
@@ -215,8 +215,8 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::reports::tests::books as sample_books;
-    use crate::db::transactions::tests::account;
+    use chobiyori_storage::test_support::account;
+    use chobiyori_storage::test_support::books as sample_books;
 
     fn request(target: ExportTarget, format: ExportFormat) -> ExportRequest {
         ExportRequest {

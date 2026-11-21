@@ -12,7 +12,7 @@
 
 use super::labels::{self as l};
 use super::report::{paginate, Cell, ColumnKind, Report, Row, RowStyle, Section};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point};
 use krilla::num::NormalizedF32;

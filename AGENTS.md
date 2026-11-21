@@ -39,11 +39,11 @@ chobiyori/
 ├── index.html・vite.config.ts  # 画面の入口とビルドの設定
 ├── src-tauri/                  # バックエンド（Rust + Tauri）
 │   ├── src/commands/           # 画面から呼ぶコマンド
-│   ├── src/db/                 # スキーマ（migrations/）とマスタの読み書き
-│   ├── src/domain/             # 会計の決まりごと（区分・検証・按分・標準科目）
 │   ├── src/export/             # 帳簿の CSV・PDF 出力
 │   ├── src/import/             # 仕訳 CSV・Excel 帳簿・カードや口座の明細の取込
 │   ├── src/receipt/            # レシートの読み取り（Gemini API）と API キーの保管
+│   ├── crates/core/            # 会計の決まりごと（区分・検証・按分・標準科目・計算）とエラー。画面・DB・通信に依存しない
+│   ├── crates/storage/         # スキーマ（migrations/）、マスタと仕訳の読み書き、暗号化、バックアップ。core だけに依存する
 │   ├── capabilities/           # 画面に許可する操作
 │   └── tauri.conf.json
 └── docs/                       # 仕様と開発資料
@@ -52,7 +52,8 @@ chobiyori/
 ## 方針
 
 - DB アクセス・会計の計算・取込や出力は Rust 側に置く。画面は入力と表示だけを担う。
-- 会計の計算は `cargo test` で検証する。
+- 会計の計算は `crates/core`（`chobiyori-core`）に置き、`cargo test` で検証する。`core` は `tauri`・`rusqlite`・`reqwest` などに依存させない（`rusqlite` は SQLite との橋渡しの feature だけ）。
+- 依存の向きは `commands → storage・import・export・receipt → core`。`core` は `storage` を、`storage` は `export`・`import`・`receipt` を呼べない（crate が分かれているのでコンパイルで止まる）。複数の層をまたぐテストは `src-tauri/src/tests/` に置き、`storage` のテスト用ヘルパーは `test-support` feature の `test_support` から使う。
 - 文言は `i18n/messages/ja.json` と `en.json` に同じキーで置く。画面に文言を直接書かない。
 - 色は `styles/globals.css` の CSS 変数で定義し、画面ではトークン名（`bg-card` など）を使う。
 - 依存や GitHub Actions を足すときは、`docs/DEVELOPMENT.md` の「依存の安全」に従う（公開から 7 日待つ、Actions はコミットハッシュで指定する）。

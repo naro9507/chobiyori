@@ -1,8 +1,8 @@
 //! 未提出の申告期限を終日の iCalendar 予定にする。
 
 use super::labels::{Locale, Text};
-use crate::db::filing::DeadlineNotice;
-use crate::domain::filing::DeadlineKind;
+use chobiyori_core::filing::DeadlineKind;
+use chobiyori_storage::filing::DeadlineNotice;
 
 const INCOME: Text = Text {
     ja: "確定申告の期限",

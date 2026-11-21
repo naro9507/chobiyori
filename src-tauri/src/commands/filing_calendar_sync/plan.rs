@@ -1,10 +1,10 @@
-use crate::db::{documents, filing, locks, received_bills, setup};
-use crate::domain::{document::DocumentKind, filing::add_days, journal};
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::{
     filing_calendar,
     labels::{Locale, Text},
 };
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::{document::DocumentKind, filing::add_days, journal};
+use chobiyori_storage::{documents, filing, locks, received_bills, setup};
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn closing_reminders_are_opt_in_and_follow_month_locks() {
-        let db = setup::tests::set_up_db();
+        let db = chobiyori_storage::test_support::set_up_db();
         let deadline = || {
             build(&db.conn(), "2026-11-15", Locale::Ja)
                 .unwrap()

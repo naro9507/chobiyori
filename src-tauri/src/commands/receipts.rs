@@ -5,17 +5,17 @@
 //! 確定するまで記帳しない。
 
 use super::files;
-use crate::db::attachments::{self, Attachment, FILE_MAX};
-use crate::db::inbox::{self, InboxItem, Reconciliation};
-use crate::db::receipts::{
-    self, AddReceiptsResult, Receipt, ReceiptFields, ReceiptSettings, ReceiptSettingsInput,
-};
-use crate::db::Database;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::receipt::gemini::Gemini;
 use crate::receipt::secret::{self, Keyring, SecretStore};
 use crate::receipt::{ReadError, ReceiptReader};
 use base64::Engine;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_storage::attachments::{self, Attachment, FILE_MAX};
+use chobiyori_storage::inbox::{self, InboxItem, Reconciliation};
+use chobiyori_storage::receipts::{
+    self, AddReceiptsResult, Receipt, ReceiptFields, ReceiptSettings, ReceiptSettingsInput,
+};
+use chobiyori_storage::Database;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
@@ -327,9 +327,9 @@ pub async fn reconciliation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::receipts::tests::READING;
-    use crate::db::setup::tests::set_up_db;
     use crate::receipt::ReadError;
+    use chobiyori_storage::test_support::set_up_db;
+    use chobiyori_storage::test_support::READING;
     use std::sync::Mutex;
 
     /// 決まった返事を順に返す偽物の読み取り。本物の API は呼ばない。
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn a_bundle_of_receipts_is_read_one_by_one_into_the_inbox() {
         let db = set_up_db();
-        let jpeg = crate::db::attachments::tests::jpeg;
+        let jpeg = chobiyori_storage::test_support::jpeg;
         db.transaction(|tx| {
             receipts::add_files(
                 tx,
@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn a_missing_model_or_used_up_quota_stops_the_bundle_without_failing_receipts() {
         let db = set_up_db();
-        let jpeg = crate::db::attachments::tests::jpeg;
+        let jpeg = chobiyori_storage::test_support::jpeg;
         db.transaction(|tx| receipts::add_files(tx, &[("a.jpg".into(), jpeg(1))]))
             .unwrap();
         consent(&db);

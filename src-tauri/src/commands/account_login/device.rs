@@ -1,7 +1,7 @@
 // The native side returns a secret obtainable only through the platform credential.
 // Only the public challenge / hardware-wrapped key material goes into the envelope.
-use crate::error::{AppError, AppResult, ErrorCode};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use ring::{
     aead,
     rand::{SecureRandom, SystemRandom},

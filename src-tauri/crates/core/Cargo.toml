@@ -1,0 +1,23 @@
+[package]
+name = "chobiyori-core"
+# 配布する版は src-tauri/Cargo.toml の [package] で決める（scripts/sync-rust-version.mjs）
+version = "0.0.0"
+description = "帳日和の会計の決まりごと（区分・検証・按分・標準科目・計算）。画面や DB には依存しない"
+edition = "2021"
+rust-version = "1.92"
+license = "ISC"
+publish = false
+
+[features]
+# SQLite との橋渡し（列挙型の ToSql/FromSql と、rusqlite::Error からの変換）。
+# 付けなければ rusqlite を使わずにビルドできる
+rusqlite = ["dep:rusqlite"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true, optional = true }
+
+[dev-dependencies]
+# 明細の取込のテストで、CSV を表にする
+csv = { workspace = true }

@@ -15,13 +15,13 @@
 
 | 対象 | 入力と期待値 | 検証箇所 |
 | --- | --- | --- |
-| 白色の原価 | 期首100,000＋仕入300,000－期末80,000＝⑨320,000 | `domain::closing::white_tests::nta_white_form_subtotals_and_field_numbers` |
+| 白色の原価 | 期首100,000＋仕入300,000－期末80,000＝⑨320,000 | `chobiyori_core::closing::white_tests::nta_white_form_subtotals_and_field_numbers` |
 | 白色の経費 | 給料100,000＋家賃50,000＋光熱費36,000＋雑費4,000。⑰はその他経費40,000、⑱は全経費190,000 | 同上 |
 | 白色の所得 | 売上1,000,000－原価320,000－経費190,000＝⑲490,000。控除は⑳、控除後所得は㉑ | 同上。従来の⑰〜⑳のずれ、その他経費の小計欠落、重複所得行を修正 |
 | 専従者給与 | 記録した200,000を白色の経費から除外し、所得との照合でも加算する | 同上 |
-| 専従者控除 | 要件を満たす配偶者1人・控除前所得1,000,000→控除500,000、所得500,000。按分の記帳後は控除前所得964,000→控除482,000へ手動更新。申告案内・CSVへ同じ金額を反映 | `db::closing::white_integration_tests::white_deduction_flows_to_statement_guide_and_export` |
-| 家事按分 | 支払120,000、記録に基づく事業割合30%という例→経費36,000、事業主貸84,000。白色の経費にも36,000だけ反映 | 同上。端数処理と0/100%は既存の `domain::allocation::tests` |
-| 開業費・元入金 | 開業費120,000＋現金100,000－借入50,000＝元入金170,000。手動償却30,000→⑬30,000、未償却資産90,000、翌期元入金140,000 | `domain::closing::white_tests::manual_startup_amortization_keeps_the_unamortized_asset`。初期設定のDB保存は既存 `db::setup::extended_tests` |
+| 専従者控除 | 要件を満たす配偶者1人・控除前所得1,000,000→控除500,000、所得500,000。按分の記帳後は控除前所得964,000→控除482,000へ手動更新。申告案内・CSVへ同じ金額を反映 | `tests::white_return::white_deduction_flows_to_statement_guide_and_export`（`src-tauri/src/tests/`） |
+| 家事按分 | 支払120,000、記録に基づく事業割合30%という例→経費36,000、事業主貸84,000。白色の経費にも36,000だけ反映 | 同上。端数処理と0/100%は既存の `chobiyori_core::allocation::tests` |
+| 開業費・元入金 | 開業費120,000＋現金100,000－借入50,000＝元入金170,000。手動償却30,000→⑬30,000、未償却資産90,000、翌期元入金140,000 | `chobiyori_core::closing::white_tests::manual_startup_amortization_keeps_the_unamortized_asset`。初期設定のDB保存は既存 `chobiyori_storage::setup::extended_tests` |
 
 経費の記号も、五十音順から公式のイロハ順（租税公課イ〜雑費レ）へ修正した。⑰の小計を⑱へ重複加算しないことを上の数値例で確認する。
 
