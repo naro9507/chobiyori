@@ -52,8 +52,14 @@ jobs:
             exit 0
           fi
 
-          release_id=$(gh api --paginate "repos/$GH_REPO/releases" |
-            jq -r --arg tag "$tag" '.[] | select(.tag_name == $tag and .draft and (.prerelease | not)) | .id')
+          releases=$(gh api --paginate "repos/$GH_REPO/releases")
+          # 同じタグがすでに公開済みなら、イミュータブルリリースのため公開し直せない。
+          if jq -e --arg tag "$tag" 'any(.[]; .tag_name == $tag and (.draft | not))' \
+            <<< "$releases" >/dev/null; then
+            echo "$tag はすでに公開済みのため、何もしません"
+            exit 0
+          fi
+          release_id=$(jq -r --arg tag "$tag" '.[] | select(.tag_name == $tag and .draft and (.prerelease | not)) | .id' <<< "$releases")
           [[ -n "$release_id" ]] || exit 0
           release=$(gh api "repos/$GH_REPO/releases/$release_id")
           version=${tag#v}
