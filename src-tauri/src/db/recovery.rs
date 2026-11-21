@@ -122,6 +122,8 @@ pub fn reset(path: &Path, code: &str, new: &str) -> AppResult<Database> {
     if current == new {
         return Err(AppError::field(ErrorCode::SamePassword, "newPassword"));
     }
+    db.conn()
+        .execute("DELETE FROM settings WHERE key=?1", [vault::DEVICE_BINDING])?;
     vault::change_password(&db, &current, new)?;
     Ok(db)
 }

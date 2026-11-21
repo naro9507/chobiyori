@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
+import { useLoginStatus } from "./account-login"
 import { PASSWORD_MIN } from "./lock-screen"
 import { useChangePassword } from "./security-api"
 
@@ -21,6 +22,7 @@ export function PasswordCard() {
 	const t = useTranslations("security")
 	const errorMessage = useErrorMessage()
 	const change = useChangePassword()
+	const deviceLogin = useLoginStatus().data?.enabled
 	const [current, setCurrent] = useState("")
 	const [next, setNext] = useState("")
 	const [confirm, setConfirm] = useState("")
@@ -91,10 +93,18 @@ export function PasswordCard() {
 					<p className="text-muted-foreground text-xs">
 						{t("changeBackupNote")}
 					</p>
+					{deviceLogin && (
+						<p className="text-muted-foreground text-xs">
+							{t("changeDeviceNote")}
+						</p>
+					)}
 					{change.error &&
 						!(isAppError(change.error) && change.error.field) && (
 							<p role="alert" className="text-destructive text-sm">
-								{errorMessage(change.error)}
+								{isAppError(change.error) &&
+								change.error.code === "deviceAuthFailed"
+									? t("changeDeviceFailed")
+									: errorMessage(change.error)}
 							</p>
 						)}
 					{change.isSuccess && (

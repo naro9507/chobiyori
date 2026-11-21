@@ -67,37 +67,70 @@ fn cipher(key: [u8; 32]) -> AppResult<aead::LessSafeKey> {
     ))
 }
 
-pub(super) fn seal(mut data: Vec<u8>) -> AppResult<Envelope> {
-    let (handle, key) = native(true, &random::<32>()?)?;
-    let nonce = random()?;
-    cipher(key)?
-        .seal_in_place_append_tag(
-            aead::Nonce::assume_unique_for_key(nonce),
-            aead::Aad::from(b"chobiyori-login-v1"),
-            &mut data,
-        )
-        .map_err(|_| failed())?;
-    Ok(Envelope {
-        handle: STANDARD.encode(handle),
-        nonce,
-        ciphertext: STANDARD.encode(data),
-    })
+pub(super) struct DeviceKey {
+    handle: String,
+    cipher: aead::LessSafeKey,
 }
 
-pub(super) fn open(envelope: &Envelope) -> AppResult<Vec<u8>> {
-    let handle = STANDARD.decode(&envelope.handle).map_err(|_| failed())?;
-    let (_, key) = native(false, &handle)?;
-    let mut bytes = STANDARD
-        .decode(&envelope.ciphertext)
-        .map_err(|_| failed())?;
-    let length = cipher(key)?
-        .open_in_place(
-            aead::Nonce::assume_unique_for_key(envelope.nonce),
-            aead::Aad::from(b"chobiyori-login-v1"),
-            &mut bytes,
-        )
-        .map_err(|_| failed())?
-        .len();
-    bytes.truncate(length);
-    Ok(bytes)
+impl DeviceKey {
+    #[cfg(test)]
+    pub(super) fn test_key() -> Self {
+        Self {
+            handle: STANDARD.encode([0; 32]),
+            cipher: cipher([0; 32]).unwrap(),
+        }
+    }
+
+    pub(super) fn seal(&self, mut data: Vec<u8>) -> AppResult<Envelope> {
+        let nonce = random()?;
+        self.cipher
+            .seal_in_place_append_tag(
+                aead::Nonce::assume_unique_for_key(nonce),
+                aead::Aad::from(b"chobiyori-login-v1"),
+                &mut data,
+            )
+            .map_err(|_| failed())?;
+        Ok(Envelope {
+            handle: self.handle.clone(),
+            nonce,
+            ciphertext: STANDARD.encode(data),
+        })
+    }
+
+    pub(super) fn open(&self, envelope: &Envelope) -> AppResult<Vec<u8>> {
+        let mut bytes = STANDARD
+            .decode(&envelope.ciphertext)
+            .map_err(|_| failed())?;
+        let length = self
+            .cipher
+            .open_in_place(
+                aead::Nonce::assume_unique_for_key(envelope.nonce),
+                aead::Aad::from(b"chobiyori-login-v1"),
+                &mut bytes,
+            )
+            .map_err(|_| failed())?
+            .len();
+        bytes.truncate(length);
+        Ok(bytes)
+    }
+}
+
+impl Envelope {
+    pub(super) fn authenticate(&self) -> AppResult<DeviceKey> {
+        let handle = STANDARD.decode(&self.handle).map_err(|_| failed())?;
+        let (_, key) = native(false, &handle)?;
+        Ok(DeviceKey {
+            handle: self.handle.clone(),
+            cipher: cipher(key)?,
+        })
+    }
+}
+
+pub(super) fn seal(data: Vec<u8>) -> AppResult<Envelope> {
+    let (handle, key) = native(true, &random::<32>()?)?;
+    DeviceKey {
+        handle: STANDARD.encode(handle),
+        cipher: cipher(key)?,
+    }
+    .seal(data)
 }
