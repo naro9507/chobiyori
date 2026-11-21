@@ -201,6 +201,9 @@ let notices: DeadlineNotice[]
 let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
 let calendarConnections: Set<string>
+let calendarAuthorization: Promise<void> | undefined
+let calendarSync: Promise<void> | undefined
+let calendarAccessExpired: boolean
 let registration: InvoiceRegistration
 let taxStatus: ConsumptionReport["taxStatus"]
 
@@ -209,6 +212,9 @@ beforeEach(() => {
 	scheduleResult = "ready"
 	calendarResult = "saved"
 	calendarConnections = new Set()
+	calendarAuthorization = undefined
+	calendarSync = undefined
+	calendarAccessExpired = false
 	registration = {
 		registrationNo: null,
 		registeredOn: null,
@@ -297,12 +303,15 @@ beforeEach(() => {
 					? "connected"
 					: "disconnected"
 			case "connect_filing_calendar":
+				await calendarAuthorization
 				calendarConnections.add(args?.provider ?? "")
 				return null
 			case "disconnect_filing_calendar":
 				calendarConnections.delete(args?.provider ?? "")
 				return null
 			case "sync_filing_calendar":
+				await calendarSync
+				if (calendarAccessExpired) throw { code: "calendarAuth" }
 				return null
 			case "export_filing_calendar":
 				return calendarResult
@@ -592,7 +601,15 @@ describe("インボイスの登録と期限", () => {
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
 	})
 
-	it("連携したカレンダーだけを同期する", async () => {
+	it("カレンダーの連携状態と同期状態を個別に表示する", async () => {
+		let finishAuthorization!: () => void
+		let finishSync!: () => void
+		calendarAuthorization = new Promise((resolve) => {
+			finishAuthorization = resolve
+		})
+		calendarSync = new Promise((resolve) => {
+			finishSync = resolve
+		})
 		const user = userEvent.setup()
 		renderAt("/settings?view=business")
 		const google = within(
@@ -601,8 +618,14 @@ describe("インボイスの登録と期限", () => {
 		const outlook = within(
 			await screen.findByRole("group", { name: "Outlook" })
 		)
-		await user.click(await google.findByRole("button", { name: "連携する" }))
+		expect(await google.findByText("未連携")).toBeInTheDocument()
+		await user.click(google.getByRole("button", { name: "連携する" }))
+		expect(await google.findByText("認証中…")).toBeInTheDocument()
+		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
+		await act(async () => finishAuthorization())
 		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(await google.findByText("同期中…")).toBeInTheDocument()
+		expect(outlook.getByText("未連携")).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
@@ -616,19 +639,45 @@ describe("インボイスの登録と期限", () => {
 			today: today(),
 			locale: "ja",
 		})
+		await act(async () => finishSync())
+		expect(
+			await google.findByText("申告期限の同期が完了しました。")
+		).toBeInTheDocument()
 		await user.click(await outlook.findByRole("button", { name: "連携する" }))
 		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			await outlook.findByText("申告期限の同期が完了しました。")
+		).toBeInTheDocument()
 		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
 			today: today(),
 			locale: "ja",
 		})
 		await user.click(google.getByRole("button", { name: "連携を解除" }))
+		expect(await google.findByText("未連携")).toBeInTheDocument()
 		expect(
 			await google.findByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携を解除" })
+		).toBeInTheDocument()
+	})
+
+	it("認証が切れたカレンダーは再連携が必要だと表示する", async () => {
+		calendarConnections.add("google")
+		calendarAccessExpired = true
+		const user = userEvent.setup()
+		renderAt("/settings?view=business")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		expect(await google.findByText("再連携が必要")).toBeInTheDocument()
+		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
+		calendarAccessExpired = false
+		await user.click(google.getByRole("button", { name: "再連携する" }))
+		expect(await google.findByText("連携済み")).toBeInTheDocument()
+		expect(
+			await google.findByText("申告期限の同期が完了しました。")
 		).toBeInTheDocument()
 	})
 

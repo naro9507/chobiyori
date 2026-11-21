@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { CircleCheck, Loader2 } from "lucide-react"
 import { type RefObject, useEffect, useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -62,17 +64,38 @@ export function AccountLoginSettings() {
 		)
 	if (!status.data) return null
 	const { google, microsoft, linked } = status.data
+	const available = google || microsoft || !!linked
+	const authorizing = change.isPending && change.variables != null
+	let setupLabel = t("deviceNotLinked")
+	if (linked)
+		setupLabel = t(linked === "google" ? "linkedGoogle" : "linkedMicrosoft")
+	if (authorizing) setupLabel = t("deviceAuthorizing")
+
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{t("deviceTitle")}</CardTitle>
+				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+					<CardTitle>{t("deviceTitle")}</CardTitle>
+					{available && (
+						<Badge
+							role="status"
+							variant={linked && !authorizing ? "success" : "outline"}
+						>
+							{linked && !authorizing && <CircleCheck aria-hidden="true" />}
+							{authorizing && (
+								<Loader2
+									aria-hidden="true"
+									className="motion-safe:animate-spin"
+								/>
+							)}
+							{setupLabel}
+						</Badge>
+					)}
+				</div>
 				<CardDescription>{t("deviceDescription")}</CardDescription>
 			</CardHeader>
 			<CardContent className="flex max-w-md flex-col gap-3">
-				{linked && (
-					<p>{t(linked === "google" ? "linkedGoogle" : "linkedMicrosoft")}</p>
-				)}
-				{google || microsoft || linked ? (
+				{available ? (
 					<>
 						<p className="text-muted-foreground text-sm">{t("deviceNote")}</p>
 						<Field label={t("devicePassword")} hint={t("devicePasswordHint")}>
@@ -112,7 +135,16 @@ export function AccountLoginSettings() {
 				) : (
 					<p>{t("deviceUnavailable")}</p>
 				)}
-				{change.error && <p role="alert">{errorMessage(change.error)}</p>}
+				{authorizing && (
+					<p className="text-muted-foreground text-sm">
+						{t("deviceAuthorizationHint")}
+					</p>
+				)}
+				{change.error && (
+					<p role="alert" className="text-destructive text-sm">
+						{errorMessage(change.error)}
+					</p>
+				)}
 			</CardContent>
 		</Card>
 	)

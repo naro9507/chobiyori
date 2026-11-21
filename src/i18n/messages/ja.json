@@ -1153,6 +1153,9 @@
 		"linkMicrosoft": "Microsoft アカウントで設定",
 		"linkedGoogle": "設定済み（Google アカウント）",
 		"linkedMicrosoft": "設定済み（Microsoft アカウント）",
+		"deviceNotLinked": "未設定",
+		"deviceAuthorizing": "本人確認中…",
+		"deviceAuthorizationHint": "ブラウザで本人確認を行い、帳日和に戻ってください。",
 		"unlinkAccount": "設定を解除",
 		"deviceUnavailable": "この PC では利用できません。",
 		"deviceOpen": "Windows Hello / Touch ID で開く",
@@ -1627,8 +1630,14 @@
 		"calendarSyncNow": "今すぐ同期",
 		"calendarUnavailable": "このバージョンでは利用できません",
 		"calendarConnected": "連携済み",
+		"calendarDisconnected": "未連携",
+		"calendarAuthorizationPending": "認証中…",
+		"calendarConnectionLoading": "連携状態を確認中…",
+		"calendarConnectionUnknown": "連携状態を確認できません",
+		"calendarReauthorizationRequired": "再連携が必要",
 		"calendarSyncing": "同期中…",
-		"calendarAuthorizing": "ブラウザでカレンダーへのアクセスを許可してください。"
+		"calendarSyncCompleted": "申告期限の同期が完了しました。",
+		"calendarAuthorizing": "ブラウザでカレンダーへのアクセスを許可し、帳日和に戻ってください。"
 	},
 	"receivables": {
 		"tabsLabel": "売上管理の表示",

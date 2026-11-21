@@ -5,7 +5,7 @@ pub(super) mod oauth;
 
 use self::{
     api::{CalendarApi, Deadline},
-    oauth::OAuth,
+    oauth::{Flow, OAuth},
 };
 use crate::db::{filing, Database};
 use crate::domain::filing::add_days;
@@ -107,7 +107,7 @@ pub async fn connect_filing_calendar(
     let _guard = provider.lock(&state).lock().await;
     let oauth = OAuth::configured(provider).ok_or_else(failed)?;
     let client = http_client()?;
-    let token = oauth.connect(&client, locale == Locale::Ja).await?;
+    let token = oauth.connect(&client, locale, Flow::Calendar).await?;
     let refresh_token = token
         .refresh_token
         .filter(|token| !token.is_empty())

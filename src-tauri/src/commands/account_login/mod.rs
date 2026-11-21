@@ -2,7 +2,11 @@
 //! unlock offline, but both routes require fresh access to the platform key.
 mod device;
 
-use super::filing_calendar_sync::{http_client, oauth::OAuth, Provider};
+use super::filing_calendar_sync::{
+    http_client,
+    oauth::{Flow, OAuth},
+    Provider,
+};
 use super::security::{ensure_not_open, open_books, BookFiles};
 use crate::{
     db::{unlock_guard, vault, Database},
@@ -81,11 +85,11 @@ pub async fn login_status() -> AppResult<LoginStatus> {
     })
 }
 
-async fn identify(provider: Provider, locale: Locale) -> AppResult<String> {
+async fn identify(provider: Provider, locale: Locale, flow: Flow) -> AppResult<String> {
     let oauth = OAuth::login(provider).ok_or_else(failed)?;
     let client = http_client().map_err(|_| failed())?;
     let token = oauth
-        .connect(&client, locale == Locale::Ja)
+        .connect(&client, locale, flow)
         .await
         .map_err(|_| failed())?;
     oauth
@@ -115,7 +119,7 @@ pub async fn link_login(
     if !SUPPORTED {
         return Err(device::failed());
     }
-    let account = identify(provider, locale).await?;
+    let account = identify(provider, locale, Flow::LinkLogin).await?;
     let binding = URL_SAFE_NO_PAD.encode(device::random::<32>()?);
     let data = serde_json::to_vec(&Credential {
         binding: binding.clone(),
@@ -174,7 +178,7 @@ pub async fn open_with_login(
     }
     let record = record()?.ok_or_else(failed)?;
     let account = if online {
-        Some(identify(record.provider, locale).await?)
+        Some(identify(record.provider, locale, Flow::Unlock).await?)
     } else {
         None
     };

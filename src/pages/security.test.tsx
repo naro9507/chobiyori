@@ -1,9 +1,10 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { act, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
+import { AccountLoginSettings } from "@/features/security/account-login"
 import { RecoveryCard } from "@/features/security/recovery-card"
 import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
@@ -20,6 +21,7 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 const free = { retryAfter: 0, attemptsLeft: 5 }
 let book: BookStatus
 let linked: "google" | null
+let loginAuthorization: Promise<void> | undefined
 let deviceOk: boolean
 let locks: LockStatus
 
@@ -39,6 +41,7 @@ beforeEach(() => {
 	useYearStore.setState({ selected: null })
 	book = { state: "encrypted", unlocked: false, ...free }
 	linked = null
+	loginAuthorization = undefined
 	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
 	mocks.callCommand.mockReset()
@@ -47,6 +50,10 @@ beforeEach(() => {
 			switch (command) {
 				case "login_status":
 					return { google: true, microsoft: true, linked }
+				case "link_login":
+					await loginAuthorization
+					linked = "google"
+					return null
 				case "open_with_login":
 					if (deviceOk) {
 						book = { state: "encrypted", unlocked: true, ...free }
@@ -294,6 +301,32 @@ describe("起動時のパスワード", () => {
 		expect(screen.queryByLabelText("復旧コード")).toBeNull()
 		expect(screen.getByLabelText("いまのパスワード")).toHaveValue("")
 	})
+})
+
+it("端末ログインの成功を本人確認から戻ったあとで表示する", async () => {
+	let finishAuthorization!: () => void
+	loginAuthorization = new Promise((resolve) => {
+		finishAuthorization = resolve
+	})
+	const user = userEvent.setup()
+	render(
+		<AppProviders>
+			<AccountLoginSettings />
+		</AppProviders>
+	)
+	expect(await screen.findByRole("status")).toHaveTextContent("未設定")
+	await user.type(screen.getByLabelText("現在のパスワード"), "correct horse")
+	await user.click(
+		screen.getByRole("button", { name: "Google アカウントで設定" })
+	)
+	expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
+	expect(
+		screen.queryByText("設定済み（Google アカウント）")
+	).not.toBeInTheDocument()
+	await act(async () => finishAuthorization())
+	expect(
+		await screen.findByText("設定済み（Google アカウント）")
+	).toBeInTheDocument()
 })
 
 describe("月締め", () => {

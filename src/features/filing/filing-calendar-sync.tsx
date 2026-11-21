@@ -1,4 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { CircleCheck, Loader2 } from "lucide-react"
+import { useId } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTranslations } from "@/i18n/use-translations"
 import { isAppError } from "@/lib/errors"
@@ -10,6 +13,16 @@ import { today, useFilingDeadlines } from "./filing-api"
 const providers = ["google", "outlook"] as const
 type Provider = (typeof providers)[number]
 type Connection = "unavailable" | "disconnected" | "connected"
+
+const statusLabels = {
+	authorizing: "calendarAuthorizationPending",
+	connected: "calendarConnected",
+	disconnected: "calendarDisconnected",
+	loading: "calendarConnectionLoading",
+	reauthorize: "calendarReauthorizationRequired",
+	unavailable: "calendarUnavailable",
+	unknown: "calendarConnectionUnknown",
+} as const
 
 const connectionKey = (provider: Provider) => [
 	"filing-calendar-connection",
@@ -67,6 +80,7 @@ export function FilingCalendarSyncWorker() {
 
 function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	const t = useTranslations("filing")
+	const titleId = useId()
 	const errorMessage = useErrorMessage()
 	const locale = useSettingsStore((state) => state.locale)
 	const queryClient = useQueryClient()
@@ -78,8 +92,8 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 				: callCommand<null>("disconnect_filing_calendar", { provider }),
 		onSuccess: async (_, operation) => {
 			await queryClient.invalidateQueries({ queryKey: connectionKey(provider) })
-			if (operation === "connect") {
-				await queryClient.invalidateQueries(
+			if (operation === "connect" && connected) {
+				void queryClient.invalidateQueries(
 					{ queryKey: syncKey(provider) },
 					{ cancelRefetch: false }
 				)
@@ -92,15 +106,52 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 		(connected ? (deadlines.error ?? sync.error) : null)
 	const reauthorize =
 		isAppError(sync.error) && sync.error.code === "calendarAuth"
-
+	const authorizing = change.isPending && change.variables === "connect"
+	let status: keyof typeof statusLabels = connection.data ?? "loading"
+	if (connection.isError) status = "unknown"
+	if (connected && reauthorize) status = "reauthorize"
+	if (authorizing) status = "authorizing"
 	const name = t(provider === "google" ? "calendarGoogle" : "calendarOutlook")
+	const syncStatus = sync.isFetching
+		? t("calendarSyncing")
+		: sync.isSuccess && deadlines.isSuccess
+			? t("calendarSyncCompleted")
+			: null
 
 	return (
-		<fieldset className="space-y-2">
-			<legend className="font-medium">{name}</legend>
-			{connection.data === "unavailable" && (
+		<fieldset
+			aria-labelledby={titleId}
+			className="space-y-2 rounded-lg border p-3"
+		>
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+				<h4 id={titleId} className="font-medium">
+					{name}
+				</h4>
+				<Badge
+					role="status"
+					variant={
+						status === "connected"
+							? "success"
+							: status === "reauthorize"
+								? "warning"
+								: "outline"
+					}
+				>
+					{status === "connected" && <CircleCheck aria-hidden="true" />}
+					{authorizing && (
+						<Loader2 aria-hidden="true" className="motion-safe:animate-spin" />
+					)}
+					{t(statusLabels[status])}
+				</Badge>
+			</div>
+			{authorizing && (
 				<p className="text-muted-foreground text-sm">
-					{t("calendarUnavailable")}
+					{t("calendarAuthorizing")}
+				</p>
+			)}
+			{status === "connected" && syncStatus && (
+				<p role="status" className="text-muted-foreground text-sm">
+					{syncStatus}
 				</p>
 			)}
 			{(connected || connection.data === "disconnected") && (
@@ -138,16 +189,6 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 						</Button>
 					)}
 				</div>
-			)}
-			{change.isPending && change.variables === "connect" && (
-				<p role="status" className="text-muted-foreground text-sm">
-					{t("calendarAuthorizing")}
-				</p>
-			)}
-			{!change.isPending && connected && (
-				<p role="status" className="text-muted-foreground text-sm">
-					{t(sync.isFetching ? "calendarSyncing" : "calendarConnected")}
-				</p>
 			)}
 			{error && !change.isPending && (
 				<p role="alert" className="text-destructive text-sm">

@@ -1153,6 +1153,9 @@
 		"linkMicrosoft": "Set up with Microsoft account",
 		"linkedGoogle": "Set up (Google account)",
 		"linkedMicrosoft": "Set up (Microsoft account)",
+		"deviceNotLinked": "Not set up",
+		"deviceAuthorizing": "Verifying identity…",
+		"deviceAuthorizationHint": "Verify your identity in the browser, then return to Chobiyori.",
 		"unlinkAccount": "Remove setup",
 		"deviceUnavailable": "Not available on this PC.",
 		"deviceOpen": "Open with Windows Hello / Touch ID",
@@ -1627,8 +1630,14 @@
 		"calendarSyncNow": "Sync now",
 		"calendarUnavailable": "Not available in this version",
 		"calendarConnected": "Connected",
+		"calendarDisconnected": "Not connected",
+		"calendarAuthorizationPending": "Authorizing…",
+		"calendarConnectionLoading": "Checking connection…",
+		"calendarConnectionUnknown": "Connection status unavailable",
+		"calendarReauthorizationRequired": "Reconnection required",
 		"calendarSyncing": "Syncing…",
-		"calendarAuthorizing": "Allow calendar access in your browser."
+		"calendarSyncCompleted": "Filing deadline sync complete.",
+		"calendarAuthorizing": "Allow calendar access in your browser, then return to Chobiyori."
 	},
 	"receivables": {
 		"tabsLabel": "Recurring sales views",
