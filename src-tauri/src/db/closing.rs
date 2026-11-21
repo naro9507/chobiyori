@@ -8,7 +8,11 @@ use crate::db::accounts::{self, Account};
 use crate::db::fixed_assets;
 use crate::db::reports;
 use crate::db::transactions::{self, ensure_year_open};
-use chobiyori_core::closing::{self, AccountFigure, OpeningTotals, Statement};
+use chobiyori_core::balance::TrialBalance;
+use chobiyori_core::closing::{
+    self, AccountFigure, CheckItem, ChecklistFacts, InventoryStatus, OpeningRow, OpeningTotals,
+    Statement,
+};
 use chobiyori_core::depreciation::Method;
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_core::journal::{
@@ -16,7 +20,7 @@ use chobiyori_core::journal::{
 };
 use chobiyori_core::master::{AccountCategory, FilingType, TaxStatus};
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 
 /// 決算書の行（`statement_line`）で科目を探す。標準の科目を優先する。
@@ -53,14 +57,6 @@ fn year_info(conn: &Connection, year: i64) -> AppResult<YearInfo> {
 }
 
 // ---- 期首残高 ----
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OpeningRow {
-    pub account_id: i64,
-    /// 区分の向きで正（資産は借方、負債・資本は貸方）
-    pub amount: i64,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -195,24 +191,6 @@ pub fn confirm_opening(db: &Database, year: i64, confirmed: bool) -> AppResult<O
 
 // ---- 棚卸 ----
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InventoryStatus {
-    pub fiscal_year: i64,
-    /// 期首の商品の棚卸高（期首残高の棚卸資産）
-    pub opening: i64,
-    /// 年間の仕入
-    pub purchases: i64,
-    /// 入力した期末の棚卸高
-    pub closing: Option<i64>,
-    /// 売上原価（期首 + 仕入 − 期末）。期末を入れるまでは空
-    pub cost_of_sales: Option<i64>,
-    /// 期末の棚卸を仕訳にした
-    pub recorded: bool,
-    /// 期首の棚卸を振り替えた（期首の棚卸高があるときだけ要る）
-    pub opening_recorded: bool,
-}
-
 fn line_total(conn: &Connection, year: i64, line: &str, debit_normal: bool) -> AppResult<i64> {
     let (debit, credit): (i64, i64) = conn.query_row(
         "SELECT coalesce(sum(CASE WHEN l.side = 'debit' THEN l.amount END), 0),
@@ -260,15 +238,14 @@ pub fn inventory(conn: &Connection, year: i64) -> AppResult<InventoryStatus> {
         Some((0, None, _)) => true,
         _ => false,
     };
-    Ok(InventoryStatus {
-        fiscal_year: year,
+    Ok(InventoryStatus::new(
+        year,
         opening,
         purchases,
         closing,
-        cost_of_sales: closing.map(|c| opening + purchases - c),
         recorded,
         opening_recorded,
-    })
+    ))
 }
 
 fn matches_inventory_posting(
@@ -381,66 +358,25 @@ pub fn record_inventory(
 
 // ---- 決算整理のチェックリスト ----
 
-/// チェックリストの項目。`auto` は帳簿の状態から済んだかを決める項目。
-const ITEMS: &[(&str, bool)] = &[
-    ("opening", true),
-    ("accruals", false),
-    ("allocation", false),
-    ("depreciation", true),
-    ("inventory", true),
-    ("badDebt", false),
-    ("cashCount", false),
-    ("owner", false),
-];
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CheckItem {
-    pub item: String,
-    pub done: bool,
-    /// 帳簿から自動で決まる項目（手で印を付けられない）
-    pub auto: bool,
-}
-
 pub fn checklist(conn: &Connection, year: i64) -> AppResult<Vec<CheckItem>> {
     let info = year_info(conn, year)?;
     let mut stmt = conn.prepare("SELECT item FROM closing_checks WHERE fiscal_year = ?1")?;
     let manual: Vec<String> = stmt
         .query_map([year], |r| r.get(0))?
         .collect::<Result<_, _>>()?;
-    let assets = fixed_assets::for_year(conn, year)?;
-    let inventory = inventory(conn, year)?;
-    let mut list = Vec::new();
-    for &(item, auto) in ITEMS {
-        let done = match item {
-            "opening" => info.opening_confirmed,
-            "depreciation" => {
-                if assets.assets.is_empty() {
-                    continue;
-                }
-                assets
-                    .assets
-                    .iter()
-                    .all(|a| a.depreciation.is_none() || a.transaction_id.is_some())
-            }
-            "inventory" => {
-                if inventory.opening == 0 && inventory.purchases == 0 && inventory.closing.is_none()
-                {
-                    continue;
-                }
-                inventory.recorded && inventory.opening_recorded
-            }
-            // 貸倒引当金は青色申告だけ
-            "badDebt" if info.filing_type == FilingType::White => continue,
-            _ => manual.iter().any(|m| m == item),
-        };
-        list.push(CheckItem {
-            item: item.to_string(),
-            done,
-            auto,
-        });
-    }
-    Ok(list)
+    let assets = fixed_assets::for_year(conn, year)?.assets;
+    let depreciation_pending = assets
+        .iter()
+        .filter(|a| a.depreciation.is_some() && a.transaction_id.is_none())
+        .count();
+    Ok(closing::checklist(&ChecklistFacts {
+        filing_type: info.filing_type,
+        opening_confirmed: info.opening_confirmed,
+        asset_count: assets.len(),
+        depreciation_pending,
+        inventory: &inventory(conn, year)?,
+        manual: &manual,
+    }))
 }
 
 pub fn set_check(
@@ -450,7 +386,7 @@ pub fn set_check(
     done: bool,
 ) -> AppResult<Vec<CheckItem>> {
     year_info(conn, year)?;
-    if !ITEMS.iter().any(|(i, auto)| *i == item && !auto) {
+    if !closing::is_manual_check(item) {
         return Err(AppError::field(ErrorCode::NotFound, "item"));
     }
     if done {
@@ -589,15 +525,13 @@ fn breakdowns(conn: &Connection, year: i64) -> AppResult<Vec<Breakdown>> {
     .collect()
 }
 
-/// 青色申告決算書（一般用）に転記する金額。
-pub fn statement(conn: &Connection, year: i64) -> AppResult<StatementAmounts> {
-    let info = year_info(conn, year)?;
-    let tb = reports::trial_balance(conn, year, 1, 12)?;
+/// 試算表の各科目に、科目の名前と決算書の行を添える。
+fn account_figures(conn: &Connection, tb: &TrialBalance) -> AppResult<Vec<AccountFigure>> {
     let accounts: HashMap<i64, Account> = accounts::list(conn)?
         .into_iter()
         .map(|a| (a.id, a))
         .collect();
-    let figures: Vec<AccountFigure> = tb
+    Ok(tb
         .rows
         .iter()
         .filter_map(|r| {
@@ -612,7 +546,14 @@ pub fn statement(conn: &Connection, year: i64) -> AppResult<StatementAmounts> {
                 closing: r.balance,
             })
         })
-        .collect();
+        .collect())
+}
+
+/// 青色申告決算書（一般用）に転記する金額。
+pub fn statement(conn: &Connection, year: i64) -> AppResult<StatementAmounts> {
+    let info = year_info(conn, year)?;
+    let tb = reports::trial_balance(conn, year, 1, 12)?;
+    let figures = account_figures(conn, &tb)?;
     let mut statement = closing::statement(year, info.filing_type, &figures, tb.pre_tax_income);
     if info.filing_type == FilingType::White {
         let stored: Option<String> = conn
@@ -627,21 +568,7 @@ pub fn statement(conn: &Connection, year: i64) -> AppResult<StatementAmounts> {
             .unwrap_or("0")
             .parse::<i64>()
             .map_err(|_| AppError::new(ErrorCode::InvalidFormat))?;
-        if deduction < 0 || deduction > statement.income_before_deduction.max(0) {
-            statement.issues.push(closing::StatementIssue {
-                code: closing::StatementIssueCode::WhiteDeductionExceedsIncome,
-                value: None,
-            });
-        }
-        statement.deduction = deduction;
-        statement.income = statement.income_before_deduction - deduction;
-        for line in &mut statement.pl {
-            match line.key.as_str() {
-                "family_deduction" => line.amount = deduction,
-                "income" => line.amount = statement.income,
-                _ => {}
-            }
-        }
+        closing::apply_white_deduction(&mut statement, deduction);
     }
     let depreciation = fixed_assets::for_year(conn, year)?
         .assets
@@ -726,41 +653,20 @@ pub fn carry_forward(db: &Database, year: i64, overwrite: bool) -> AppResult<Car
             }
         }
 
-        let accounts: HashMap<i64, Account> = accounts::list(tx)?.into_iter().map(|a| (a.id, a)).collect();
-        let line_of = |id: i64| accounts.get(&id).and_then(|a| a.statement_line.as_deref());
         let capital_account = account_by_line(tx, "bs.capital")?;
-        let (mut drawings, mut contributions, mut capital) = (0, 0, 0);
-        let mut rows = Vec::new();
-        for r in &tb.rows {
-            if !matches!(
-                r.category,
-                AccountCategory::Asset | AccountCategory::Liability | AccountCategory::Equity
-            ) {
-                continue;
-            }
-            match line_of(r.account_id) {
-                Some("bs.owner_drawings") => drawings += r.balance,
-                Some("bs.owner_contributions") => contributions += r.balance,
-                _ if r.account_id == capital_account => capital += r.balance,
-                _ => rows.push(OpeningRow {
-                    account_id: r.account_id,
-                    amount: r.balance,
-                }),
-            }
-        }
-        let capital = closing::next_capital(capital, tb.pre_tax_income, contributions, drawings);
-        rows.push(OpeningRow {
-            account_id: capital_account,
-            amount: capital,
-        });
-        write_opening(tx, next_year, &rows)?;
+        let carried = closing::carry_forward_rows(
+            &account_figures(tx, &tb)?,
+            capital_account,
+            tb.pre_tax_income,
+        );
+        write_opening(tx, next_year, &carried.rows)?;
         tx.execute(
             "UPDATE fiscal_years SET opening_confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), opening_legacy = 0 WHERE year = ?1",
             [next_year],
         )?;
         Ok(CarryForward {
             next_year,
-            capital,
+            capital: carried.capital,
             created,
         })
     })

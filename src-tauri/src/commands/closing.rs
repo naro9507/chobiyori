@@ -1,10 +1,9 @@
 //! 決算（期首残高・固定資産と減価償却・棚卸・チェックリスト・決算書の金額・年度繰越）のコマンド。
 
-use crate::db::closing::{
-    self, CarryForward, CheckItem, InventoryStatus, OpeningBalances, OpeningRow, StatementAmounts,
-};
+use crate::db::closing::{self, CarryForward, OpeningBalances, StatementAmounts};
 use crate::db::fixed_assets::{self, DepreciationYear, FixedAsset, FixedAssetInput};
 use crate::db::Database;
+use chobiyori_core::closing::{CheckItem, InventoryStatus, OpeningRow};
 use chobiyori_core::depreciation::{self, UsefulLife};
 use chobiyori_core::error::AppResult;
 use tauri::State;

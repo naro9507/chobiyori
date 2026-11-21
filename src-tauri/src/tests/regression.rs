@@ -6,6 +6,7 @@ use crate::db::{
 };
 use crate::export::{csv, labels::Locale, report::Names};
 use crate::import::{self, journal_csv};
+use chobiyori_core::closing::OpeningRow;
 use chobiyori_core::error::ErrorCode;
 use chobiyori_core::{
     depreciation::Method,
@@ -13,8 +14,8 @@ use chobiyori_core::{
     master::TaxCategory,
 };
 
-fn opening(account_id: i64, amount: i64) -> closing::OpeningRow {
-    closing::OpeningRow { account_id, amount }
+fn opening(account_id: i64, amount: i64) -> OpeningRow {
+    OpeningRow { account_id, amount }
 }
 
 fn pair(db: &Database, left: &str, right: &str) -> (i64, i64) {

@@ -45,6 +45,176 @@ pub fn next_capital(
     capital + income_before_deduction + contributions - drawings
 }
 
+/// 期首残高の 1 行。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningRow {
+    pub account_id: i64,
+    /// 区分の向きで正（資産は借方、負債・資本は貸方）
+    pub amount: i64,
+}
+
+/// 年度の繰越で作る、翌年の期首残高。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CarryForwardRows {
+    /// 資産・負債と元入金の行（元入金が最後）
+    pub rows: Vec<OpeningRow>,
+    /// 翌年の期首の元入金
+    pub capital: i64,
+}
+
+/// 年末の残高から、翌年の期首残高の行を作る。
+///
+/// 資産・負債は期末残高のまま持ち越す。事業主貸・事業主借は 0 にして元入金に畳む
+/// （`next_capital`）。`figures` の `closing` は、資産・負債・資本では期末残高。
+pub fn carry_forward_rows(
+    figures: &[AccountFigure],
+    capital_account: i64,
+    income_before_deduction: i64,
+) -> CarryForwardRows {
+    let (mut drawings, mut contributions, mut capital) = (0, 0, 0);
+    let mut rows = Vec::new();
+    for f in figures {
+        if !matches!(
+            f.category,
+            AccountCategory::Asset | AccountCategory::Liability | AccountCategory::Equity
+        ) {
+            continue;
+        }
+        match f.statement_line.as_deref() {
+            Some("bs.owner_drawings") => drawings += f.closing,
+            Some("bs.owner_contributions") => contributions += f.closing,
+            _ if f.account_id == capital_account => capital += f.closing,
+            _ => rows.push(OpeningRow {
+                account_id: f.account_id,
+                amount: f.closing,
+            }),
+        }
+    }
+    let capital = next_capital(capital, income_before_deduction, contributions, drawings);
+    rows.push(OpeningRow {
+        account_id: capital_account,
+        amount: capital,
+    });
+    CarryForwardRows { rows, capital }
+}
+
+/// 棚卸の状態。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InventoryStatus {
+    pub fiscal_year: i64,
+    /// 期首の商品の棚卸高（期首残高の棚卸資産）
+    pub opening: i64,
+    /// 年間の仕入
+    pub purchases: i64,
+    /// 入力した期末の棚卸高
+    pub closing: Option<i64>,
+    /// 売上原価（期首 + 仕入 − 期末）。期末を入れるまでは空
+    pub cost_of_sales: Option<i64>,
+    /// 期末の棚卸を仕訳にした
+    pub recorded: bool,
+    /// 期首の棚卸を振り替えた（期首の棚卸高があるときだけ要る）
+    pub opening_recorded: bool,
+}
+
+impl InventoryStatus {
+    /// 売上原価は期首・仕入・期末から決める。
+    pub fn new(
+        fiscal_year: i64,
+        opening: i64,
+        purchases: i64,
+        closing: Option<i64>,
+        recorded: bool,
+        opening_recorded: bool,
+    ) -> Self {
+        Self {
+            fiscal_year,
+            opening,
+            purchases,
+            closing,
+            cost_of_sales: closing.map(|c| opening + purchases - c),
+            recorded,
+            opening_recorded,
+        }
+    }
+
+    /// 期首の棚卸も仕入も期末の入力もない（棚卸の項目を出さない）。
+    fn is_idle(&self) -> bool {
+        self.opening == 0 && self.purchases == 0 && self.closing.is_none()
+    }
+}
+
+/// 決算整理のチェックリストの項目。`true` は帳簿の状態から済んだかを決める項目。
+const CHECK_ITEMS: &[(&str, bool)] = &[
+    ("opening", true),
+    ("accruals", false),
+    ("allocation", false),
+    ("depreciation", true),
+    ("inventory", true),
+    ("badDebt", false),
+    ("cashCount", false),
+    ("owner", false),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckItem {
+    pub item: String,
+    pub done: bool,
+    /// 帳簿から自動で決まる項目（手で印を付けられない）
+    pub auto: bool,
+}
+
+/// チェックリストを作るのに要る、帳簿の状態。
+pub struct ChecklistFacts<'a> {
+    pub filing_type: FilingType,
+    pub opening_confirmed: bool,
+    /// 登録してある固定資産の数
+    pub asset_count: usize,
+    /// その年の償却があるのに、仕訳にしていない固定資産の数
+    pub depreciation_pending: usize,
+    pub inventory: &'a InventoryStatus,
+    /// 手で印を付けた項目
+    pub manual: &'a [String],
+}
+
+/// 手で印を付けられる項目か（帳簿から自動で決まる項目は付けられない）。
+pub fn is_manual_check(item: &str) -> bool {
+    CHECK_ITEMS.iter().any(|(i, auto)| *i == item && !auto)
+}
+
+/// 決算整理のチェックリスト。対象のない項目（固定資産がない・棚卸がない・白色の貸倒引当金）は出さない。
+pub fn checklist(facts: &ChecklistFacts) -> Vec<CheckItem> {
+    let mut list = Vec::new();
+    for &(item, auto) in CHECK_ITEMS {
+        let done = match item {
+            "opening" => facts.opening_confirmed,
+            "depreciation" => {
+                if facts.asset_count == 0 {
+                    continue;
+                }
+                facts.depreciation_pending == 0
+            }
+            "inventory" => {
+                if facts.inventory.is_idle() {
+                    continue;
+                }
+                facts.inventory.recorded && facts.inventory.opening_recorded
+            }
+            // 貸倒引当金は青色申告だけ
+            "badDebt" if facts.filing_type == FilingType::White => continue,
+            _ => facts.manual.iter().any(|m| m == item),
+        };
+        list.push(CheckItem {
+            item: item.to_string(),
+            done,
+            auto,
+        });
+    }
+    list
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct PlLineDef {
     key: String,
@@ -489,9 +659,177 @@ pub fn statement(
     }
 }
 
+/// 白色の事業専従者控除を決算書に反映する。控除が所得（控除前）を超えるときは、直す項目として知らせる。
+pub fn apply_white_deduction(statement: &mut Statement, deduction: i64) {
+    if deduction < 0 || deduction > statement.income_before_deduction.max(0) {
+        statement.issues.push(StatementIssue {
+            code: StatementIssueCode::WhiteDeductionExceedsIncome,
+            value: None,
+        });
+    }
+    statement.deduction = deduction;
+    statement.income = statement.income_before_deduction - deduction;
+    for line in &mut statement.pl {
+        match line.key.as_str() {
+            "family_deduction" => line.amount = deduction,
+            "income" => line.amount = statement.income,
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn figure(
+        id: i64,
+        category: AccountCategory,
+        line: Option<&str>,
+        closing: i64,
+    ) -> AccountFigure {
+        AccountFigure {
+            account_id: id,
+            category,
+            statement_line: line.map(str::to_string),
+            name_ja: String::new(),
+            name_en: String::new(),
+            opening: 0,
+            closing,
+        }
+    }
+
+    #[test]
+    fn carry_forward_folds_owner_accounts_into_capital() {
+        use AccountCategory::*;
+        let figures = [
+            figure(1, Asset, Some("bs.cash"), 1_000_000),
+            figure(2, Liability, Some("bs.payables"), 200_000),
+            figure(3, Equity, Some("bs.capital"), 500_000),
+            figure(4, Equity, Some("bs.owner_drawings"), 300_000),
+            figure(5, Equity, Some("bs.owner_contributions"), 100_000),
+            // 損益の科目は繰り越さない
+            figure(6, Revenue, Some("pl.sales"), 900_000),
+        ];
+        let result = carry_forward_rows(&figures, 3, 400_000);
+        // 元入金 = 500,000 + 400,000 + 100,000 − 300,000
+        assert_eq!(result.capital, 700_000);
+        assert_eq!(
+            result.rows,
+            vec![
+                OpeningRow {
+                    account_id: 1,
+                    amount: 1_000_000
+                },
+                OpeningRow {
+                    account_id: 2,
+                    amount: 200_000
+                },
+                OpeningRow {
+                    account_id: 3,
+                    amount: 700_000
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn inventory_cost_of_sales_waits_for_the_closing_amount() {
+        assert_eq!(
+            InventoryStatus::new(2026, 100, 300, None, false, false).cost_of_sales,
+            None
+        );
+        assert_eq!(
+            InventoryStatus::new(2026, 100, 300, Some(80), true, true).cost_of_sales,
+            Some(320)
+        );
+    }
+
+    fn checklist_items(facts: &ChecklistFacts) -> Vec<(String, bool)> {
+        checklist(facts)
+            .into_iter()
+            .map(|c| (c.item, c.done))
+            .collect()
+    }
+
+    #[test]
+    fn checklist_hides_items_without_a_target() {
+        let idle = InventoryStatus::new(2026, 0, 0, None, false, true);
+        let facts = ChecklistFacts {
+            filing_type: FilingType::White,
+            opening_confirmed: true,
+            asset_count: 0,
+            depreciation_pending: 0,
+            inventory: &idle,
+            manual: &["cashCount".to_string()],
+        };
+        let items = checklist_items(&facts);
+        let names: Vec<&str> = items.iter().map(|(n, _)| n.as_str()).collect();
+        // 固定資産・棚卸がなく、白色なので貸倒引当金もない
+        assert_eq!(
+            names,
+            ["opening", "accruals", "allocation", "cashCount", "owner"]
+        );
+        assert!(items.contains(&("opening".to_string(), true)));
+        assert!(items.contains(&("cashCount".to_string(), true)));
+        assert!(items.contains(&("accruals".to_string(), false)));
+    }
+
+    #[test]
+    fn checklist_derives_automatic_items_from_the_books() {
+        let done = InventoryStatus::new(2026, 100, 300, Some(80), true, true);
+        let pending = InventoryStatus::new(2026, 100, 300, Some(80), true, false);
+        let mut facts = ChecklistFacts {
+            filing_type: FilingType::Blue65,
+            opening_confirmed: false,
+            asset_count: 2,
+            depreciation_pending: 1,
+            inventory: &pending,
+            manual: &[],
+        };
+        let find = |facts: &ChecklistFacts, name: &str| {
+            checklist(facts)
+                .into_iter()
+                .find(|c| c.item == name)
+                .unwrap()
+        };
+        assert!(!find(&facts, "opening").done);
+        assert!(!find(&facts, "depreciation").done);
+        assert!(!find(&facts, "inventory").done);
+        assert!(!find(&facts, "badDebt").auto);
+        facts.opening_confirmed = true;
+        facts.depreciation_pending = 0;
+        facts.inventory = &done;
+        assert!(find(&facts, "opening").done);
+        assert!(find(&facts, "depreciation").done);
+        assert!(find(&facts, "inventory").done);
+    }
+
+    #[test]
+    fn only_manual_items_can_be_checked_by_hand() {
+        assert!(is_manual_check("cashCount"));
+        assert!(!is_manual_check("opening"));
+        assert!(!is_manual_check("unknown"));
+    }
+
+    #[test]
+    fn white_deduction_over_income_is_reported_but_still_applied() {
+        let figures: Vec<AccountFigure> = Vec::new();
+        let mut statement = super::statement(2026, FilingType::White, &figures, 0);
+        statement.income_before_deduction = 100_000;
+        apply_white_deduction(&mut statement, 60_000);
+        assert_eq!((statement.deduction, statement.income), (60_000, 40_000));
+        assert!(statement
+            .issues
+            .iter()
+            .all(|i| i.code != StatementIssueCode::WhiteDeductionExceedsIncome));
+        apply_white_deduction(&mut statement, 100_001);
+        assert_eq!(statement.income, -1);
+        assert!(statement
+            .issues
+            .iter()
+            .any(|i| i.code == StatementIssueCode::WhiteDeductionExceedsIncome));
+    }
     use AccountCategory::*;
 
     fn f(
