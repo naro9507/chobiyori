@@ -3,7 +3,7 @@
 //! 中身は帳簿の DB の中に置く（帳簿と一緒に SQLCipher で暗号化される）。
 //! 入れるときに sha256 を計算して記録し、同じファイルは 2 回入れない。
 
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use sha2::{Digest, Sha256};

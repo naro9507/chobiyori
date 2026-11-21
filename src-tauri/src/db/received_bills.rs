@@ -1,7 +1,7 @@
 //! 受け取った請求書の支払期限と確認状況を記録する。
 
-use crate::domain::{journal, master};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::{journal, master};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 

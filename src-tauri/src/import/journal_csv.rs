@@ -7,10 +7,10 @@
 //! 列の対応を利用者が決められる汎用の取込（形式エディタ）は、フェーズ 5 で取込受信箱と一緒に作る。
 
 use super::{parse_amount, AccountRef, Draft, DraftLine, Issue, IssueCode, Parsed, PartnerRef};
-use crate::domain::journal::Side;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::csv::{unneutralize, JOURNAL_COLUMNS};
 use crate::export::labels as l;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::Side;
 use std::collections::HashMap;
 
 /// ファイルの中身を文字列にする。UTF-8 として読めなければ Shift_JIS として読む。
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn sub_accounts_tax_categories_and_invoices_round_trip() {
-        use crate::domain::master::TaxCategory;
+        use chobiyori_core::master::TaxCategory;
         let (source, sub) = taxable_book_with_bank_sub_account();
         let (supplies, bank) = {
             let conn = source.conn();

@@ -7,7 +7,7 @@
 //! 読めないため。ファイルを消せば制限は外れるが、そもそも PC のファイルに触れる人は帳簿の
 //! ファイルを持ち出して試せる。ここで防ぐのは、アプリの画面から続けて試されることだけ。
 
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};

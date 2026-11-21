@@ -3,7 +3,7 @@
 use crate::db::deposits::{self, DepositInput, DepositSuggestion, OpenTargets};
 use crate::db::transactions::Transaction;
 use crate::db::{inbox, Database};
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 /// 入金を待っている請求書と、年度の定期売上の未入金の月。

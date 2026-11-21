@@ -11,7 +11,7 @@ use crate::db::recovery;
 use crate::db::unlock_guard::{self, Attempts};
 use crate::db::vault::{self, BookState};
 use crate::db::Database;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;

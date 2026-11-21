@@ -5,8 +5,6 @@
 
 mod commands;
 pub mod db;
-pub mod domain;
-pub mod error;
 pub mod export;
 pub mod import;
 pub mod mail;

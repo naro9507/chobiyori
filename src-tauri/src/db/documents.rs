@@ -10,12 +10,12 @@
 
 use super::transactions::Transaction;
 use super::{attachments, audit, closing, setup, transactions, Database};
-use crate::domain::document::{
+use chobiyori_core::document::{
     self as doc, DisplayStatus, DocumentKind, DocumentStatus, LineInput, TaxMode, Totals,
 };
-use crate::domain::journal::{self, EntryMode, Side, TransactionInput, TransactionKind};
-use crate::domain::master::TaxCategory;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{self, EntryMode, Side, TransactionInput, TransactionKind};
+use chobiyori_core::master::TaxCategory;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 

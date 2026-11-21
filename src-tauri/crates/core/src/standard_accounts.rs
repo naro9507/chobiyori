@@ -115,7 +115,7 @@ pub const GENERAL: &[StandardAccount] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::master;
+    use crate::master;
     use std::collections::HashSet;
 
     #[test]

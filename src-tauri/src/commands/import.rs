@@ -5,10 +5,10 @@
 
 use super::files;
 use crate::db::Database;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::import::{
     self, excel_book, journal_csv, AccountMapping, ImportPreview, ImportResult, Parsed,
 };
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;

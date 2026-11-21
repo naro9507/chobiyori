@@ -1,8 +1,8 @@
 //! 集計（試算表・口座残高）のコマンド。
 
 use crate::db::{reports, Database};
-use crate::domain::balance::TrialBalance;
-use crate::error::AppResult;
+use chobiyori_core::balance::TrialBalance;
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 /// 合計残高試算表。口座残高もここから出す（`to_month` 月末の残高）。

@@ -1,11 +1,11 @@
-//! 明細のファイル（CSV・TSV・Excel）を「文字列の表」にする。読み方は `domain::statement`。
+//! 明細のファイル（CSV・TSV・Excel）を「文字列の表」にする。読み方は `chobiyori_core::statement`。
 
 use crate::db::formats::ImportFormat;
-use crate::domain::statement::{
+use calamine::{Data, Reader};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::statement::{
     self, Delimiter, FormatDefinition, HeaderDiff, Statement, TextEncoding,
 };
-use crate::error::{AppError, AppResult, ErrorCode};
-use calamine::{Data, Reader};
 use std::io::Cursor;
 
 /// 表に読む行の上限。カードの明細なら 1 年分でも数千行
@@ -181,7 +181,7 @@ pub fn read_with(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::domain::statement::ColumnRole;
+    use chobiyori_core::statement::ColumnRole;
 
     /// 匿名化したアメックスの明細（Shift_JIS）。様式は推測で、実物での確認が要る。
     pub(crate) fn amex_fixture(rows: &[(&str, &str, &str, &str)]) -> Vec<u8> {
@@ -260,7 +260,7 @@ pub(crate) mod tests {
             assert_eq!(found.preset.as_deref(), Some(key));
             assert_eq!(
                 found.source_kind,
-                crate::domain::statement::SourceKind::Card
+                chobiyori_core::statement::SourceKind::Card
             );
             let original = read_with(csv.as_bytes(), name, &found.definition)
                 .unwrap()

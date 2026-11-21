@@ -174,6 +174,7 @@ impl fmt::Display for AppError {
 
 impl std::error::Error for AppError {}
 
+#[cfg(feature = "rusqlite")]
 impl From<rusqlite::Error> for AppError {
     fn from(error: rusqlite::Error) -> Self {
         use rusqlite::ffi;

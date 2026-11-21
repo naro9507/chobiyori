@@ -3,16 +3,16 @@
 //! - プラン: 取引先（顧客）ごとに、名前・金額・売上の科目・開始月・終了月。休みの月を持てる
 //! - 入金: 「口座 / 売上」の仕訳を記録し、プランと対象月に結び付ける。返金は逆向きの仕訳
 //! - 顧客やプランを決めずに入金を記録することもでき、「未割当の入金」として別に出す
-//! - 月ごとの一覧と年間の表は、プランと入金から毎回作る（`domain::recurring`）
+//! - 月ごとの一覧と年間の表は、プランと入金から毎回作る（`chobiyori_core::recurring`）
 
 use super::transactions::{self, Transaction};
 use super::Database;
-use crate::domain::journal::{
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
     parse_date, EntryMode, LineInput, Side, TransactionInput, TransactionKind,
 };
-use crate::domain::master::{self, MEMO_MAX, NAME_MAX};
-use crate::domain::recurring::{self, MonthCell, PaymentStatus, PlanSchedule};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, MEMO_MAX, NAME_MAX};
+use chobiyori_core::recurring::{self, MonthCell, PaymentStatus, PlanSchedule};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ pub struct PlanInput {
 fn validate(conn: &Connection, input: &PlanInput) -> AppResult<(String, String)> {
     let name = master::required(&input.name, NAME_MAX, "name")?;
     let memo = master::optional(&input.memo, MEMO_MAX, "memo")?;
-    if !(1..=crate::domain::journal::AMOUNT_MAX).contains(&input.amount) {
+    if !(1..=chobiyori_core::journal::AMOUNT_MAX).contains(&input.amount) {
         return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
     }
     if !recurring::valid_month(&input.start_month) {
@@ -267,7 +267,7 @@ pub(crate) fn record_one(
     input: &PaymentInput,
     entry_mode: EntryMode,
 ) -> AppResult<Transaction> {
-    if !(1..=crate::domain::journal::AMOUNT_MAX).contains(&input.amount) {
+    if !(1..=chobiyori_core::journal::AMOUNT_MAX).contains(&input.amount) {
         return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
     }
     transactions::ensure_payment_account(conn, input.payment_account_id, "paymentAccountId")?;
@@ -689,7 +689,7 @@ pub struct DraftInvoices {
 
 /// 売上の科目の既定の税区分から、請求書の税率を決める。
 fn document_rate(conn: &Connection, account_id: i64) -> AppResult<i64> {
-    let category: Option<crate::domain::master::TaxCategory> = conn
+    let category: Option<chobiyori_core::master::TaxCategory> = conn
         .query_row(
             "SELECT default_tax_category FROM accounts WHERE id = ?1",
             [account_id],
@@ -697,7 +697,7 @@ fn document_rate(conn: &Connection, account_id: i64) -> AppResult<i64> {
         )
         .optional()?
         .flatten();
-    use crate::domain::master::TaxCategory::*;
+    use chobiyori_core::master::TaxCategory::*;
     Ok(match category {
         Some(TaxableSales8) => 8,
         Some(ExemptSales | NonTaxable | OutOfScope) => 0,
@@ -758,7 +758,7 @@ pub fn draft_invoices(db: &Database, year: i64, month: u32) -> AppResult<DraftIn
             let mut lines = Vec::new();
             for p in &plans {
                 let rate = document_rate(tx, p.revenue_account_id)?;
-                lines.push(crate::domain::document::LineInput {
+                lines.push(chobiyori_core::document::LineInput {
                     name: format!("{}（{}月分）", p.name, month),
                     quantity: 100,
                     unit: String::new(),
@@ -769,13 +769,13 @@ pub fn draft_invoices(db: &Database, year: i64, month: u32) -> AppResult<DraftIn
             let id = super::documents::create_in(
                 tx,
                 &super::documents::DocumentInput {
-                    kind: crate::domain::document::DocumentKind::Invoice,
+                    kind: chobiyori_core::document::DocumentKind::Invoice,
                     partner_id: Some(partner_id),
                     recipient_name: if billing.is_empty() { name } else { billing },
                     recipient_address: address,
                     recipient_email: email,
                     issue_date: issue_date.clone(),
-                    due_date: crate::domain::filing::add_days(&issue_date, settings.due_days.max(0)),
+                    due_date: chobiyori_core::filing::add_days(&issue_date, settings.due_days.max(0)),
                     title: format!("{}年{}月分", year, month),
                     notes: settings.default_notes.clone(),
                     lines,

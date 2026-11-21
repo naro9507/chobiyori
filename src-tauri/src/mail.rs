@@ -5,7 +5,7 @@
 //! 送る処理は `MailSender` の後ろに置き、テストでは偽物に差し替える（本物のメールは送らない）。
 
 use crate::db::documents::MailSettings;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;

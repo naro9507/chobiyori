@@ -1,8 +1,8 @@
 //! 家事按分ルール（自宅兼事務所の家賃・光熱費など）。
 
 use super::flag;
-use crate::domain::master::{self, Rounding, NAME_MAX};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, Rounding, NAME_MAX};
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 

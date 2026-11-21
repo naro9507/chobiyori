@@ -1,10 +1,10 @@
 mod callback_page;
 
 use super::{failed, Provider};
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::labels::Locale;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use callback_page::render;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use reqwest::{Client, Url};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};

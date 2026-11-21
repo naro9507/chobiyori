@@ -4,7 +4,7 @@
 //! 履歴は帳簿と一緒に暗号化される。履歴そのものは画面から消せない。
 
 use crate::db::transactions::Transaction;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 

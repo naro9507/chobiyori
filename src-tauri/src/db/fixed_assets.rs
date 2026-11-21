@@ -1,15 +1,17 @@
 //! 固定資産台帳と、年ごとの減価償却の記録。
 //!
-//! 償却費は保存せず、資産の情報から `domain::depreciation` で毎年計算する。
+//! 償却費は保存せず、資産の情報から `chobiyori_core::depreciation` で毎年計算する。
 //! 計算した償却は候補として見せ、利用者が「記録する」を押したときだけ仕訳にする。
 
 use super::Database;
 use crate::db::closing::account_by_line;
 use crate::db::transactions::{self, ensure_year_open};
-use crate::domain::depreciation::{self, Asset, Method, YearDepreciation};
-use crate::domain::journal::{self, EntryMode, LineInput, Side, TransactionInput, TransactionKind};
-use crate::domain::master::{self, AccountCategory, FilingType, MEMO_MAX, NAME_MAX};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::depreciation::{self, Asset, Method, YearDepreciation};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
+    self, EntryMode, LineInput, Side, TransactionInput, TransactionKind,
+};
+use chobiyori_core::master::{self, AccountCategory, FilingType, MEMO_MAX, NAME_MAX};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

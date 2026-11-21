@@ -1,10 +1,10 @@
 //! 初期設定（事業者情報・申告区分・年度・科目の投入）。
 
 use super::Database;
-pub use crate::domain::industry::IndustryTemplate;
-use crate::domain::master::{self, FilingType, TaxStatus, NAME_MAX};
-use crate::domain::standard_accounts;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+pub use chobiyori_core::industry::IndustryTemplate;
+use chobiyori_core::master::{self, FilingType, TaxStatus, NAME_MAX};
+use chobiyori_core::standard_accounts;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -52,7 +52,7 @@ pub struct SetupAccount {
     pub balance: i64,
 }
 
-crate::domain::string_enum! {
+chobiyori_core::string_enum! {
     pub enum SetupAccountKind {
         Cash => "cash",
         Bank => "bank",
@@ -209,7 +209,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
         for (index, account) in input.accounts.iter().enumerate() {
             let name = master::required(&account.name, NAME_MAX, "accountName")
                 .map_err(|e| AppError::line(e.code, index, "accountName"))?;
-            if account.balance.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+            if account.balance.abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
                 return Err(AppError::line(ErrorCode::OutOfRange, index, "openingBalance"));
             }
             // 口座は、同じ種類の標準の科目のすぐあとに並べる
@@ -242,7 +242,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
             if !seen.insert(row.account_code.clone()) || row.account_code == "302" {
                 return Err(AppError::line(ErrorCode::DuplicateCode, index, "otherBalance"));
             }
-            if row.amount.abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+            if row.amount.abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
                 return Err(AppError::line(ErrorCode::OutOfRange, index, "otherBalance"));
             }
             let (id, category): (i64, String) = tx.query_row("SELECT id, category FROM accounts WHERE code = ?1 AND category IN ('asset', 'liability', 'equity')", [&row.account_code], |r| Ok((r.get(0)?, r.get(1)?))).optional()?.ok_or(AppError::line(ErrorCode::NotFound, index, "otherBalance"))?;
@@ -251,7 +251,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, row.amount])?;
             if category == "asset" { asset_total += row.amount; } else { liability_total += row.amount; }
         }
-        if (asset_total - liability_total).abs_diff(0) > crate::domain::journal::AMOUNT_MAX as u64 {
+        if (asset_total - liability_total).abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
             return Err(AppError::new(ErrorCode::OutOfRange));
         }
         if !input.accounts.is_empty() || !input.opening_balances.is_empty() {
@@ -398,7 +398,7 @@ pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
             filing_type: row.get(1)?,
             tax_status,
             closed: row.get(3)?,
-            taxable_from: crate::domain::filing::taxable_from(
+            taxable_from: chobiyori_core::filing::taxable_from(
                 year,
                 tax_status == TaxStatus::Exempt,
                 start.as_deref(),
@@ -729,7 +729,7 @@ mod extended_tests {
             SetupAccount {
                 name: "Bank".into(),
                 kind: SetupAccountKind::Bank,
-                balance: crate::domain::journal::AMOUNT_MAX + 1,
+                balance: chobiyori_core::journal::AMOUNT_MAX + 1,
             },
         ];
         assert!(complete(&db, &i).is_err());

@@ -9,12 +9,12 @@ use crate::db::inbox::{self, AddResult, BulkResult, ConfirmInput, InboxItem, Inb
 use crate::db::rules::{self, RuleInput};
 use crate::db::transactions::Transaction;
 use crate::db::Database;
-use crate::domain::rules::Rule;
-use crate::domain::statement::{
+use crate::import::statement_file;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::rules::Rule;
+use chobiyori_core::statement::{
     self, ColumnRole, FormatDefinition, HeaderDiff, RowNote, StatementRow,
 };
-use crate::error::{AppError, AppResult, ErrorCode};
-use crate::import::statement_file;
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{AppHandle, State};

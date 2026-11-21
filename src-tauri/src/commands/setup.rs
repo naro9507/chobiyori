@@ -2,8 +2,8 @@
 
 use crate::db::setup::{self, BusinessProfile, FiscalYear, SetupInput, SetupStatus};
 use crate::db::Database;
-use crate::domain::master::FilingType;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
+use chobiyori_core::master::FilingType;
 use tauri::State;
 
 /// 初期設定が済んでいるか。済んでいなければ画面は初期設定ウィザードを出す。

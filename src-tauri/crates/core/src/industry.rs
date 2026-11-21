@@ -268,7 +268,7 @@ impl IndustryTemplate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::standard_accounts::GENERAL;
+    use crate::standard_accounts::GENERAL;
 
     #[test]
     fn templates_fit_the_blank_rows_and_do_not_reuse_codes() {
@@ -284,7 +284,7 @@ mod tests {
                     "{}",
                     a.code
                 );
-                assert!(crate::domain::master::code(a.code).is_ok());
+                assert!(crate::master::code(a.code).is_ok());
             }
             let mut codes: Vec<&str> = accounts.iter().map(|a| a.code).collect();
             codes.dedup();
@@ -301,7 +301,7 @@ mod tests {
                         "{code}"
                     );
                 }
-                assert!(crate::domain::master::code(r.code).is_ok());
+                assert!(crate::master::code(r.code).is_ok());
             }
         }
     }

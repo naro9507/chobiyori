@@ -3,7 +3,7 @@
 use crate::db::templates::{self, Candidate, PostInput, Template, TemplateInput};
 use crate::db::transactions::Transaction;
 use crate::db::Database;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 #[tauri::command]

@@ -9,7 +9,7 @@
 
 use super::vault::{export_to, Password};
 use super::{audit, connect, migrate, Database, MIGRATIONS};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{
     backup::{Backup, StepResult},
     Connection,

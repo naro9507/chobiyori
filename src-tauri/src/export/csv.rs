@@ -8,8 +8,8 @@ use super::report::{Cell, Names, Report};
 use crate::db::accounts::Account;
 use crate::db::books::JournalBook;
 use crate::db::partners::Partner;
-use crate::domain::journal::Side;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::Side;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]

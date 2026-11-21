@@ -7,14 +7,16 @@
 use super::formats::ImportFormat;
 use super::transactions::{self, Transaction};
 use super::{deposits, rules, Database};
-use crate::domain::allocation;
-use crate::domain::journal::{self, EntryMode, LineInput, Side, TransactionInput, TransactionKind};
-use crate::domain::master::{self, TaxCategory, MEMO_MAX};
-use crate::domain::receipt::{self, PointsAs};
-use crate::domain::rules::{normalize, Rule, RuleResult};
-use crate::domain::statement::{self, StatementRow};
-use crate::domain::string_enum;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::allocation;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
+    self, EntryMode, LineInput, Side, TransactionInput, TransactionKind,
+};
+use chobiyori_core::master::{self, TaxCategory, MEMO_MAX};
+use chobiyori_core::receipt::{self, PointsAs};
+use chobiyori_core::rules::{normalize, Rule, RuleResult};
+use chobiyori_core::statement::{self, StatementRow};
+use chobiyori_core::string_enum;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -176,7 +178,7 @@ fn suggest(
     item: &InboxItem,
 ) -> Option<Suggestion> {
     if let Some(rule) =
-        crate::domain::rules::find(rules, &item.merchant, item.spend, item.format_id)
+        chobiyori_core::rules::find(rules, &item.merchant, item.spend, item.format_id)
     {
         return Some(Suggestion {
             source: SuggestionSource::Rule,
@@ -724,7 +726,7 @@ pub(crate) mod tests {
     use crate::db::formats::tests::card_format;
     use crate::db::setup::tests::set_up_db;
     use crate::db::transactions::tests::{account, entry};
-    use crate::domain::rules::MatchKind;
+    use chobiyori_core::rules::MatchKind;
 
     pub(crate) fn row(date: &str, spend: i64, merchant: &str) -> StatementRow {
         StatementRow {
@@ -828,7 +830,7 @@ pub(crate) mod tests {
         let october = crate::db::recurring::monthly(&conn, 2026, 10).unwrap();
         assert_eq!(
             october.rows[0].cell.status,
-            crate::domain::recurring::PaymentStatus::Paid
+            chobiyori_core::recurring::PaymentStatus::Paid
         );
     }
 

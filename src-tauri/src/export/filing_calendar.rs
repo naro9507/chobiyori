@@ -2,7 +2,7 @@
 
 use super::labels::{Locale, Text};
 use crate::db::filing::DeadlineNotice;
-use crate::domain::filing::DeadlineKind;
+use chobiyori_core::filing::DeadlineKind;
 
 const INCOME: Text = Text {
     ja: "確定申告の期限",

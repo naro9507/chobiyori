@@ -2,7 +2,7 @@
 //! どのマスタも「一覧・追加・変更・有効/無効・削除」の 5 つをそろえる。
 
 use crate::db::{accounts, allocation_rules, partners, sub_accounts, Database};
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 // 勘定科目

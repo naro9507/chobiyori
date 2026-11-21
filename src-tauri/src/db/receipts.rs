@@ -5,10 +5,10 @@
 
 use super::attachments::{self, Attachment};
 use super::inbox::InboxStatus;
-use crate::domain::receipt::{self, Check, PaymentMethod, PointsAs, ReceiptReading};
-use crate::domain::string_enum;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::receipt::gemini::{valid_model, DEFAULT_MODEL};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::receipt::{self, Check, PaymentMethod, PointsAs, ReceiptReading};
+use chobiyori_core::string_enum;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
@@ -390,20 +390,20 @@ fn upsert_item(conn: &Connection, receipt: &Receipt, fields: &ReceiptFields) -> 
     if fields.date.trim().is_empty() {
         return Err(AppError::field(ErrorCode::Required, "date"));
     }
-    let date = crate::domain::journal::parse_date(fields.date.trim())
+    let date = chobiyori_core::journal::parse_date(fields.date.trim())
         .map(|_| fields.date.trim().to_string())
         .ok_or(AppError::field(ErrorCode::InvalidFormat, "date"))?;
-    if !(1..=crate::domain::journal::AMOUNT_MAX).contains(&fields.total) {
+    if !(1..=chobiyori_core::journal::AMOUNT_MAX).contains(&fields.total) {
         return Err(AppError::field(ErrorCode::OutOfRange, "total"));
     }
-    if !(0..=crate::domain::journal::AMOUNT_MAX - fields.total).contains(&fields.points) {
+    if !(0..=chobiyori_core::journal::AMOUNT_MAX - fields.total).contains(&fields.points) {
         return Err(AppError::field(ErrorCode::OutOfRange, "points"));
     }
     if !(0..=fields.total + fields.points).contains(&fields.reduced_amount) {
         return Err(AppError::field(ErrorCode::OutOfRange, "reducedAmount"));
     }
     ensure_payment_account(conn, Some(fields.payment_account_id), "paymentAccountId")?;
-    let merchant = crate::domain::master::optional(&fields.merchant, 100, "merchant")?;
+    let merchant = chobiyori_core::master::optional(&fields.merchant, 100, "merchant")?;
     let invoice_no = match fields
         .invoice_no
         .as_deref()

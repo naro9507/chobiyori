@@ -3,7 +3,7 @@
 use crate::db::recurring::{self, MonthlyList, PaymentInput, Plan, PlanInput, YearMatrix};
 use crate::db::transactions::Transaction;
 use crate::db::Database;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 #[tauri::command]

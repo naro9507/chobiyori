@@ -1,10 +1,10 @@
 //! 集計（試算表・口座残高）。合計は SQL で科目ごとに出し、残高の計算は
-//! `domain::balance` で行う。集計値は保存しない。
+//! `chobiyori_core::balance` で行う。集計値は保存しない。
 
 use crate::db::accounts;
-use crate::domain::balance::{self, Movement, Totals, TrialBalance};
-use crate::domain::journal::period_range;
-use crate::error::AppResult;
+use chobiyori_core::balance::{self, Movement, Totals, TrialBalance};
+use chobiyori_core::error::AppResult;
+use chobiyori_core::journal::period_range;
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
@@ -71,10 +71,10 @@ pub(crate) mod tests {
     use crate::db::setup::tests::set_up_db;
     use crate::db::transactions::tests::{account, entry};
     use crate::db::transactions::{create, create_simple};
-    use crate::domain::journal::{
+    use chobiyori_core::error::{AppError, ErrorCode};
+    use chobiyori_core::journal::{
         EntryMode, LineInput, Side, SimpleInput, SimpleKind, TransactionInput,
     };
-    use crate::error::{AppError, ErrorCode};
 
     /// 1 か月分（3 月）の帳簿をつける。2 月にも 1 件ある。
     pub(crate) fn books() -> crate::db::Database {

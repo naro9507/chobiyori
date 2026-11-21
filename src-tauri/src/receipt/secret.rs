@@ -1,7 +1,7 @@
 //! API キーの保管。OS の資格情報ストア（Windows の資格情報マネージャー、macOS のキーチェーン）に置く。
 //! DB・ファイル・ログ・画面には出さない（画面には「登録済みかどうか」だけを返す）。
 
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 
 const SERVICE: &str = "jp.dcs.accounting";
 const GEMINI_KEY: &str = "gemini-api-key";

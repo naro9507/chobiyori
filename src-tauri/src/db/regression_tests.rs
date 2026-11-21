@@ -4,14 +4,14 @@ use crate::db::{
     backup, books, closing, documents, filing, fixed_assets, locks, recurring, reports, setup,
     transactions, Database,
 };
-use crate::domain::{
+use crate::export::{csv, labels::Locale, report::Names};
+use crate::import::{self, journal_csv};
+use chobiyori_core::error::ErrorCode;
+use chobiyori_core::{
     depreciation::Method,
     document::{DocumentKind, LineInput},
     master::TaxCategory,
 };
-use crate::error::ErrorCode;
-use crate::export::{csv, labels::Locale, report::Names};
-use crate::import::{self, journal_csv};
 
 fn opening(account_id: i64, amount: i64) -> closing::OpeningRow {
     closing::OpeningRow { account_id, amount }
@@ -416,7 +416,7 @@ fn csv_roundtrip_preserves_a_literal_leading_apostrophe() {
 #[test]
 fn statement_cannot_be_matched_to_another_bank_subaccount() {
     use crate::db::{formats, inbox};
-    use crate::domain::statement::StatementRow;
+    use chobiyori_core::statement::StatementRow;
     let db = set_up_db();
     let (bank, expense) = pair(&db, "104", "610");
     let (a, b, format) = {
@@ -457,7 +457,7 @@ fn statement_cannot_be_matched_to_another_bank_subaccount() {
 
 #[test]
 fn an_already_taxable_year_keeps_sales_before_invoice_registration() {
-    use crate::domain::master::TaxStatus;
+    use chobiyori_core::master::TaxStatus;
     let db = set_up_db();
     db.conn()
         .execute("UPDATE fiscal_years SET tax_status = 'standard'", [])
@@ -503,7 +503,7 @@ fn an_already_taxable_year_keeps_sales_before_invoice_registration() {
 
 #[test]
 fn small_asset_special_treatment_is_rejected_in_white_filing() {
-    use crate::domain::master::FilingType;
+    use chobiyori_core::master::FilingType;
     let db = Database::open_in_memory().unwrap();
     let mut initial = input();
     initial.filing_type = FilingType::White;
@@ -521,7 +521,7 @@ fn small_asset_special_treatment_is_rejected_in_white_filing() {
 
 #[test]
 fn statement_import_rejects_more_than_100000_csv_records() {
-    use crate::domain::statement::{Delimiter, TextEncoding};
+    use chobiyori_core::statement::{Delimiter, TextEncoding};
     let mut contents = String::from("Date,Memo,Amount\n");
     contents.push_str(&"2026-04-01,Test store,100\n".repeat(99_999));
     contents.push_str("2026-04-02,Unique last row,900\n");
@@ -617,7 +617,7 @@ fn migration_preserves_legacy_attachment_and_balanced_opening() {
 
 #[test]
 fn special_thirty_percent_is_available_only_in_2027_and_2028() {
-    use crate::domain::filing::{consumption_tax, Rate, SalesAmount};
+    use chobiyori_core::filing::{consumption_tax, Rate, SalesAmount};
     let sales = [SalesAmount {
         rate: Rate::Standard10,
         category: 5,

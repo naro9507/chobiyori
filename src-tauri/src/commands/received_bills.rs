@@ -1,5 +1,5 @@
 use crate::db::{received_bills, Database};
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
 use received_bills::{ReceivedBill, ReceivedBillInput};
 use tauri::State;
 

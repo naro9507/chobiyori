@@ -40,7 +40,7 @@ lint: ## リント（Biome と Clippy）
 
 format: ## 整形（Biome と rustfmt）
 	pnpm format:fix
-	cargo fmt --manifest-path src-tauri/Cargo.toml
+	cargo fmt --all --manifest-path src-tauri/Cargo.toml
 
 check: lint typecheck test ## プッシュ前と同じ検査
 	pnpm format

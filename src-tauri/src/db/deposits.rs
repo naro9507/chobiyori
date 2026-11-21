@@ -8,11 +8,11 @@
 
 use super::transactions::Transaction;
 use super::{documents, recurring, Database};
-use crate::domain::document::{DisplayStatus, DocumentKind};
-use crate::domain::journal::{parse_date, EntryMode};
-use crate::domain::recurring::{month_key, PaymentStatus};
-use crate::domain::rules;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::document::{DisplayStatus, DocumentKind};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{parse_date, EntryMode};
+use chobiyori_core::recurring::{month_key, PaymentStatus};
+use chobiyori_core::rules;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -274,7 +274,7 @@ pub fn suggest(
         let near = invoice
             .due_date
             .as_deref()
-            .and_then(|due| crate::domain::filing::days_between(date, due))
+            .and_then(|due| chobiyori_core::filing::days_between(date, due))
             .is_some_and(|d| d.abs() <= 15);
         let score =
             50 * i64::from(exact_amount) + 40 * i64::from(name_matches) + 10 * i64::from(near);

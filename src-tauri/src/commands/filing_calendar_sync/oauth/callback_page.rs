@@ -1,5 +1,5 @@
-use crate::error::ErrorCode;
 use crate::export::labels::{Locale, Text};
+use chobiyori_core::error::ErrorCode;
 
 const RECEIVED: Text = Text {
     ja: "ブラウザでの認証を受け付けました",

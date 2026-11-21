@@ -1,10 +1,10 @@
 use crate::db::{documents, filing, locks, received_bills, setup};
-use crate::domain::{document::DocumentKind, filing::add_days, journal};
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::{
     filing_calendar,
     labels::{Locale, Text},
 };
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::{document::DocumentKind, filing::add_days, journal};
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 

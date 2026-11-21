@@ -1,8 +1,8 @@
 //! 補助科目（普通預金 → 口座別、借入金 → 借入先別 など）。
 
 use super::flag;
-use crate::domain::master::{self, NAME_MAX};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, NAME_MAX};
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 

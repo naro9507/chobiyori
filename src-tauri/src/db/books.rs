@@ -1,15 +1,15 @@
 //! 帳簿（仕訳帳・総勘定元帳・現金出納帳 / 預金出納帳・経費帳）の読み出し。
 //!
-//! どの帳簿も、保存してある仕訳から毎回作る。残高の計算は `domain::ledger` で行う。
+//! どの帳簿も、保存してある仕訳から毎回作る。残高の計算は `chobiyori_core::ledger` で行う。
 //! 繰越は、期首残高と、年度の初めから期間の前までの増減。
 
 use crate::db::accounts::{self, Account};
 use crate::db::transactions::{self, Transaction};
-use crate::domain::balance::{signed, Totals};
-use crate::domain::journal::{period_range, Side};
-use crate::domain::ledger::{self, Ledger, LedgerEntry};
-use crate::domain::master::AccountCategory;
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::balance::{signed, Totals};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{period_range, Side};
+use chobiyori_core::ledger::{self, Ledger, LedgerEntry};
+use chobiyori_core::master::AccountCategory;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::collections::HashMap;

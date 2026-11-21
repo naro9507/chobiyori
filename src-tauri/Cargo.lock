@@ -568,6 +568,7 @@ dependencies = [
  "block2",
  "calamine",
  "cc",
+ "chobiyori-core",
  "csv",
  "encoding_rs",
  "keyring",
@@ -594,6 +595,16 @@ dependencies = [
  "tempfile",
  "ttf-parser",
  "windows",
+]
+
+[[package]]
+name = "chobiyori-core"
+version = "0.0.0"
+dependencies = [
+ "csv",
+ "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,18 +1,18 @@
 //! 取引（ヘッダ）と明細行の読み書き。
 //!
-//! 書き込みはすべて 1 つの DB トランザクションで行い、検証（`domain::journal::validate`）を
+//! 書き込みはすべて 1 つの DB トランザクションで行い、検証（`chobiyori_core::journal::validate`）を
 //! 通らない取引は保存しない。これで「取引ごとに借方合計 = 貸方合計」が常に成り立つ。
 
 use super::locks::ensure_date_open;
 use super::{audit, Database};
-use crate::domain::allocation;
-use crate::domain::journal::{
+use chobiyori_core::allocation;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
     self, AllowedInactive, EntryMode, MasterLookup, OwnerAccounts, Side, SimpleInput, SimpleKind,
     TransactionInput, TransactionKind, ValidTransaction,
 };
-use crate::domain::master::{Rounding, TaxCategory};
-use crate::domain::standard_accounts::{OWNER_CONTRIBUTIONS_LINE, OWNER_DRAWINGS_LINE};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{Rounding, TaxCategory};
+use chobiyori_core::standard_accounts::{OWNER_CONTRIBUTIONS_LINE, OWNER_DRAWINGS_LINE};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -566,7 +566,7 @@ pub fn list_between(
 pub(crate) mod tests {
     use super::*;
     use crate::db::setup::tests::set_up_db;
-    use crate::domain::journal::{LineInput, SimpleKind};
+    use chobiyori_core::journal::{LineInput, SimpleKind};
 
     /// コードから科目の id を引く。
     pub(crate) fn account(conn: &Connection, code: &str) -> i64 {

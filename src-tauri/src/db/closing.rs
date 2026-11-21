@@ -1,6 +1,6 @@
 //! 決算: 期首残高、棚卸、決算整理のチェックリスト、決算書の金額一覧、年度の繰越。
 //!
-//! 計算は `domain::closing`・`domain::depreciation` で行い、ここは DB の読み書きをする。
+//! 計算は `chobiyori_core::closing`・`chobiyori_core::depreciation` で行い、ここは DB の読み書きをする。
 //! 期末の棚卸などの仕訳は、利用者が「記録する」を押したときだけ作る。
 
 use super::Database;
@@ -8,13 +8,13 @@ use crate::db::accounts::{self, Account};
 use crate::db::fixed_assets;
 use crate::db::reports;
 use crate::db::transactions::{self, ensure_year_open};
-use crate::domain::closing::{self, AccountFigure, OpeningTotals, Statement};
-use crate::domain::depreciation::Method;
-use crate::domain::journal::{
+use chobiyori_core::closing::{self, AccountFigure, OpeningTotals, Statement};
+use chobiyori_core::depreciation::Method;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{
     EntryMode, LineInput, Side, TransactionInput, TransactionKind, AMOUNT_MAX,
 };
-use crate::domain::master::{AccountCategory, FilingType, TaxStatus};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{AccountCategory, FilingType, TaxStatus};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1076,8 +1076,8 @@ pub fn save_white_deduction(db: &Database, year: i64, amount: i64) -> AppResult<
 mod white_integration_tests {
     use super::*;
     use crate::db::setup;
-    use crate::domain::journal::{SimpleInput, SimpleKind};
     use crate::export::{self, labels::Locale, ExportFormat, ExportRequest, ExportTarget};
+    use chobiyori_core::journal::{SimpleInput, SimpleKind};
 
     #[test]
     fn white_deduction_flows_to_statement_guide_and_export() {

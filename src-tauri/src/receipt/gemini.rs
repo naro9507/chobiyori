@@ -1,11 +1,11 @@
 //! Gemini API（Google AI Studio）でレシートを読む。
 //!
-//! 画像と指示の文を送り、`domain::receipt::response_schema` の形の JSON を受け取る。
+//! 画像と指示の文を送り、`chobiyori_core::receipt::response_schema` の形の JSON を受け取る。
 //! モデル名は設定で変えられる（提供側の改廃に備える）。キーはヘッダで送り、URL やログに出さない。
 
 use super::{ReadError, ReceiptReader};
-use crate::domain::receipt::{response_schema, PROMPT};
 use base64::Engine;
+use chobiyori_core::receipt::{response_schema, PROMPT};
 use serde_json::Value;
 use std::time::Duration;
 

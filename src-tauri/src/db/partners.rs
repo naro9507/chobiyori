@@ -1,8 +1,8 @@
 //! 取引先マスタ。顧客・仕入先・支払先・金融機関を 1 つにまとめる。
 
 use super::flag;
-use crate::domain::master::{self, MEMO_MAX, NAME_MAX};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, MEMO_MAX, NAME_MAX};
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 
@@ -74,7 +74,7 @@ fn validate(input: &PartnerInput) -> AppResult<Valid> {
         )?,
         memo: master::optional(&input.memo, MEMO_MAX, "memo")?,
         billing_name: master::optional(&input.billing_name, NAME_MAX * 2, "billingName")?,
-        email: crate::domain::document::email(&input.email, "email")?,
+        email: chobiyori_core::document::email(&input.email, "email")?,
         address: master::optional(&input.address, 200, "address")?,
     })
 }

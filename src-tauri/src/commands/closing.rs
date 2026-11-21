@@ -5,8 +5,8 @@ use crate::db::closing::{
 };
 use crate::db::fixed_assets::{self, DepreciationYear, FixedAsset, FixedAssetInput};
 use crate::db::Database;
-use crate::domain::depreciation::{self, UsefulLife};
-use crate::error::AppResult;
+use chobiyori_core::depreciation::{self, UsefulLife};
+use chobiyori_core::error::AppResult;
 use tauri::State;
 
 #[tauri::command]

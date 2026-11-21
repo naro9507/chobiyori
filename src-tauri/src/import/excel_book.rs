@@ -16,9 +16,9 @@ use super::{
     AccountRef, BookAccount, BookPartner, Draft, DraftLine, Issue, IssueCode, Parsed, PartnerRef,
 };
 use crate::db::accounts::Account;
-use crate::domain::journal::{days_in_month, Side};
-use crate::error::{AppError, AppResult, ErrorCode};
 use calamine::{Data, Range, Reader};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{days_in_month, Side};
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -372,7 +372,7 @@ pub fn parse(bytes: &[u8], year: i64) -> AppResult<Parsed> {
         };
         let Some(amount) = r
             .amount
-            .filter(|a| (1..=crate::domain::journal::AMOUNT_MAX).contains(a))
+            .filter(|a| (1..=chobiyori_core::journal::AMOUNT_MAX).contains(a))
         else {
             parsed.issues.push(issue(IssueCode::InvalidAmount));
             continue;

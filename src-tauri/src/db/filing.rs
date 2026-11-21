@@ -1,13 +1,13 @@
 //! 確定申告・消費税の申告・インボイスの登録の補助（F12）。
 //!
-//! 計算は `domain::filing` で行い、ここでは帳簿から材料を読み、記録を書く。
+//! 計算は `chobiyori_core::filing` で行い、ここでは帳簿から材料を読み、記録を書く。
 //! アプリから国税庁などへは何も送らない（登録番号は利用者が公表サイトで確かめる）。
 
 use super::{audit, closing, setup, transactions, Database};
-use crate::domain::filing::{self, ConsumptionTax, DeadlineKind, Rate, SalesAmount};
-use crate::domain::journal;
-use crate::domain::master::{self, FilingType, TaxCategory, TaxStatus};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::filing::{self, ConsumptionTax, DeadlineKind, Rate, SalesAmount};
+use chobiyori_core::journal;
+use chobiyori_core::master::{self, FilingType, TaxCategory, TaxStatus};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -550,7 +550,7 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         item("return_income", "①", "", "", st.income, false),
         item("return_deduction", "", "", "", st.deduction, false),
     ];
-    if amounts.filing_type == crate::domain::master::FilingType::White {
+    if amounts.filing_type == chobiyori_core::master::FilingType::White {
         returns.retain(|item| item.key != "return_deduction");
     }
     Ok(IncomeGuide {
@@ -867,7 +867,7 @@ mod tests {
     use crate::db::setup::tests::set_up_db;
     use crate::db::transactions::tests::account;
     use crate::db::transactions::{create, get};
-    use crate::domain::journal::{EntryMode, LineInput, Side, TransactionInput};
+    use chobiyori_core::journal::{EntryMode, LineInput, Side, TransactionInput};
 
     fn line(side: Side, account_id: i64, amount: i64, tax: Option<TaxCategory>) -> LineInput {
         LineInput {

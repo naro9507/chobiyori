@@ -11,11 +11,11 @@ use crate::db::receipts::{
     self, AddReceiptsResult, Receipt, ReceiptFields, ReceiptSettings, ReceiptSettingsInput,
 };
 use crate::db::Database;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::receipt::gemini::Gemini;
 use crate::receipt::secret::{self, Keyring, SecretStore};
 use crate::receipt::{ReadError, ReceiptReader};
 use base64::Engine;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::{AppHandle, State};

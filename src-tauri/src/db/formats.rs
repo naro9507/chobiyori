@@ -3,9 +3,9 @@
 //! 利用者が作った形式は DB に置く。同梱のプリセット（`presets/*.json`）は、利用者が書き出した
 //! 形式のファイルと同じ形のデータで、そのままでは使わず、取込先の口座を選んで複製して使う。
 
-use crate::domain::master::{self, NAME_MAX};
-use crate::domain::statement::{FormatDefinition, SourceKind};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, NAME_MAX};
+use chobiyori_core::statement::{FormatDefinition, SourceKind};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 
@@ -273,7 +273,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::setup::tests::set_up_db;
     use crate::db::transactions::tests::account;
-    use crate::domain::statement::{AmountSign, ColumnRole, Delimiter, TextEncoding};
+    use chobiyori_core::statement::{AmountSign, ColumnRole, Delimiter, TextEncoding};
 
     pub(crate) fn definition() -> FormatDefinition {
         FormatDefinition {

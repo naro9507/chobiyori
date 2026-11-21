@@ -4,10 +4,10 @@ mod device;
 use super::security::{ensure_not_open, open_books, BookFiles};
 use crate::{
     db::{unlock_guard, vault, Database},
-    error::{AppError, AppResult, ErrorCode},
     receipt::secret::{KeyringItem, SecretStore},
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::path::Path;

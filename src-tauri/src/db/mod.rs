@@ -32,7 +32,7 @@ pub mod transactions;
 pub mod unlock_guard;
 pub mod vault;
 
-use crate::error::{AppError, AppResult};
+use chobiyori_core::error::{AppError, AppResult};
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
@@ -182,7 +182,7 @@ fn migrate(conn: &Connection) -> AppResult<()> {
             "データベースの版 {current} は、このアプリが知っている版 {} より新しい",
             MIGRATIONS.len()
         );
-        return Err(AppError::new(crate::error::ErrorCode::Database));
+        return Err(AppError::new(chobiyori_core::error::ErrorCode::Database));
     }
     for (index, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
         let version = index + 1;

@@ -9,16 +9,16 @@ use crate::db::documents::{
     self, Document, DocumentInput, DocumentSettings, MailSettings, PaymentInput,
 };
 use crate::db::{attachments, setup, Database};
-use crate::domain::document::{self as doc, DocumentKind, DocumentStatus};
-use crate::domain::journal::{Side, TransactionInput};
-use crate::domain::master::TaxCategory;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::document::{self as layout, Images, Page};
 use crate::export::labels::amount as yen;
 use crate::export::pdf::find_font;
 use crate::mail::{self, MailSender, OutgoingMail, Smtp};
 use crate::receipt::secret::{KeyringItem, SecretStore, SMTP_PASSWORD};
 use base64::Engine;
+use chobiyori_core::document::{self as doc, DocumentKind, DocumentStatus};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::journal::{Side, TransactionInput};
+use chobiyori_core::master::TaxCategory;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -565,9 +565,9 @@ pub async fn mark_document_sent(
 mod tests {
     use super::*;
     use crate::db::setup::tests::set_up_db;
-    use crate::domain::document::LineInput;
     use crate::mail::tests::FakeSender;
     use crate::receipt::secret::tests::MemoryStore;
+    use chobiyori_core::document::LineInput;
 
     fn issued(db: &Database) -> Document {
         let d = documents::create(

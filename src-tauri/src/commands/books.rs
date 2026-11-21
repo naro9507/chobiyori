@@ -2,8 +2,8 @@
 
 use crate::db::books::{self, JournalBook};
 use crate::db::Database;
-use crate::domain::ledger::Ledger;
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
+use chobiyori_core::ledger::Ledger;
 use tauri::State;
 
 #[tauri::command]

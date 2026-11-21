@@ -1,8 +1,8 @@
 //! 勘定科目マスタ。
 
 use super::flag;
-use crate::domain::master::{self, AccountCategory, TaxCategory, NAME_MAX};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, AccountCategory, TaxCategory, NAME_MAX};
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 
@@ -216,7 +216,7 @@ pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
 mod tests {
     use super::*;
     use crate::db::setup::tests::set_up_db;
-    use crate::domain::standard_accounts::GENERAL;
+    use chobiyori_core::standard_accounts::GENERAL;
 
     fn input(code: &str, name: &str) -> AccountInput {
         AccountInput {

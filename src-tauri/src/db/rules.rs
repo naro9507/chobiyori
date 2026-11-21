@@ -1,8 +1,8 @@
-//! 自動仕訳ルールの読み書き。照合は `domain::rules`。
+//! 自動仕訳ルールの読み書き。照合は `chobiyori_core::rules`。
 
-use crate::domain::master::{self, MEMO_MAX};
-use crate::domain::rules::{normalize, MatchKind, Rule, RuleResult};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::master::{self, MEMO_MAX};
+use chobiyori_core::rules::{normalize, MatchKind, Rule, RuleResult};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Deserialize;
 

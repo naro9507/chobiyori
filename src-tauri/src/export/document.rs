@@ -9,8 +9,8 @@
 use super::labels::amount as yen;
 use super::pdf::{Measure, PdfFont};
 use crate::db::documents::Document;
-use crate::domain::document::{DocumentKind, TaxMode};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::document::{DocumentKind, TaxMode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::num::NormalizedF32;
@@ -123,7 +123,7 @@ fn total_label(kind: DocumentKind) -> &'static str {
 
 /// 日付を「2026年3月1日」にする。
 pub fn japanese_date(date: &str) -> String {
-    match crate::domain::journal::parse_date(date) {
+    match chobiyori_core::journal::parse_date(date) {
         Some((y, m, d)) => format!("{y}年{m}月{d}日"),
         None => date.to_string(),
     }
@@ -653,7 +653,7 @@ fn fill(gray: u8) -> Fill {
 pub(crate) mod tests {
     use super::*;
     use crate::db::documents::{Document, Issuer, Send};
-    use crate::domain::document::{totals, DisplayStatus, DocumentStatus, LineInput};
+    use chobiyori_core::document::{totals, DisplayStatus, DocumentStatus, LineInput};
 
     pub(crate) fn sample(mode: TaxMode, lines: usize) -> Document {
         let lines: Vec<LineInput> = (0..lines)

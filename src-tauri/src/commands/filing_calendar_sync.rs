@@ -10,9 +10,9 @@ use self::{
     plan::{CalendarOptions, Deadline},
 };
 use crate::db::Database;
-use crate::error::{AppError, AppResult, ErrorCode};
 use crate::export::labels::Locale;
 use crate::receipt::secret::{KeyringItem, SecretStore};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{async_runtime::Mutex, State};

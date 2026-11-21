@@ -9,7 +9,7 @@
 //! 途中で失敗しても元のファイルは残る。
 
 use super::{connect, migrate, Database};
-use crate::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use rusqlite::Connection;
 use serde::Serialize;
 use std::fmt;

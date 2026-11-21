@@ -8,12 +8,12 @@ use crate::db::books::JournalBook;
 use crate::db::closing::StatementAmounts;
 use crate::db::partners::Partner;
 use crate::db::sub_accounts::SubAccount;
-use crate::domain::balance::TrialBalance;
-use crate::domain::closing::Side as BsSide;
-use crate::domain::depreciation::Method;
-use crate::domain::journal::Side;
-use crate::domain::ledger::Ledger;
-use crate::domain::master::AccountCategory;
+use chobiyori_core::balance::TrialBalance;
+use chobiyori_core::closing::Side as BsSide;
+use chobiyori_core::depreciation::Method;
+use chobiyori_core::journal::Side;
+use chobiyori_core::ledger::Ledger;
+use chobiyori_core::master::AccountCategory;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -472,7 +472,7 @@ pub fn statement(amounts: &StatementAmounts, names: &Names, ctx: &Context) -> Re
             ja.to_string()
         }
     };
-    let white = amounts.filing_type == crate::domain::master::FilingType::White;
+    let white = amounts.filing_type == chobiyori_core::master::FilingType::White;
     let s = &amounts.statement;
     let mut sections = Vec::new();
 

@@ -1,8 +1,8 @@
 //! 復旧コードで保護した帳簿の鍵情報。コードは発行時だけ画面に返す。
 
 use super::{vault, Database};
-use crate::error::{AppError, AppResult, ErrorCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM, NONCE_LEN};
 use ring::rand::{SecureRandom, SystemRandom};
 use std::fs::File;

@@ -1,8 +1,8 @@
 //! 取引入力（かんたん入力・仕訳グリッド・複合仕訳）のコマンド。
 
 use crate::db::{transactions, Database};
-use crate::domain::journal::{SimpleInput, TransactionInput};
-use crate::error::AppResult;
+use chobiyori_core::error::AppResult;
+use chobiyori_core::journal::{SimpleInput, TransactionInput};
 use tauri::State;
 
 /// 年度の取引。`month`（1〜12）を渡すとその月だけ。

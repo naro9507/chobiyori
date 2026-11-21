@@ -1,11 +1,11 @@
 //! よく使う摘要と、そこから作る仕訳。
 use super::{flag, transactions, Database};
-use crate::domain::{
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
+use chobiyori_core::{
     allocation,
     journal::{EntryMode, LineInput, Side, TransactionInput, TransactionKind, AMOUNT_MAX},
     master::{self, TaxCategory, NAME_MAX},
 };
-use crate::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 
