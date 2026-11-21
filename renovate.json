@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 9am on monday"],
+  "minimumReleaseAge": "7 days",
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "npm の minor・patch をまとめる",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm"
+    },
+    {
+      "description": "Cargo の minor・patch をまとめる",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "cargo"
+    },
+    {
+      "description": "GitHub Actions をまとめる",
+      "matchManagers": ["github-actions"],
+      "groupName": "actions"
+    }
+  ]
+}
