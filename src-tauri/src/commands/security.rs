@@ -4,7 +4,7 @@
 //! コマンドは動かない（画面はパスワードの画面だけを出す）。
 
 use super::files;
-use crate::db::audit::{self, AuditEntry};
+use crate::db::audit::{self, AuditPage};
 use crate::db::backup::{self, BackupFile, BackupKind, BackupSummary};
 use crate::db::locks::{self, LockStatus};
 use crate::db::recovery;
@@ -347,7 +347,8 @@ pub async fn set_year_closed(
 pub async fn list_history(
     db: State<'_, Database>,
     fiscal_year: Option<i64>,
-    limit: Option<i64>,
-) -> AppResult<Vec<AuditEntry>> {
-    audit::list(&db.conn(), fiscal_year, limit.unwrap_or(200))
+    page: i64,
+    query: Option<String>,
+) -> AppResult<AuditPage> {
+    audit::list(&db.conn(), fiscal_year, page, query.as_deref())
 }

@@ -54,16 +54,55 @@ pub struct AuditEntry {
     pub at: String,
 }
 
-/// 新しい順に、`limit` 件まで。`fiscal_year` を渡すとその年度のものだけ（年度のない操作も含める）。
-pub fn list(conn: &Connection, fiscal_year: Option<i64>, limit: i64) -> AppResult<Vec<AuditEntry>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, entity, entity_id, action, fiscal_year, before_json, after_json, at
-         FROM audit_logs
-         WHERE ?1 IS NULL OR fiscal_year IS NULL OR fiscal_year = ?1
-         ORDER BY id DESC LIMIT ?2",
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditPage {
+    pub entries: Vec<AuditEntry>,
+    pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+}
+
+const PAGE_SIZE: i64 = 50;
+
+// 年度のない操作はどの年度にも出す。メモなどは変更前と変更後の両方を検索する。
+const FILTER: &str = "
+    WHERE (?1 IS NULL OR fiscal_year IS NULL OR fiscal_year = ?1)
+      AND (?2 IS NULL
+        OR instr(at, ?2) > 0
+        OR instr(lower(CASE WHEN json_valid(before_json) THEN
+            coalesce(before_json ->> 'date', '') || ' ' ||
+            coalesce(before_json ->> 'memo', '')
+          END), lower(?2)) > 0
+        OR instr(lower(CASE WHEN json_valid(after_json) THEN
+            coalesce(after_json ->> 'date', '') || ' ' ||
+            coalesce(after_json ->> 'memo', '') || ' ' ||
+            coalesce(after_json ->> 'number', '')
+          END), lower(?2)) > 0)";
+
+/// 絞り込んだ履歴を新しい順に返す。存在しないページは最も近いページに丸める。
+pub fn list(
+    conn: &Connection,
+    fiscal_year: Option<i64>,
+    page: i64,
+    query: Option<&str>,
+) -> AppResult<AuditPage> {
+    let query = query.map(str::trim).filter(|query| !query.is_empty());
+    let total: i64 = conn.query_row(
+        &format!("SELECT count(*) FROM audit_logs {FILTER}"),
+        params![fiscal_year, query],
+        |row| row.get(0),
     )?;
+    let last_page = (total.max(1) - 1) / PAGE_SIZE + 1;
+    let page = page.clamp(1, last_page);
+    let offset = (page - 1) * PAGE_SIZE;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id, entity, entity_id, action, fiscal_year, before_json, after_json, at
+         FROM audit_logs {FILTER}
+         ORDER BY id DESC LIMIT ?3 OFFSET ?4"
+    ))?;
     let parse = |text: Option<String>| text.and_then(|t| serde_json::from_str(&t).ok());
-    let rows = stmt.query_map(params![fiscal_year, limit.clamp(1, 1000)], |r| {
+    let rows = stmt.query_map(params![fiscal_year, query, PAGE_SIZE, offset], |r| {
         Ok(AuditEntry {
             id: r.get(0)?,
             entity: r.get(1)?,
@@ -75,5 +114,94 @@ pub fn list(conn: &Connection, fiscal_year: Option<i64>, limit: i64) -> AppResul
             at: r.get(7)?,
         })
     })?;
-    Ok(rows.collect::<Result<_, _>>()?)
+    Ok(AuditPage {
+        entries: rows.collect::<Result<_, _>>()?,
+        total,
+        page,
+        page_size: PAGE_SIZE,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn pages_include_older_history_and_keep_the_fiscal_year_filter() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(include_str!("migrations/0007_security.sql"))
+            .unwrap();
+        for year in std::iter::repeat_n(2026, 204).chain([2025]) {
+            event(&conn, "document", "issue", Some(year), None).unwrap();
+        }
+        event(&conn, "book", "restore", None, None).unwrap();
+
+        let first = list(&conn, Some(2026), 1, None).unwrap();
+        assert_eq!(first.total, 205);
+        assert_eq!(first.page_size, 50);
+        assert_eq!(first.entries.len(), 50);
+        assert_eq!(first.entries[0].action, "restore");
+
+        let ids: Vec<_> = (1..=5)
+            .flat_map(|page| list(&conn, Some(2026), page, None).unwrap().entries)
+            .map(|entry| entry.id)
+            .collect();
+        assert_eq!(
+            ids,
+            std::iter::once(206)
+                .chain((1..=204).rev())
+                .collect::<Vec<_>>()
+        );
+
+        let last = list(&conn, Some(2026), 99, None).unwrap();
+        assert_eq!(last.page, 5);
+        assert_eq!(last.entries.len(), 5);
+    }
+
+    #[test]
+    fn search_filters_before_paging_and_matches_old_and_new_entry_details() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(include_str!("migrations/0007_security.sql"))
+            .unwrap();
+        let before = json!({ "date": "2026-01-01", "memo": "仕入れ_旧" });
+        let after = json!({ "date": "2026-01-02", "memo": "仕入れ・修正後" });
+        conn.execute(
+            "INSERT INTO audit_logs (entity, action, fiscal_year, before_json, after_json)
+             VALUES ('transaction', 'update', 2026, ?1, ?2)",
+            params![before.to_string(), after.to_string()],
+        )
+        .unwrap();
+        for _ in 0..51 {
+            event(
+                &conn,
+                "document",
+                "issue",
+                Some(2026),
+                Some(json!({"number": "INV-123"})),
+            )
+            .unwrap();
+        }
+        event(
+            &conn,
+            "document",
+            "issue",
+            Some(2025),
+            Some(json!({"number": "INV-123"})),
+        )
+        .unwrap();
+
+        for query in [" 仕入れ_旧 ", "修正後", "2026-01-01", "2026-01-02"] {
+            let matched = list(&conn, Some(2026), 1, Some(query)).unwrap();
+            assert_eq!(matched.total, 1);
+            assert_eq!(matched.entries[0].id, 1);
+        }
+        let matched = list(&conn, Some(2026), 2, Some("inv-123")).unwrap();
+        assert_eq!(matched.total, 51);
+        assert_eq!(matched.page, 2);
+        assert_eq!(matched.entries.len(), 1);
+        let empty = list(&conn, Some(2026), 2, Some("%")).unwrap();
+        assert_eq!(empty.total, 0);
+        assert!(empty.entries.is_empty());
+    }
 }

@@ -1,4 +1,6 @@
 import { Loader2 } from "lucide-react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
 	Card,
 	CardContent,
@@ -6,6 +8,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
@@ -41,13 +44,26 @@ function describe(t: HistoryTransaction) {
 
 /**
  * データ: 変更履歴。取引の追加・取込・変更・削除と、締め・締めの解除・復元・パスワードの変更。
- * 新しい順に 200 件まで。履歴は画面から消せない。
+ * 新しい順に表示する。履歴は画面から消せない。
  */
 export function HistoryCard() {
+	const fiscalYear = useFiscalYear()
+	return <HistoryList key={fiscalYear} fiscalYear={fiscalYear} />
+}
+
+function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("history")
 	const errorMessage = useErrorMessage()
-	const fiscalYear = useFiscalYear()
-	const history = useHistory(fiscalYear)
+	const [input, setInput] = useState("")
+	const [query, setQuery] = useState("")
+	const [page, setPage] = useState(1)
+	const history = useHistory(fiscalYear, query, page)
+	const results = history.data
+	const pageCount = results ? Math.ceil(results.total / results.pageSize) : 0
+	const search = (value: string) => {
+		setQuery(value.trim())
+		setPage(1)
+	}
 	const locale = useSettingsStore((state) => state.locale)
 	const when = (at: string) =>
 		new Date(at).toLocaleString(locale === "ja" ? "ja-JP" : "en-US")
@@ -116,13 +132,49 @@ export function HistoryCard() {
 		<Card>
 			<CardHeader>
 				<CardTitle>{t("title")}</CardTitle>
-				<CardDescription>
-					{t("description", { year: fiscalYear ?? "" })}
-				</CardDescription>
+				{fiscalYear !== null && (
+					<CardDescription>
+						{t("description", { year: fiscalYear })}
+					</CardDescription>
+				)}
 			</CardHeader>
-			<CardContent>
+			<CardContent className="flex flex-col gap-3">
+				<form
+					className="flex flex-wrap items-center gap-2"
+					onSubmit={(event) => {
+						event.preventDefault()
+						search(input)
+					}}
+				>
+					<Input
+						type="search"
+						aria-label={t("searchLabel")}
+						placeholder={t("searchPlaceholder")}
+						className="min-w-40 flex-1 sm:max-w-sm"
+						value={input}
+						onChange={(event) => setInput(event.target.value)}
+					/>
+					<Button type="submit" variant="outline">
+						{t("search")}
+					</Button>
+					{(input || query) && (
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={() => {
+								setInput("")
+								search("")
+							}}
+						>
+							{t("clearSearch")}
+						</Button>
+					)}
+				</form>
 				{history.isPending && history.fetchStatus !== "idle" && (
-					<p className="flex items-center gap-2 text-muted-foreground text-sm">
+					<p
+						role="status"
+						className="flex items-center gap-2 text-muted-foreground text-sm"
+					>
 						<Loader2 aria-hidden="true" className="size-4 animate-spin" />
 						{t("loading")}
 					</p>
@@ -132,12 +184,18 @@ export function HistoryCard() {
 						{errorMessage(history.error)}
 					</p>
 				)}
-				{history.data?.length === 0 && (
-					<p className="text-muted-foreground text-sm">{t("empty")}</p>
+				{results?.total === 0 && (
+					<p role="status" className="text-muted-foreground text-sm">
+						{t(query ? "noMatches" : "empty")}
+					</p>
 				)}
-				{history.data && history.data.length > 0 && (
-					<ul className="max-h-96 overflow-y-auto rounded-lg border text-sm">
-						{history.data.map((entry) => (
+				{results && results.entries.length > 0 && (
+					<ul
+						key={results.page}
+						aria-busy={history.isPlaceholderData}
+						className="max-h-96 overflow-y-auto rounded-lg border text-sm"
+					>
+						{results.entries.map((entry) => (
 							<li
 								key={entry.id}
 								className="flex flex-col gap-0.5 border-b px-3 py-2 last:border-b-0 sm:flex-row sm:gap-4"
@@ -149,6 +207,41 @@ export function HistoryCard() {
 							</li>
 						))}
 					</ul>
+				)}
+				{results && pageCount > 0 && (
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<p role="status" className="num text-muted-foreground text-sm">
+							{t("pageStatus", {
+								total: results.total,
+								page: results.page,
+								pages: pageCount,
+							})}
+						</p>
+						{pageCount > 1 && (
+							<nav aria-label={t("pagination")} className="flex gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={history.isPlaceholderData || results.page <= 1}
+									onClick={() => setPage(results.page - 1)}
+								>
+									{t("previous")}
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={
+										history.isPlaceholderData || results.page >= pageCount
+									}
+									onClick={() => setPage(results.page + 1)}
+								>
+									{t("next")}
+								</Button>
+							</nav>
+						)}
+					</div>
 				)}
 			</CardContent>
 		</Card>

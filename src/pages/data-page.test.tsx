@@ -6,10 +6,15 @@ import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
 import type { AccountMapping, ImportPreview } from "@/features/data/import-api"
 import type { Account } from "@/features/master/master-api"
+import type {
+	HistoryEntry,
+	HistoryTransaction,
+} from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
 const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+let historyEntries: (HistoryEntry & { after: HistoryTransaction })[]
 
 vi.mock("@/lib/tauri", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/tauri")>()),
@@ -106,9 +111,13 @@ function renderPage() {
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
+	historyEntries = []
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
-		async (command: string, args?: { mapping?: AccountMapping[] }) => {
+		async (
+			command: string,
+			args?: { mapping?: AccountMapping[]; query?: string; page?: number }
+		) => {
 			switch (command) {
 				case "setup_status":
 					return { completed: true, fiscalYear: 2026 }
@@ -137,6 +146,18 @@ beforeEach(() => {
 					return { fiscalYear: 2014, imported: 3, duplicates: 0 }
 				case "export_report":
 					return "勘定科目.csv"
+				case "list_history": {
+					const entries = historyEntries.filter((entry) =>
+						entry.after.memo.includes(args?.query ?? "")
+					)
+					const page = args?.page ?? 1
+					return {
+						entries: entries.slice((page - 1) * 50, page * 50),
+						total: entries.length,
+						page,
+						pageSize: 50,
+					}
+				}
 				default:
 					throw new Error(`想定外のコマンド: ${command}`)
 			}
@@ -221,6 +242,58 @@ describe("データ", () => {
 		})
 		expect(
 			await within(item).findByText("「勘定科目.csv」を保存しました。")
+		).toBeInTheDocument()
+	})
+
+	it("変更履歴を50件ずつ表示し、検索すると1ページ目に戻る", async () => {
+		historyEntries = Array.from({ length: 52 }, (_, index) => ({
+			id: 52 - index,
+			entity: "transaction",
+			entityId: 52 - index,
+			action: "create",
+			fiscalYear: 2026,
+			before: null,
+			after: {
+				date: "2026-01-01",
+				memo: index === 51 ? "古い仕入れ" : "取引のメモ",
+				lines: [],
+			},
+			at: "2026-01-01T00:00:00Z",
+		}))
+		const user = userEvent.setup()
+		renderPage()
+
+		expect(
+			await screen.findByText("全 52 件 · 1 / 2 ページ")
+		).toBeInTheDocument()
+		expect(screen.getAllByText(/取引のメモ/)).toHaveLength(50)
+		expect(screen.queryByText(/古い仕入れ/)).toBeNull()
+		expect(screen.getByRole("button", { name: "前のページ" })).toBeDisabled()
+		await user.click(screen.getByRole("button", { name: "次のページ" }))
+		expect(
+			await screen.findByText("全 52 件 · 2 / 2 ページ")
+		).toBeInTheDocument()
+		expect(screen.getByText(/古い仕入れ/)).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "次のページ" })).toBeDisabled()
+
+		const search = screen.getByRole("searchbox", { name: "変更履歴を検索" })
+		await user.type(search, "古い仕入れ{Enter}")
+		expect(
+			await screen.findByText("全 1 件 · 1 / 1 ページ")
+		).toBeInTheDocument()
+		expect(mocks.callCommand).toHaveBeenCalledWith("list_history", {
+			fiscalYear: 2026,
+			page: 1,
+			query: "古い仕入れ",
+		})
+		await user.clear(search)
+		await user.type(search, "一致しない{Enter}")
+		expect(
+			await screen.findByText("検索に一致する履歴はありません。")
+		).toBeInTheDocument()
+		await user.click(screen.getByRole("button", { name: "クリア" }))
+		expect(
+			await screen.findByText("全 52 件 · 1 / 2 ページ")
 		).toBeInTheDocument()
 	})
 })
