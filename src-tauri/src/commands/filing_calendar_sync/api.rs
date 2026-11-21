@@ -1,4 +1,4 @@
-use super::{failed, Provider};
+use super::{failed, plan::Deadline, Provider};
 use crate::error::{AppError, AppResult, ErrorCode};
 use reqwest::{Client, RequestBuilder, Response, StatusCode, Url};
 use serde::Deserialize;
@@ -11,13 +11,6 @@ const OUTLOOK_MARKER: &str =
 const GOOGLE_ORIGIN: &str = "https://www.googleapis.com";
 const OUTLOOK_ORIGIN: &str = "https://graph.microsoft.com";
 const CALENDAR_NAME: &str = "帳日和 / Chobiyori";
-
-pub(super) struct Deadline {
-    pub key: String,
-    pub title: String,
-    pub date: String,
-    pub end: String,
-}
 
 struct Event {
     id: String,

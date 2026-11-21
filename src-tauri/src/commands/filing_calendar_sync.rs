@@ -1,16 +1,17 @@
-//! 申告期限だけを、許可されたカレンダーに反映する。
+//! 帳簿の期限を、許可されたカレンダーに反映する。
 
 mod api;
 mod oauth;
+mod plan;
 
 use self::{
-    api::{CalendarApi, Deadline},
+    api::CalendarApi,
     oauth::OAuth,
+    plan::{CalendarOptions, Deadline},
 };
-use crate::db::{filing, Database};
-use crate::domain::filing::add_days;
+use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::export::{filing_calendar, labels::Locale};
+use crate::export::labels::Locale;
 use crate::receipt::secret::{KeyringItem, SecretStore};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -148,6 +149,28 @@ pub async fn disconnect_filing_calendar(
 }
 
 #[tauri::command]
+pub fn filing_calendar_options(db: State<'_, Database>) -> AppResult<CalendarOptions> {
+    plan::options(&db.conn())
+}
+
+#[tauri::command]
+pub fn save_filing_calendar_options(
+    db: State<'_, Database>,
+    options: CalendarOptions,
+) -> AppResult<()> {
+    plan::save_options(&db.conn(), &options)
+}
+
+#[tauri::command]
+pub fn filing_calendar_plan(
+    db: State<'_, Database>,
+    today: String,
+    locale: Locale,
+) -> AppResult<Vec<Deadline>> {
+    plan::build(&db.conn(), &today, locale)
+}
+
+#[tauri::command]
 pub async fn sync_filing_calendar(
     db: State<'_, Database>,
     state: State<'_, CalendarSyncState>,
@@ -165,19 +188,7 @@ pub async fn sync_filing_calendar(
     if connection.paused {
         return Ok(());
     }
-    let deadlines = filing::upcoming_deadlines(&db.conn(), &today)?
-        .into_iter()
-        .filter(|notice| !notice.submitted && notice.days_left >= 0)
-        .map(|notice| {
-            let (kind, label) = filing_calendar::event_label(&notice, locale);
-            Ok(Deadline {
-                key: format!("{kind}-{}", notice.fiscal_year),
-                title: format!("{} ({})", label, notice.fiscal_year),
-                end: add_days(&notice.date, 1).ok_or_else(failed)?,
-                date: notice.date,
-            })
-        })
-        .collect::<AppResult<Vec<_>>>()?;
+    let deadlines = plan::build(&db.conn(), &today, locale)?;
     let calendar_key = format!("{}-{}", provider.credential().0, connection.account_key);
     let calendar_store = KeyringItem(&calendar_key);
     let calendar_id = calendar_store.get()?;

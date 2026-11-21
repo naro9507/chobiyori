@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { calendarPlanKey } from "@/features/filing/calendar-query"
 import type { TaxCategory } from "@/features/master/master-api"
 import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { callCommand } from "@/lib/tauri"
@@ -120,6 +121,7 @@ export function useInvalidateBooks() {
 			queryClient.invalidateQueries({ queryKey: ["books"] }),
 			queryClient.invalidateQueries({ queryKey: ["templates"] }),
 			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
+			queryClient.invalidateQueries({ queryKey: calendarPlanKey }),
 			queryClient.invalidateQueries({ queryKey: ["documents"] }),
 			queryClient.invalidateQueries({ queryKey: ["deposit-targets"] }),
 			queryClient.invalidateQueries({ queryKey: ["deposit-suggestions"] }),

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { calendarPlanKey } from "@/features/filing/calendar-query"
 import type { Side } from "@/features/journal/journal-api"
 import { callCommand } from "@/lib/tauri"
 
@@ -177,6 +178,7 @@ function useInvalidate() {
 	const queryClient = useQueryClient()
 	return () =>
 		Promise.all([
+			queryClient.invalidateQueries({ queryKey: calendarPlanKey }),
 			queryClient.invalidateQueries({ queryKey: key }),
 			queryClient.invalidateQueries({ queryKey: ["transactions"] }),
 			queryClient.invalidateQueries({ queryKey: ["trial-balance"] }),

@@ -197,6 +197,14 @@ const deadline: DeadlineNotice = {
 	done: 2,
 	total: 7,
 }
+const defaultCalendarOptions = {
+	invoiceDue: false,
+	estimateExpiry: false,
+	monthlyClose: false,
+	monthlyCloseDay: 10,
+	receivedBillDue: false,
+}
+let calendarOptions: typeof defaultCalendarOptions
 let notices: DeadlineNotice[]
 let scheduleResult: "ready" | "denied"
 let calendarResult: "saved" | "cancelled" | "noDeadlines"
@@ -210,6 +218,7 @@ let taxStatus: ConsumptionReport["taxStatus"]
 
 beforeEach(() => {
 	notices = [deadline]
+	calendarOptions = defaultCalendarOptions
 	scheduleResult = "ready"
 	calendarResult = "saved"
 	calendarConnections = new Set()
@@ -305,6 +314,26 @@ beforeEach(() => {
 					supported: true,
 					enabled: false,
 				}
+			case "filing_calendar_options":
+				return calendarOptions
+			case "save_filing_calendar_options":
+				calendarOptions = args.options
+				return null
+			case "filing_calendar_plan": {
+				const dates = notices
+					.filter((notice) => !notice.submitted && notice.daysLeft >= 0)
+					.map(({ kind, fiscalYear, date }) => ({
+						key: `${kind}-${fiscalYear}`,
+						date,
+					}))
+				if (calendarOptions.monthlyClose) {
+					dates.push({
+						key: "close-2026-12",
+						date: `2027-01-${calendarOptions.monthlyCloseDay}`,
+					})
+				}
+				return dates
+			}
 			case "filing_calendar_connection":
 				if (!calendarConnections.has(args.provider)) return "disconnected"
 				return pausedCalendars.has(args.provider) ? "paused" : "connected"
@@ -664,12 +693,12 @@ describe("インボイスの登録と期限", () => {
 		})
 		await act(async () => finishSync())
 		expect(
-			await google.findByText("申告期限の同期が完了しました。")
+			await google.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		await user.click(await outlook.findByRole("button", { name: "連携する" }))
 		expect(await outlook.findByText("連携済み")).toBeInTheDocument()
 		expect(
-			await outlook.findByText("申告期限の同期が完了しました。")
+			await outlook.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
@@ -696,14 +725,14 @@ describe("インボイスの登録と期限", () => {
 		const google = await providerSettings("Google カレンダー")
 		const outlook = await providerSettings("Outlook")
 		const googleSwitch = await google.findByRole("switch", {
-			name: "申告期限を同期",
+			name: "予定を同期",
 		})
 		expect(googleSwitch).toBeChecked()
 		expect(
-			await google.findByText("申告期限の同期が完了しました。")
+			await google.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		expect(
-			await outlook.findByText("申告期限の同期が完了しました。")
+			await outlook.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		const syncs = (provider: string) =>
 			mocks.callCommand.mock.calls.filter(
@@ -718,9 +747,7 @@ describe("インボイスの登録と期限", () => {
 		expect(googleSwitch).not.toBeChecked()
 		expect(google.getByText("連携済み")).toBeInTheDocument()
 		expect(google.getByRole("button", { name: "今すぐ同期" })).toBeDisabled()
-		expect(
-			outlook.getByRole("switch", { name: "申告期限を同期" })
-		).toBeChecked()
+		expect(outlook.getByRole("switch", { name: "予定を同期" })).toBeChecked()
 		expect(mocks.callCommand).toHaveBeenCalledWith(
 			"set_filing_calendar_sync_enabled",
 			{ provider: "google", enabled: false }
@@ -734,9 +761,9 @@ describe("インボイスの登録と期限", () => {
 			expect(syncs("outlook")).toBeGreaterThan(previousOutlookSyncs)
 		)
 		expect(syncs("google")).toBe(previousGoogleSyncs)
-		await user.click(reopened.getByRole("switch", { name: "申告期限を同期" }))
+		await user.click(reopened.getByRole("switch", { name: "予定を同期" }))
 		expect(
-			await reopened.findByText("申告期限の同期が完了しました。")
+			await reopened.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		expect(syncs("google")).toBeGreaterThan(previousGoogleSyncs)
 		expect(mocks.callCommand).toHaveBeenCalledWith(
@@ -746,6 +773,50 @@ describe("インボイスの登録と期限", () => {
 		expect(mocks.callCommand).not.toHaveBeenCalledWith(
 			"connect_filing_calendar",
 			{ provider: "google", locale: "ja" }
+		)
+	})
+
+	it("予定の種類と月締め日を保存すると、連携中のカレンダーに同期する", async () => {
+		calendarConnections.add("google")
+		const user = userEvent.setup()
+		renderAt("/settings?view=external")
+		const google = within(
+			await screen.findByRole("group", { name: "Google カレンダー" })
+		)
+		await google.findByText("カレンダーの同期が完了しました。")
+		const group = within(screen.getByRole("group", { name: "同期する予定" }))
+		const labels = [
+			"発行した請求書の入金期限",
+			"見積書の有効期限",
+			"月締めの予定",
+			"受け取った請求書の支払期限",
+		]
+		for (const label of labels) {
+			const checkbox = group.getByRole("checkbox", { name: label })
+			expect(checkbox).not.toBeChecked()
+			await user.click(checkbox)
+		}
+		await user.selectOptions(group.getByLabelText("月締めの予定日"), "15")
+		await user.click(group.getByRole("button", { name: "同期する予定を保存" }))
+		expect(await group.findByText("保存しました。")).toBeVisible()
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"save_filing_calendar_options",
+			{
+				options: {
+					invoiceDue: true,
+					estimateExpiry: true,
+					monthlyClose: true,
+					monthlyCloseDay: 15,
+					receivedBillDue: true,
+				},
+			}
+		)
+		await waitFor(() =>
+			expect(
+				mocks.callCommand.mock.calls.filter(
+					([command]) => command === "sync_filing_calendar"
+				)
+			).toHaveLength(2)
 		)
 	})
 
@@ -763,7 +834,7 @@ describe("インボイスの登録と期限", () => {
 		await user.click(google.getByRole("button", { name: "再連携する" }))
 		expect(await google.findByText("連携済み")).toBeInTheDocument()
 		expect(
-			await google.findByText("申告期限の同期が完了しました。")
+			await google.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 	})
 

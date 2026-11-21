@@ -16,7 +16,9 @@ import { isAppError } from "@/lib/errors"
 import { callCommand, isTauri } from "@/lib/tauri"
 import { useErrorMessage } from "@/lib/use-error-message"
 import { useSettingsStore } from "@/stores/settings-store"
-import { today, useFilingDeadlines } from "./filing-api"
+import { calendarPlanKey } from "./calendar-query"
+import { useFilingDay } from "./filing-api"
+import { FilingCalendarOptions } from "./filing-calendar-options"
 
 const providers = ["google", "outlook"] as const
 type Provider = (typeof providers)[number]
@@ -51,30 +53,32 @@ function useCalendarSync(provider: Provider, background = false) {
 	})
 	const syncEnabled = connection.data === "connected"
 	const connected = syncEnabled || connection.data === "paused"
-	const deadlines = useFilingDeadlines(syncEnabled, true)
-	const plan = deadlines.data
-		?.filter((notice) => !notice.submitted && notice.daysLeft >= 0)
-		.map(({ kind, fiscalYear, date, estimated }) => [
-			kind,
-			fiscalYear,
-			date,
-			estimated,
-		])
+	const day = useFilingDay()
+	const plan = useQuery({
+		queryKey: [...calendarPlanKey, day, locale],
+		queryFn: () =>
+			callCommand<{ key: string; date: string; title: string }[]>(
+				"filing_calendar_plan",
+				{ today: day, locale }
+			),
+		enabled: syncEnabled,
+		retry: false,
+	})
 	const sync = useQuery({
-		queryKey: [...syncKey(provider), locale, deadlines.day, plan],
+		queryKey: [...syncKey(provider), locale, day, plan.data],
 		queryFn: () =>
 			callCommand<null>("sync_filing_calendar", {
 				provider,
 				locale,
-				today: today(),
+				today: day,
 			}),
-		enabled: syncEnabled && deadlines.isSuccess,
+		enabled: syncEnabled && plan.isSuccess,
 		retry: false,
 		refetchOnWindowFocus: false,
 		refetchInterval: background && syncEnabled ? 15 * 60 * 1000 : false,
 		refetchIntervalInBackground: true,
 	})
-	return { connection, connected, syncEnabled, sync, deadlines }
+	return { connection, connected, syncEnabled, sync, plan }
 }
 
 function CalendarSyncWorker({ provider }: { provider: Provider }) {
@@ -95,7 +99,7 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	const errorMessage = useErrorMessage()
 	const locale = useSettingsStore((state) => state.locale)
 	const queryClient = useQueryClient()
-	const { connection, connected, syncEnabled, sync, deadlines } =
+	const { connection, connected, syncEnabled, sync, plan } =
 		useCalendarSync(provider)
 	const change = useMutation({
 		mutationFn: (operation: CalendarOperation) => {
@@ -126,7 +130,7 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	const error =
 		change.error ??
 		connection.error ??
-		(syncEnabled ? (deadlines.error ?? sync.error) : null)
+		(syncEnabled ? (plan.error ?? sync.error) : null)
 	const reauthorize =
 		syncEnabled && isAppError(sync.error) && sync.error.code === "calendarAuth"
 	const authorizing = change.isPending && change.variables === "connect"
@@ -143,7 +147,7 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 	if (updatingSync) syncStatus = t("calendarSyncUpdating")
 	else if (!syncEnabled) syncStatus = t("calendarSyncPaused")
 	else if (sync.isFetching) syncStatus = t("calendarSyncing")
-	else if (sync.isSuccess && deadlines.isSuccess)
+	else if (sync.isSuccess && plan.isSuccess)
 		syncStatus = t("calendarSyncCompleted")
 
 	return (
@@ -220,7 +224,7 @@ function CalendarConnectionSettings({ provider }: { provider: Provider }) {
 								!syncEnabled ||
 								change.isPending ||
 								sync.isFetching ||
-								!deadlines.isSuccess
+								!plan.isSuccess
 							}
 							onClick={() => void sync.refetch()}
 						>
@@ -258,10 +262,11 @@ export function FilingCalendarSyncSettings() {
 				<CardTitle>{t("calendarSyncTitle")}</CardTitle>
 				<CardDescription>{t("calendarSyncHint")}</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-3">
+			<CardContent className="space-y-4">
 				{providers.map((provider) => (
 					<CalendarConnectionSettings key={provider} provider={provider} />
 				))}
+				<FilingCalendarOptions />
 			</CardContent>
 		</Card>
 	)
