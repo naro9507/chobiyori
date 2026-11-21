@@ -200,7 +200,8 @@ shadcn/ui の部品は `src/components/ui/` に置き、自分たちのコード
 | Rust の crate | `Cargo.lock` と違う版を使わない | `--locked` を付けて実行 |
 | GitHub Actions | 版のタグではなくコミットハッシュで指定する。チェックアウトに認証情報を残さない | `.github/workflows/` |
 | 既知の脆弱性 | 毎日の定期監査と手動実行。失敗時は Issue で追跡する | `.github/workflows/security-audit.yml` |
-| 更新 | Dependabot が週に 1 回、公開から 7 日たった版への更新を提案する | `.github/dependabot.yml` |
+| 更新 | Renovate が公開から 7 日たった版への更新を提案する | `renovate.json` |
+| マージ | Renovate の PR だけ、CI が通ったら自動でマージする（要: Allow auto-merge と、ブランチ保護で `check` を必須にする） | `.github/workflows/auto-merge.yml` |
 
 依存を足すときの注意:
 

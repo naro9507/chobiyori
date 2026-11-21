@@ -14,7 +14,7 @@ permissions: {}
 jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: write
@@ -45,12 +45,12 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: steps.changesets.outputs.pending == 'true'
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         if: steps.changesets.outputs.pending == 'true'
 
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         if: steps.changesets.outputs.pending == 'true'
         with:
           toolchain: stable
@@ -65,11 +65,11 @@ jobs:
         with:
           version-script: pnpm release:prepare
           commit-message: リリースに向けてバージョンを更新する
-          pr-title: 帳日和のリリース準備
+          pr-title: リリース
           create-github-releases: false
           push-git-tags: false
 
-      - name: PR にタグ付けの手順と変更点を記載
+      - name: PR のタイトルと本文をタグ名にする
         if: steps.release.outputs.pr-number != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,16 +78,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version=$(node -p "require('./package.json').version")
-          {
-            echo "## 帳日和 v$version のリリース準備"
-            echo
-            echo "この PR を main にマージしたあと、マージ結果のコミットに \`v$version\` タグを付けてプッシュします。"
-            echo "[リリース手順](https://github.com/$GH_REPO/blob/main/docs/RELEASE.md#リリースの手順)"
-            echo
-            echo "## 変更点"
-            echo
-            node scripts/release-notes.mjs "v$version"
-          } > "$RUNNER_TEMP/release-pr.md"
+          tag="v$(node -p "require('./package.json').version")"
           gh api -X PATCH "repos/$GH_REPO/pulls/$PR_NUMBER" \
-            -F "body=@$RUNNER_TEMP/release-pr.md" --jq .html_url
+            -f "title=$tag" -f "body=$tag" --jq .html_url
