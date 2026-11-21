@@ -124,19 +124,19 @@ export function LockScreen({ status }: { status: BookStatus }) {
 					<CardTitle className="flex items-center gap-2">
 						<KeyRound aria-hidden="true" className="size-5" />
 						{t(
-							login?.linked && !choosing ? "linkedUnlockTitle" : `${mode}Title`
+							login?.enabled && !choosing ? "linkedUnlockTitle" : `${mode}Title`
 						)}
 					</CardTitle>
 					<CardDescription>
 						{t(
-							login?.linked && !choosing
+							login?.enabled && !choosing
 								? "linkedUnlockDescription"
 								: `${mode}Description`
 						)}
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					{!choosing && login?.linked && (
+					{!choosing && login?.enabled && (
 						<>
 							<DeviceUnlock status={login} autoStarted={deviceStarted} />
 							<p className="mb-3 text-muted-foreground text-sm">

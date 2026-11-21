@@ -122,10 +122,15 @@ pub async fn change_password(
     new: String,
 ) -> AppResult<()> {
     let _guard = login.0.lock().await;
+    let updated = if vault::validate_password_change(&db, &current, &new)?.is_some() {
+        super::account_login::prepare_password_change(&db, &current, &new).await?
+    } else {
+        None
+    };
     let _access = files.access.lock().unwrap_or_else(|p| p.into_inner());
     vault::change_password(&db, &current, &new)?;
-    if current != new {
-        super::account_login::discard_device_record();
+    if let Some(updated) = updated {
+        super::account_login::finish_password_change(&updated);
     }
     audit::event(&db.conn(), "books", "change_password", None, None)
 }
