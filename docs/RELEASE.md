@@ -31,7 +31,7 @@ Google のデスクトップ用クライアントシークレットは実行フ�
 
 利用者に伝える変更がある PR では、`pnpm changeset` を実行する。バージョンの上げ方（patch / minor / major）を選び、変更点を日本語で書いて、生成された `.changeset/*.md` を PR に含める。
 
-リリース準備時に Changesets が変更メモを集め、`CHANGELOG.md` と `package.json` を更新する。タグをプッシュすると、Actions がその版の変更点を GitHub のリリースノートに入れる。同じ内容がアプリの更新前後の案内と、設定画面の「変更履歴」に表示される。
+変更メモが `main` に入ると、Actions の「Prepare release PR」が Changesets を実行する。`CHANGELOG.md` と `package.json` を更新し、Cargo のバージョンもそろえた「帳日和のリリース準備」PR を作る。変更メモが増えると同じ PR を更新する。タグをプッシュすると、Actions がその版の変更点を GitHub のリリースノートに入れる。同じ内容がアプリの更新前後の案内と、設定画面の「変更履歴」に表示される。
 
 更新ファイルには署名が付いていて、アプリは公開鍵で確かめてから入れ替える。署名が合わない更新は適用しない。
 
@@ -62,18 +62,18 @@ pnpm tauri signer generate -w ~/.tauri/chobiyori-updater.key
 
 ## リリースの手順
 
+GitHub の Settings → Actions → General で「Allow GitHub Actions to create and approve pull requests」を有効にする。リリース準備 PR の CI に承認ボタンが出た場合は、リポジトリの書き込み権限を持つ人が「Approve workflows to run」を押す。
+
+1. 「帳日和のリリース準備」PR の変更点と CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
+2. マージ結果のコミットに、PR の `package.json` に入ったバージョンのタグを付けてプッシュする。タグをプッシュすると配布ビルドが始まる。
+
 ```bash
-pnpm release:prepare           # Changesets で版を上げ、Cargo の版もそろえる
-git diff
-git add -A -- .changeset CHANGELOG.md package.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-git commit -m "v0.2.7"         # package.json に入ったバージョンを使う
-git tag -a v0.2.7 -m "v0.2.7"
-git push --atomic origin main v0.2.7
+git fetch origin main
+git tag -a v0.2.7 <マージ結果のコミットSHA> -m "v0.2.7"
+git push origin v0.2.7
 ```
 
-1. Actions で「CI」と「Build installers」の結果を確認する。
-2. 「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開後、アプリが更新を検出できる。
-3. 公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。
+Actions で「CI」と「Build installers」の結果を確認する。「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。
 
 バージョンは必ず前より大きい番号にする。同じか小さい番号では、更新として扱われない。
 
