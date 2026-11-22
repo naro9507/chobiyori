@@ -13,9 +13,11 @@ import { useFiscalYear } from "@/features/journal/journal-api"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { AttachmentsPanel } from "@/features/ledger/attachments-panel"
+import { BookSearchForm } from "@/features/ledger/book-search-form"
 import { type BookColumn, BookTable } from "@/features/ledger/book-table"
 import { ExportButtons } from "@/features/ledger/export-buttons"
 import {
+	type BookSearch,
 	type ExportTarget,
 	type JournalBook,
 	type Ledger,
@@ -68,6 +70,21 @@ export function LedgersPage() {
 	const [chosenToMonth, setToMonth] = useState<number | null>(null)
 	const toMonth = chosenToMonth ?? currentMonth(fiscalYear)
 	const period: Period = { fiscalYear, fromMonth, toMonth }
+	const [savedSearch, setSavedSearch] = useState<{
+		year: number | null
+		filters?: BookSearch
+	}>()
+	const search =
+		(book === "journal" || book === "ledger") &&
+		savedSearch?.year === fiscalYear
+			? savedSearch?.filters
+			: undefined
+	const searchBooks = (filters?: BookSearch) =>
+		setSavedSearch({ year: fiscalYear, filters })
+	const showJournalEntry = (transactionId: number) => {
+		searchBooks({ transactionId })
+		setBook("journal")
+	}
 
 	// 元帳は全科目、出納帳は現金・預金（資産の口座）から選ぶ
 	const ledgerAccounts = masters.accounts
@@ -83,6 +100,11 @@ export function LedgersPage() {
 	const [partnerAccount, setPartnerAccount] = useState<number | null>(null)
 	const partnerAccountId = partnerAccount ?? partnerAccounts[0]?.id ?? null
 	const [ledgerAccount, setLedgerAccount] = useState<number | null>(null)
+	const showLedgerEntry = (accountId: number, transactionId: number) => {
+		setLedgerAccount(accountId)
+		searchBooks({ transactionId })
+		setBook("ledger")
+	}
 	const [cashAccount, setCashAccount] = useState<number | null>(null)
 	const ledgerId = ledgerAccount ?? ledgerAccounts[0]?.id ?? null
 	const cashId = cashAccount ?? cashAccounts[0]?.id ?? null
@@ -191,14 +213,32 @@ export function LedgersPage() {
 										setPartnerAccount
 									)}
 							</div>
-							<ExportButtons target={target} period={period} />
+							<ExportButtons target={target} period={period} search={search} />
 						</div>
+						{fiscalYear !== null &&
+							(book === "journal" || book === "ledger") && (
+								<BookSearchForm
+									key={`${fiscalYear}-${JSON.stringify(search)}`}
+									year={fiscalYear}
+									search={search}
+									onSearch={searchBooks}
+								/>
+							)}
 
 						<Tabs.Content value="journal" className="outline-none">
-							<JournalView period={period} />
+							<JournalView
+								period={period}
+								search={search}
+								showLedgerEntry={showLedgerEntry}
+							/>
 						</Tabs.Content>
 						<Tabs.Content value="ledger" className="outline-none">
-							<LedgerView period={period} accountId={ledgerId} />
+							<LedgerView
+								period={period}
+								accountId={ledgerId}
+								search={search}
+								showJournalEntry={showJournalEntry}
+							/>
 						</Tabs.Content>
 						<Tabs.Content value="cash" className="outline-none">
 							{cashAccounts.length === 0 ? (
@@ -245,11 +285,13 @@ function QueryState<T>({
 	query,
 	period,
 	isEmpty,
+	filtered,
 	children,
 }: {
 	query: { isPending: boolean; error: unknown; data: T | undefined }
 	period: Period
 	isEmpty: (data: T) => boolean
+	filtered?: boolean
 	children: (data: T) => ReactNode
 }) {
 	const t = useTranslations("ledgers")
@@ -269,7 +311,8 @@ function QueryState<T>({
 			</p>
 		)
 	}
-	if (isEmpty(query.data)) return <Message>{t("empty")}</Message>
+	if (isEmpty(query.data))
+		return <Message>{t(filtered ? "noBookMatches" : "empty")}</Message>
 	return children(query.data)
 }
 
@@ -334,17 +377,37 @@ function journalRows(
 	return rows
 }
 
-function JournalView({ period }: { period: Period }) {
+function JournalView({
+	period,
+	search,
+	showLedgerEntry,
+}: {
+	period: Period
+	search?: BookSearch
+	showLedgerEntry: (accountId: number, transactionId: number) => void
+}) {
 	const t = useTranslations("ledgers")
 	const journal = useTranslations("journal")
 	const masters = useJournalMasters()
-	const query = useJournalBook(period)
+	const query = useJournalBook(period, search)
 	const counts = useAttachmentCounts(period.fiscalYear).data
 	const [opened, setOpened] = useState<{ id: number; title: string } | null>(
 		null
 	)
-	const label = (id: number | null) =>
-		id === null ? "" : masters.accountLabel(id)
+	const accountCell = (id: number | null, transactionId: number) => {
+		if (id === null) return ""
+		const name = masters.accountLabel(id)
+		return (
+			<button
+				type="button"
+				className="cursor-pointer text-left underline-offset-4 hover:underline focus-visible:underline"
+				aria-label={t("findLedgerEntry", { account: name, id: transactionId })}
+				onClick={() => showLedgerEntry(id, transactionId)}
+			>
+				{name}
+			</button>
+		)
+	}
 	const columns: BookColumn<JournalRow>[] = [
 		{
 			id: "date",
@@ -353,9 +416,14 @@ function JournalView({ period }: { period: Period }) {
 			className: "w-16",
 		},
 		{
+			id: "transactionId",
+			header: t("transactionId"),
+			cell: (row) => (row.first ? row.transactionId : ""),
+		},
+		{
 			id: "debitAccount",
 			header: t("debitAccount"),
-			cell: (r) => label(r.debitAccount),
+			cell: (r) => accountCell(r.debitAccount, r.transactionId),
 		},
 		{
 			id: "debit",
@@ -366,7 +434,7 @@ function JournalView({ period }: { period: Period }) {
 		{
 			id: "creditAccount",
 			header: t("creditAccount"),
-			cell: (r) => label(r.creditAccount),
+			cell: (r) => accountCell(r.creditAccount, r.transactionId),
 		},
 		{
 			id: "credit",
@@ -425,6 +493,7 @@ function JournalView({ period }: { period: Period }) {
 			query={query}
 			period={period}
 			isEmpty={(b) => b.transactions.length === 0}
+			filtered={Boolean(search)}
 		>
 			{(book) => (
 				<div className="flex flex-col gap-4">
@@ -503,7 +572,8 @@ function ledgerLines(
 /** 元帳・出納帳・経費帳の列。出納帳は借方・貸方を入金・出金と書く。 */
 function useLedgerColumns(
 	period: Period,
-	cash: boolean
+	cash: boolean,
+	showJournalEntry?: (id: number) => void
 ): BookColumn<LedgerLine>[] {
 	const t = useTranslations("ledgers")
 	const masters = useJournalMasters()
@@ -543,8 +613,10 @@ function useLedgerColumns(
 				if (l.kind === "carried") return carriedLabel
 				if (l.kind === "total") return t("total")
 				if (l.kind !== "entry") return ""
-				const partner = masters.partnerLabel(l.row.partnerId)
-				return [l.row.memo, partner]
+				const partners = l.row.partnerIds?.map(masters.partnerLabel) ?? [
+					masters.partnerLabel(l.row.partnerId),
+				]
+				return [l.row.memo, ...partners]
 					.filter((p, i, all) => p !== "" && all.indexOf(p) === i)
 					.join(" / ")
 			},
@@ -582,6 +654,27 @@ function useLedgerColumns(
 				return ""
 			},
 		},
+		...(showJournalEntry
+			? [
+					{
+						id: "transactionId",
+						header: t("transactionId"),
+						cell: (line: LedgerLine) =>
+							line.kind === "entry" && (
+								<Button
+									variant="link"
+									size="sm"
+									onClick={() => showJournalEntry(line.row.transactionId)}
+									aria-label={t("findJournalEntry", {
+										id: line.row.transactionId,
+									})}
+								>
+									{line.row.transactionId}
+								</Button>
+							),
+					},
+				]
+			: []),
 	]
 }
 
@@ -596,14 +689,18 @@ function LedgerView({
 	period,
 	accountId,
 	cash = false,
+	search,
+	showJournalEntry,
 }: {
 	period: Period
 	accountId: number | null
 	cash?: boolean
+	search?: BookSearch
+	showJournalEntry?: (id: number) => void
 }) {
 	const t = useTranslations("ledgers")
-	const query = useLedger(period, accountId)
-	const columns = useLedgerColumns(period, cash)
+	const query = useLedger(period, accountId, search)
+	const columns = useLedgerColumns(period, cash, showJournalEntry)
 	if (accountId === null) return null
 	return (
 		<QueryState query={query} period={period} isEmpty={() => false}>
@@ -611,12 +708,18 @@ function LedgerView({
 				<div className="flex flex-col gap-2">
 					<BookTable
 						label={t(cash ? "cash" : "ledger")}
-						rows={ledgerLines(ledger, false, true)}
+						rows={
+							search
+								? ledgerLines(ledger, false, false).slice(1)
+								: ledgerLines(ledger, false, true)
+						}
 						columns={columns}
 						rowKey={(l) => l.key}
 						rowClassName={lineClass}
 					/>
-					{ledger.rows.length === 0 && <Message>{t("empty")}</Message>}
+					{ledger.rows.length === 0 && (
+						<Message>{t(search ? "noBookMatches" : "empty")}</Message>
+					)}
 				</div>
 			)}
 		</QueryState>

@@ -25,14 +25,26 @@ type ItemKey =
 export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 	const t = useTranslations("filing")
 	const locale = useSettingsStore((state) => state.locale)
-	const [paperYear, setPaperYear] = useState<number | null>(null)
+	const [choice, setChoice] = useState<{ year: number | null; mode: string }>()
 	const query = useIncomeGuide(fiscalYear)
 	if (!query.data) return <QueryMessage query={query} fiscalYear={fiscalYear} />
 	const guide = query.data
 	const blue65 = guide.filingType === "blue65"
-	const paper = blue65 && paperYear === fiscalYear
-	const deduction = paper ? guide.deductionOnPaper : guide.deduction
-	const income = paper ? guide.incomeOnPaper : guide.income
+	const qualifiedDeduction = guide.deductionWithQualifiedBooks
+	const mode =
+		blue65 && choice?.year === fiscalYear ? choice.mode : "configured"
+	const deduction =
+		mode === "paper"
+			? guide.deductionOnPaper
+			: mode === "qualified"
+				? (qualifiedDeduction ?? guide.deduction)
+				: guide.deduction
+	const income =
+		mode === "paper"
+			? guide.incomeOnPaper
+			: mode === "qualified"
+				? (guide.incomeWithQualifiedBooks ?? guide.income)
+				: guide.income
 
 	const rowsOf = (section: GuideSection): ValueRow[] =>
 		section.items.map((item) => {
@@ -68,19 +80,34 @@ export function IncomePanel({ fiscalYear }: { fiscalYear: number | null }) {
 			{blue65 && (
 				<Field
 					label={t("deductionTransferMode")}
-					hint={t("deductionTransferHint")}
+					hint={t(
+						guide.fiscalYear >= 2027
+							? "deductionTransferHint2027"
+							: "deductionTransferHint"
+					)}
 					className="max-w-md"
 				>
 					<NativeSelect
-						value={paper ? "paper" : "configured"}
+						value={mode}
 						onChange={(e) =>
-							setPaperYear(e.target.value === "paper" ? fiscalYear : null)
+							setChoice({ year: fiscalYear, mode: e.target.value })
 						}
 					>
 						<option value="configured">
 							{t("deductionTransferConfigured")}
 						</option>
-						<option value="paper">{t("deductionTransferPaper")}</option>
+						{qualifiedDeduction != null && (
+							<option value="qualified">
+								{t("deductionTransferQualified")}
+							</option>
+						)}
+						<option value="paper">
+							{t(
+								guide.paperDeductionCap === 100_000
+									? "deductionTransferPaper2027"
+									: "deductionTransferPaper"
+							)}
+						</option>
 					</NativeSelect>
 				</Field>
 			)}

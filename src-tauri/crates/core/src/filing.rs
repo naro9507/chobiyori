@@ -38,6 +38,8 @@ struct FilingData {
     special30: YearRange,
     deemed_purchase_rates: BTreeMap<String, i64>,
     paper_deduction_cap: i64,
+    paper_deduction_cap_from_2027: i64,
+    qualified_books_deduction_cap_from_2027: i64,
     invoice_start: String,
     transitional: Vec<Transitional>,
 }
@@ -455,9 +457,18 @@ pub fn standard_estimate(national_tax: i64, purchases: &[PurchaseAmount]) -> Sta
     }
 }
 
-/// 65 万円の控除を、e-Tax でも優良な電子帳簿でもなく出すときの上限（55 万円）。
-pub fn paper_deduction_cap() -> i64 {
-    data().paper_deduction_cap
+/// 2026年分までは優良な電子帳簿を使わず紙で出す場合。2027年分からは紙で出す場合。
+pub fn paper_deduction_cap(year: i64) -> i64 {
+    if year >= 2027 {
+        data().paper_deduction_cap_from_2027
+    } else {
+        data().paper_deduction_cap
+    }
+}
+
+/// 2027年分からの要件を満たした場合の、試算用の控除上限。
+pub fn qualified_books_deduction_cap(year: i64) -> Option<i64> {
+    (year >= 2027).then(|| data().qualified_books_deduction_cap_from_2027)
 }
 
 #[cfg(test)]
@@ -541,7 +552,10 @@ mod tests {
         assert_eq!(deemed_rate(1), Some(90));
         assert_eq!(deemed_rate(6), Some(40));
         assert_eq!(deemed_rate(7), None);
-        assert_eq!(paper_deduction_cap(), 550_000);
+        assert_eq!(paper_deduction_cap(2026), 550_000);
+        assert_eq!(paper_deduction_cap(2027), 100_000);
+        assert_eq!(qualified_books_deduction_cap(2026), None);
+        assert_eq!(qualified_books_deduction_cap(2027), Some(750_000));
     }
 
     #[test]

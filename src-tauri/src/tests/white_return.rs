@@ -66,6 +66,7 @@ fn white_deduction_flows_to_statement_guide_and_export() {
             fiscal_year: 2026,
             from_month: 1,
             to_month: 12,
+            search: None,
         },
     )
     .unwrap();

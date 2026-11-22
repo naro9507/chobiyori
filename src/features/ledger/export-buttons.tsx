@@ -4,6 +4,7 @@ import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
+	type BookSearch,
 	type CsvEncoding,
 	type ExportFormat,
 	type ExportTarget,
@@ -20,11 +21,13 @@ export function ExportButtons({
 	period,
 	formats = ["csv", "pdf"],
 	encoding = "utf8",
+	search,
 }: {
 	target: ExportTarget | null
 	period: Period
 	formats?: ExportFormat[]
 	encoding?: CsvEncoding
+	search?: BookSearch
 }) {
 	const t = useTranslations("ledgers")
 	const errorMessage = useErrorMessage()
@@ -43,6 +46,7 @@ export function ExportButtons({
 			fiscalYear,
 			fromMonth: period.fromMonth,
 			toMonth: period.toMonth,
+			...(search && { search }),
 		})
 	}
 

@@ -104,7 +104,10 @@ export type IncomeGuide = {
 	incomeBeforeDeduction: number
 	deduction: number
 	deductionOnPaper: number
+	paperDeductionCap?: number
 	incomeOnPaper: number
+	deductionWithQualifiedBooks?: number | null
+	incomeWithQualifiedBooks?: number | null
 	income: number
 	issueCount: number
 }

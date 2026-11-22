@@ -127,12 +127,10 @@ fn write_opening(conn: &Connection, year: i64, rows: &[OpeningRow]) -> AppResult
         .into_iter()
         .map(|a| (a.id, a.category))
         .collect();
-    conn.execute(
-        "DELETE FROM opening_balances WHERE fiscal_year = ?1",
-        [year],
-    )?;
+    let mut previous = read_opening(conn, year, false)?;
     let mut insert = conn.prepare(
-        "INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)",
+        "INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)
+         ON CONFLICT (fiscal_year, account_id) DO UPDATE SET amount = excluded.amount",
     )?;
     let mut seen = std::collections::HashSet::new();
     for (index, row) in rows.iter().enumerate() {
@@ -149,9 +147,14 @@ fn write_opening(conn: &Connection, year: i64, rows: &[OpeningRow]) -> AppResult
         if !seen.insert(row.account_id) {
             return Err(AppError::line(ErrorCode::DuplicateCode, index, "accountId"));
         }
-        if row.amount != 0 {
+        if row.amount != 0 && previous.remove(&row.account_id) != Some(row.amount) {
             insert.execute(params![year, row.account_id, row.amount])?;
         }
+    }
+    let mut remove =
+        conn.prepare("DELETE FROM opening_balances WHERE fiscal_year = ?1 AND account_id = ?2")?;
+    for account_id in previous.into_keys() {
+        remove.execute(params![year, account_id])?;
     }
     Ok(())
 }

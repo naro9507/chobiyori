@@ -243,6 +243,7 @@ pub fn journal(book: &JournalBook, names: &Names, ctx: &Context) -> Report {
                     c.map_or(Cell::Empty, |x| text(names.account_label(x.account_id))),
                     c.map_or(Cell::Empty, |x| Cell::Amount(x.amount)),
                     describe(memo),
+                    text(t.id.to_string()),
                 ],
                 group,
                 style: RowStyle::Normal,
@@ -256,6 +257,7 @@ pub fn journal(book: &JournalBook, names: &Names, ctx: &Context) -> Report {
             Cell::Amount(book.total_debit),
             Cell::Empty,
             Cell::Amount(book.total_credit),
+            Cell::Empty,
             Cell::Empty,
         ],
         group: usize::MAX,
@@ -272,7 +274,8 @@ pub fn journal(book: &JournalBook, names: &Names, ctx: &Context) -> Report {
                 column(&l::DEBIT_AMOUNT, locale, 12.0, ColumnKind::Sum),
                 column(&l::CREDIT_ACCOUNT, locale, 17.0, ColumnKind::Text),
                 column(&l::CREDIT_AMOUNT, locale, 12.0, ColumnKind::Sum),
-                column(&l::MEMO, locale, 35.0, ColumnKind::Text),
+                column(&l::MEMO, locale, 26.0, ColumnKind::Text),
+                column(&l::TRANSACTION_NO, locale, 9.0, ColumnKind::Text),
             ],
             rows,
             carry_label_column: Some(1),
@@ -319,13 +322,17 @@ pub fn ledgers(kind: LedgerKind, ledgers: &[Ledger], names: &Names, ctx: &Contex
             }];
             rows.extend(ledger.rows.iter().enumerate().map(|(i, r)| Row {
                 cells: vec![
-                    Cell::Date(r.date.clone()),
-                    text(names.counter(r.counter_account_id)),
-                    describe([r.memo.clone(), names.partner_name(r.partner_id)]),
-                    nonzero(r.debit),
-                    nonzero(r.credit),
-                    Cell::Amount(r.balance),
-                ],
+                        Cell::Date(r.date.clone()),
+                        text(names.counter(r.counter_account_id)),
+                        describe(
+                            std::iter::once(r.memo.clone()).chain(
+                                r.partner_ids.iter().map(|id| names.partner_name(Some(*id))),
+                            ),
+                        ),
+                        nonzero(r.debit),
+                        nonzero(r.credit),
+                        Cell::Amount(r.balance),
+                    ],
                 group: i + 1,
                 style: RowStyle::Normal,
             }));
@@ -341,7 +348,7 @@ pub fn ledgers(kind: LedgerKind, ledgers: &[Ledger], names: &Names, ctx: &Contex
                 group: usize::MAX,
                 style: RowStyle::Emphasis,
             });
-            Section {
+            let mut section = Section {
                 heading: Some(names.account_label(ledger.account_id)),
                 columns: vec![
                     column(&l::DATE, locale, 7.0, ColumnKind::Text),
@@ -353,7 +360,22 @@ pub fn ledgers(kind: LedgerKind, ledgers: &[Ledger], names: &Names, ctx: &Contex
                 ],
                 rows,
                 carry_label_column: Some(2),
+            };
+            if kind == LedgerKind::General {
+                section.columns[2].width -= 9.0;
+                section
+                    .columns
+                    .push(column(&l::TRANSACTION_NO, locale, 9.0, ColumnKind::Text));
+                for (index, row) in section.rows.iter_mut().enumerate() {
+                    row.cells.push(
+                        index
+                            .checked_sub(1)
+                            .and_then(|i| ledger.rows.get(i))
+                            .map_or(Cell::Empty, |entry| text(entry.transaction_id.to_string())),
+                    );
+                }
             }
+            section
         })
         .collect();
     report(title, ctx, sections)

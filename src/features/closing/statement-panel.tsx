@@ -190,7 +190,11 @@ function ProfitAndLoss({ data }: { data: StatementAmounts }) {
 			</dl>
 			<p className="text-muted-foreground text-xs">
 				{t(
-					data.filingType === "white" ? "whiteDeductionHint" : "deductionHint"
+					data.filingType === "white"
+						? "whiteDeductionHint"
+						: data.fiscalYear >= 2027
+							? "deductionHint2027"
+							: "deductionHint"
 				)}
 			</p>
 		</Section>
