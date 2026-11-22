@@ -250,196 +250,211 @@ export function FormatEditor({
 					</Field>
 				)}
 			</div>
-			<div className="grid gap-4 sm:grid-cols-3">
-				<Field label={t("encoding")}>
-					<NativeSelect
-						value={def.encoding}
-						onChange={(e) =>
-							setDef({ encoding: e.target.value as TextEncoding })
-						}
-					>
-						<option value="shiftJis">Shift_JIS</option>
-						<option value="utf8">UTF-8</option>
-					</NativeSelect>
-				</Field>
-				<Field label={t("delimiter")}>
-					<NativeSelect
-						value={def.delimiter}
-						onChange={(e) => setDef({ delimiter: e.target.value as Delimiter })}
-					>
-						<option value="comma">{t("delimiter_comma")}</option>
-						<option value="tab">{t("delimiter_tab")}</option>
-						<option value="semicolon">{t("delimiter_semicolon")}</option>
-					</NativeSelect>
-				</Field>
-				<Field label={t("firstRow")}>
-					<NativeSelect
-						value={rowMode}
-						onChange={(e) => {
-							setRowNumberEmpty(false)
-							setRows(e.target.value, leadingRows || 1)
-						}}
-					>
-						<option value="data">{t("startAtFirstRow")}</option>
-						<option value="skip">{t("skipLeadingRows")}</option>
-						{(opened || def.header.length > 0) && (
-							<option value="header">{t("matchHeaderRow")}</option>
-						)}
-					</NativeSelect>
-				</Field>
-				{rowMode !== "data" && (
-					<Field
-						label={t(rowMode === "header" ? "headerRow" : "skipRowCount")}
-						hint={t(
-							rowMode === "header" ? "headerRowHint" : "skipRowCountHint"
-						)}
-					>
-						<Input
-							inputMode="numeric"
-							value={rowNumberEmpty ? "" : leadingRows}
-							onBlur={() => setRowNumberEmpty(false)}
-							onChange={(e) => {
-								const value = e.target.value
-								setRowNumberEmpty(value === "")
-								const count = Number(value)
-								if (
-									/^[0-9]+$/.test(value) &&
-									count > 0 &&
-									Number.isSafeInteger(count)
-								) {
-									setRows(rowMode, count)
-								}
-							}}
-						/>
-					</Field>
-				)}
-				{(columns.includes("amount") ||
-					!columns.some(
-						(role) => role === "withdrawal" || role === "deposit"
-					)) && (
-					<Field label={t("sign")}>
+			{p && <PreviewSummary preview={p} showSample />}
+			<details
+				open={
+					!opened ||
+					Boolean(preview.error || p?.missingRoles.length || p?.errorCount) ||
+					undefined
+				}
+				className="rounded-lg border p-3"
+			>
+				<summary className="cursor-pointer font-medium text-sm">
+					{t("formatAdvanced")}
+				</summary>
+				<div className="grid gap-4 sm:grid-cols-3">
+					<Field label={t("encoding")}>
 						<NativeSelect
-							value={def.sign}
-							onChange={(e) => setDef({ sign: e.target.value as AmountSign })}
+							value={def.encoding}
+							onChange={(e) =>
+								setDef({ encoding: e.target.value as TextEncoding })
+							}
 						>
-							<option value="spendPositive">{t("sign_spendPositive")}</option>
-							<option value="spendNegative">{t("sign_spendNegative")}</option>
+							<option value="shiftJis">Shift_JIS</option>
+							<option value="utf8">UTF-8</option>
 						</NativeSelect>
 					</Field>
-				)}
-			</div>
-			<LabeledCheckbox
-				label={t("skipUnreadableDates")}
-				checked={def.skipUnreadableDates}
-				onChange={(e) => setDef({ skipUnreadableDates: e.target.checked })}
-			/>
-
-			<div className="flex flex-col gap-2">
-				<p className="font-medium text-sm">{t("rolesTitle")}</p>
-				<p className="text-muted-foreground text-xs">{t("rolesHint")}</p>
-				{preview.error && (
-					<p role="alert" className="text-destructive text-sm">
-						{errorMessage(preview.error)}
-					</p>
-				)}
-				{def.headerRow > 0 && p && header.length === 0 && (
-					<p role="alert" className="text-destructive text-sm">
-						{t("headerRowMissing")}
-					</p>
-				)}
-				<div className="overflow-x-auto rounded-lg border">
-					<table className="w-full text-xs">
-						<caption className="sr-only">{t("previewLabel")}</caption>
-						<thead className="border-b bg-muted/50">
-							<tr>
-								{opened && (
-									<th
-										scope="col"
-										className="w-10 px-2 py-1.5 text-left font-medium"
-									>
-										{t("rowNumber")}
-									</th>
-								)}
-								{columnIndexes.map((i) => (
-									<th
-										key={`column-${i}`}
-										scope="col"
-										className="px-2 py-1.5 text-left font-medium"
-									>
-										<p className="mb-1.5">
-											{t("columnNumber", { column: i + 1 })}
-										</p>
-										{!opened && def.header[i] && (
-											<p className="mb-1.5 text-muted-foreground">
-												{def.header[i]}
-											</p>
-										)}
-										<NativeSelect
-											aria-label={t("roleOf", { column: i + 1 })}
-											value={columns[i]}
-											onChange={(e) => setRole(i, e.target.value as ColumnRole)}
-											className="h-8 min-w-28 text-xs"
-										>
-											{columnRoles.map((role) => (
-												<option key={role} value={role}>
-													{t(`role_${role}`)}
-												</option>
-											))}
-										</NativeSelect>
-									</th>
-								))}
-							</tr>
-						</thead>
-						<tbody>
-							{previewRows.map(({ cells, row }) => (
-								<tr
-									key={row}
-									className={
-										row === def.headerRow
-											? "bg-accent/60 font-bold"
-											: row <= leadingRows
-												? "text-muted-foreground"
-												: ""
+					<Field label={t("delimiter")}>
+						<NativeSelect
+							value={def.delimiter}
+							onChange={(e) =>
+								setDef({ delimiter: e.target.value as Delimiter })
+							}
+						>
+							<option value="comma">{t("delimiter_comma")}</option>
+							<option value="tab">{t("delimiter_tab")}</option>
+							<option value="semicolon">{t("delimiter_semicolon")}</option>
+						</NativeSelect>
+					</Field>
+					<Field label={t("firstRow")}>
+						<NativeSelect
+							value={rowMode}
+							onChange={(e) => {
+								setRowNumberEmpty(false)
+								setRows(e.target.value, leadingRows || 1)
+							}}
+						>
+							<option value="data">{t("startAtFirstRow")}</option>
+							<option value="skip">{t("skipLeadingRows")}</option>
+							{(opened || def.header.length > 0) && (
+								<option value="header">{t("matchHeaderRow")}</option>
+							)}
+						</NativeSelect>
+					</Field>
+					{rowMode !== "data" && (
+						<Field
+							label={t(rowMode === "header" ? "headerRow" : "skipRowCount")}
+							hint={t(
+								rowMode === "header" ? "headerRowHint" : "skipRowCountHint"
+							)}
+						>
+							<Input
+								inputMode="numeric"
+								value={rowNumberEmpty ? "" : leadingRows}
+								onBlur={() => setRowNumberEmpty(false)}
+								onChange={(e) => {
+									const value = e.target.value
+									setRowNumberEmpty(value === "")
+									const count = Number(value)
+									if (
+										/^[0-9]+$/.test(value) &&
+										count > 0 &&
+										Number.isSafeInteger(count)
+									) {
+										setRows(rowMode, count)
 									}
-								>
-									<td className="num px-2 py-1">{row}</td>
-									{columnIndexes.map((i) => (
-										<td
-											key={`column-${i}`}
-											className="max-w-48 truncate px-2 py-1"
+								}}
+							/>
+						</Field>
+					)}
+					{(columns.includes("amount") ||
+						!columns.some(
+							(role) => role === "withdrawal" || role === "deposit"
+						)) && (
+						<Field label={t("sign")}>
+							<NativeSelect
+								value={def.sign}
+								onChange={(e) => setDef({ sign: e.target.value as AmountSign })}
+							>
+								<option value="spendPositive">{t("sign_spendPositive")}</option>
+								<option value="spendNegative">{t("sign_spendNegative")}</option>
+							</NativeSelect>
+						</Field>
+					)}
+				</div>
+				<LabeledCheckbox
+					label={t("skipUnreadableDates")}
+					checked={def.skipUnreadableDates}
+					onChange={(e) => setDef({ skipUnreadableDates: e.target.checked })}
+				/>
+
+				<div className="flex flex-col gap-2">
+					<p className="font-medium text-sm">{t("rolesTitle")}</p>
+					<p className="text-muted-foreground text-xs">{t("rolesHint")}</p>
+					{preview.error && (
+						<p role="alert" className="text-destructive text-sm">
+							{errorMessage(preview.error)}
+						</p>
+					)}
+					{def.headerRow > 0 && p && header.length === 0 && (
+						<p role="alert" className="text-destructive text-sm">
+							{t("headerRowMissing")}
+						</p>
+					)}
+					<div className="overflow-x-auto rounded-lg border">
+						<table className="w-full text-xs">
+							<caption className="sr-only">{t("previewLabel")}</caption>
+							<thead className="border-b bg-muted/50">
+								<tr>
+									{opened && (
+										<th
+											scope="col"
+											className="w-10 px-2 py-1.5 text-left font-medium"
 										>
-											{cells[i] ?? ""}
-										</td>
+											{t("rowNumber")}
+										</th>
+									)}
+									{columnIndexes.map((i) => (
+										<th
+											key={`column-${i}`}
+											scope="col"
+											className="px-2 py-1.5 text-left font-medium"
+										>
+											<p className="mb-1.5">
+												{t("columnNumber", { column: i + 1 })}
+											</p>
+											{!opened && def.header[i] && (
+												<p className="mb-1.5 text-muted-foreground">
+													{def.header[i]}
+												</p>
+											)}
+											<NativeSelect
+												aria-label={t("roleOf", { column: i + 1 })}
+												value={columns[i]}
+												onChange={(e) =>
+													setRole(i, e.target.value as ColumnRole)
+												}
+												className="h-8 min-w-28 text-xs"
+											>
+												{columnRoles.map((role) => (
+													<option key={role} value={role}>
+														{t(`role_${role}`)}
+													</option>
+												))}
+											</NativeSelect>
+										</th>
 									))}
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-				{!opened && (
-					<div className="flex flex-wrap gap-2">
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => setDef({ columns: [...columns, "ignore"] })}
-						>
-							<Plus aria-hidden="true" />
-							{t("addFormatColumn")}
-						</Button>
-						{width > Math.max(3, def.header.length) && (
+							</thead>
+							<tbody>
+								{previewRows.map(({ cells, row }) => (
+									<tr
+										key={row}
+										className={
+											row === def.headerRow
+												? "bg-accent/60 font-bold"
+												: row <= leadingRows
+													? "text-muted-foreground"
+													: ""
+										}
+									>
+										<td className="num px-2 py-1">{row}</td>
+										{columnIndexes.map((i) => (
+											<td
+												key={`column-${i}`}
+												className="max-w-48 truncate px-2 py-1"
+											>
+												{cells[i] ?? ""}
+											</td>
+										))}
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+					{!opened && (
+						<div className="flex flex-wrap gap-2">
 							<Button
 								size="sm"
-								variant="ghost"
-								onClick={() => setDef({ columns: columns.slice(0, -1) })}
+								variant="outline"
+								onClick={() => setDef({ columns: [...columns, "ignore"] })}
 							>
-								{t("removeLastFormatColumn")}
+								<Plus aria-hidden="true" />
+								{t("addFormatColumn")}
 							</Button>
-						)}
-					</div>
-				)}
-			</div>
-
-			{p && <PreviewSummary preview={p} />}
+							{width > Math.max(3, def.header.length) && (
+								<Button
+									size="sm"
+									variant="ghost"
+									onClick={() => setDef({ columns: columns.slice(0, -1) })}
+								>
+									{t("removeLastFormatColumn")}
+								</Button>
+							)}
+						</div>
+					)}
+				</div>
+			</details>
 
 			{save.error && (
 				<p role="alert" className="text-destructive text-sm">

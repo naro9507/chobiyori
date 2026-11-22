@@ -351,6 +351,7 @@ describe("帳簿", () => {
 		await user.click(screen.getByRole("button", { name: "PDF で保存" }))
 
 		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			receipt: expect.any(String),
 			request: {
 				target: { kind: "journal" },
 				format: "pdf",

@@ -7,6 +7,7 @@ export type BookStatus = {
 	/** notCreated: 初めての起動 / plain: 前の版の暗号化していない帳簿 / encrypted: パスワードで開く */
 	state: "notCreated" | "plain" | "encrypted"
 	unlocked: boolean
+	hasRecoveryCode?: boolean
 	/** パスワード・復旧コードを受け付けるまでの秒数。制限していなければ 0 */
 	retryAfter: number
 	/** 待たずに試せる残りの回数 */
@@ -48,10 +49,12 @@ export function useOpenBooks() {
 }
 
 export function useIssueRecoveryCode() {
+	const client = useQueryClient()
 	return useMutation({
 		gcTime: 0,
 		mutationFn: (current: string) =>
 			callCommand<string>("issue_recovery_code", { current }),
+		onSuccess: () => client.invalidateQueries({ queryKey: statusKey }),
 	})
 }
 

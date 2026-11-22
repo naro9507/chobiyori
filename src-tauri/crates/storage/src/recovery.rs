@@ -17,6 +17,10 @@ fn record_path(path: &Path) -> PathBuf {
     path.with_extension("db.recovery")
 }
 
+pub fn is_issued(path: &Path) -> bool {
+    record_path(path).is_file()
+}
+
 fn invalid_code() -> AppError {
     AppError::field(ErrorCode::InvalidRecoveryCode, "recoveryCode")
 }

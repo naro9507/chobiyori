@@ -346,7 +346,9 @@ describe("書類の画面", () => {
 
 		await user.selectOptions(screen.getByLabelText("状態で絞り込む"), "paid")
 		expect(screen.queryByRole("table")).not.toBeInTheDocument()
-		expect(screen.getByText(/書類はまだありません/)).toBeInTheDocument()
+		expect(
+			screen.getByText(/この条件に合う書類はありません/)
+		).toBeInTheDocument()
 	})
 
 	it("請求書の下書きを、税抜きの単価と数量で保存する", async () => {
@@ -376,4 +378,67 @@ describe("書類の画面", () => {
 			],
 		})
 	})
+})
+
+it("初回入金では入金した口座を明示的に選ぶ", async () => {
+	const original = mocks.callCommand.getMockImplementation()
+	const doc = { ...issued, transactionId: 7 }
+	mocks.callCommand.mockImplementation(async (cmd, args) => {
+		if (cmd === "get_document") return doc
+		if (cmd === "list_documents") return [doc]
+		if (cmd === "list_accounts")
+			return ["104", "W001"].map((code, i) => ({
+				id: i + 1,
+				code,
+				nameJa: i ? "架空銀行" : "普通預金",
+				nameEn: "",
+				category: "asset",
+				isActive: true,
+				isPaymentAccount: true,
+			}))
+		if (cmd === "list_partners" || cmd === "list_sub_accounts") return []
+		return original?.(cmd, args)
+	})
+	const user = userEvent.setup()
+	renderPage()
+	await user.click(await screen.findByRole("button", { name: /INV-2026-0001/ }))
+	await user.click(
+		await screen.findByRole("button", { name: "入金を記録する" })
+	)
+	const form = within(
+		await screen.findByRole("form", { name: "入金を記録する" })
+	)
+	const account = await form.findByLabelText("入金した口座")
+	const save = form.getByRole("button", { name: "入金を記録する" })
+	expect(account).toHaveValue("")
+	expect(save).toBeDisabled()
+	await user.selectOptions(account, "W001 架空銀行")
+	expect(save).toBeEnabled()
+	await user.click(save)
+	expect(
+		mocks.callCommand.mock.calls.some(
+			([, args]) => args?.input?.accountId === 2
+		)
+	).toBe(true)
+})
+it("単価の空欄を示し、一覧に戻るときは破棄を選べる", async () => {
+	const user = userEvent.setup()
+	renderPage()
+	await user.click(await screen.findByRole("button", { name: "請求書" }))
+	await user.type(await screen.findByLabelText(/^品名/), "制作")
+	await user.click(screen.getByRole("button", { name: "下書きを保存" }))
+	expect(screen.getByLabelText(/^単価/)).toHaveAttribute("aria-invalid", "true")
+	expect(
+		mocks.callCommand.mock.calls.some(([cmd]) => cmd === "create_document")
+	).toBe(false)
+	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
+	try {
+		await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
+		expect(screen.getByLabelText(/^品名/)).toHaveValue("制作")
+		confirm.mockReturnValue(true)
+		await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
+		expect(await screen.findByRole("button", { name: "請求書" })).toBeVisible()
+	} finally {
+		confirm.mockRestore()
+	}
 })

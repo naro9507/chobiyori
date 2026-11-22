@@ -100,6 +100,12 @@ export const helpArticles: readonly HelpArticle[] = [
 		feature: "allocation",
 	},
 	{
+		id: "bankFee",
+		section: "examples",
+		body: "bankFeeBody",
+		path: "/transactions",
+	},
+	{
 		id: "supplies",
 		section: "examples",
 		body: "suppliesBody",

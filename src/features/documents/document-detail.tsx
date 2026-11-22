@@ -456,11 +456,9 @@ function PaymentPanel({
 	const [date, setDate] = useState(localToday)
 	const [amount, setAmount] = useState(String(d.totals.total - d.paid))
 	const [accountId, setAccountId] = useState<number | null>(null)
-	const preferred =
-		d.lastPaymentAccountId == null
-			? (accounts.find((a) => a.code === "104")?.id ?? accounts[0]?.id)
-			: accounts.find((a) => a.id === d.lastPaymentAccountId)?.id
-	const account = accountId ?? preferred
+	const account = accounts.find(
+		(a) => a.id === (accountId ?? d.lastPaymentAccountId)
+	)?.id
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()

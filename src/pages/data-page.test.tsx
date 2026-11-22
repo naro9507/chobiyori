@@ -303,6 +303,7 @@ describe("データ", () => {
 		).not.toBeInTheDocument()
 		await user.click(within(item).getByRole("button", { name: "CSV で保存" }))
 		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			receipt: expect.any(String),
 			request: expect.objectContaining({
 				target: { kind: "accounts" },
 				format: "csv",

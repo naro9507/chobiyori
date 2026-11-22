@@ -388,3 +388,26 @@ it("年度を切り替えると前の年度の未保存の棚卸高を引き継�
 		closingAmount: 9000,
 	})
 })
+
+it("読めない残高はその場で直すまで保存も確定もできない", async () => {
+	const user = userEvent.setup()
+	renderPage()
+	await user.click(
+		await screen.findByRole("button", { name: "期首残高を開く" })
+	)
+	const field = await screen.findByLabelText(
+		"104 普通預金 の年度のはじめの残高"
+	)
+	await user.type(field, "1万円")
+	expect(field).toHaveValue("1万円")
+	expect(field).toHaveAttribute("aria-invalid", "true")
+	expect(screen.getByRole("button", { name: "保存する" })).toBeDisabled()
+	expect(screen.getByRole("button", { name: "確定する" })).toBeDisabled()
+	expect(
+		screen.queryByText("資産の合計と、負債・元入金の合計がそろっています")
+	).toBeNull()
+	await user.clear(field)
+	await user.type(field, "10,000")
+	expect(field).not.toHaveAttribute("aria-invalid", "true")
+	expect(screen.getByRole("button", { name: "保存する" })).toBeEnabled()
+})

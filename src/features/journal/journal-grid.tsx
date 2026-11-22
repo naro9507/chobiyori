@@ -283,7 +283,8 @@ type GridForm = {
  * 1 行の入力。Enter で次の欄へ進み、行の最後の欄で Enter を押すと保存する。
  * `transaction` を渡すとその取引を変更し、渡さなければ新しい行になる。
  */
-function GridEditor({
+export function GridEditor({
+	accountLabels,
 	fiscalYear,
 	month,
 	transaction,
@@ -294,6 +295,7 @@ function GridEditor({
 	fiscalYear: number | null
 	month: number
 	transaction?: Transaction
+	accountLabels?: [string, string]
 	focusOnMount?: boolean
 	carryOver?: boolean
 	onDone?: () => void
@@ -302,6 +304,11 @@ function GridEditor({
 	const errorMessage = useJournalErrorMessage(fiscalYear)
 	const save = useSaveTransaction(fiscalYear)
 	const masters = useJournalMasters(keepOf(transaction))
+	const accountChoices = accountLabels
+		? masters.accountItems.map((item) =>
+				item.code === "301" ? { ...item, label: t("personalPayment") } : item
+			)
+		: masters.accountItems
 	const rowRef = useRef<HTMLTableRowElement>(null)
 	useEffect(() => {
 		if (focusOnMount) rowRef.current?.querySelector("input")?.focus()
@@ -452,8 +459,8 @@ function GridEditor({
 				</td>
 				<td className="min-w-36 px-2 py-1.5 xl:min-w-44">
 					<MasterCombobox
-						aria-label={label(t("debit"))}
-						items={masters.accountItems}
+						aria-label={label(accountLabels?.[0] ?? t("debit"))}
+						items={accountChoices}
 						value={form.debitId}
 						onChange={(debitId) => setForm({ debitId })}
 						aria-invalid={invalid("accountId", 0) || undefined}
@@ -462,8 +469,8 @@ function GridEditor({
 				</td>
 				<td className="min-w-36 px-2 py-1.5 xl:min-w-44">
 					<MasterCombobox
-						aria-label={label(t("credit"))}
-						items={masters.accountItems}
+						aria-label={label(accountLabels?.[1] ?? t("credit"))}
+						items={accountChoices}
 						value={form.creditId}
 						onChange={(creditId) => setForm({ creditId })}
 						aria-invalid={invalid("accountId", 1) || undefined}

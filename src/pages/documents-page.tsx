@@ -1,5 +1,6 @@
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import { ArrowLeft, Loader2, Plus } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,10 +47,11 @@ const statusFilters: (DisplayStatus | "all")[] = [
 
 /** 請求書・見積書・納品書・領収書。一覧・作成（プレビュー付き）・送る・記帳する。 */
 export function DocumentsPage() {
+	const { documentId } = useSearch({ strict: false })
 	const revision = useEntryIntent((s) => s.invoice)
 	return (
 		<DocumentsView
-			key={revision}
+			key={`${revision}-${documentId ?? "list"}`}
 			newInvoice={useEntryIntent.getState().invoicePending}
 		/>
 	)
@@ -60,12 +62,22 @@ function DocumentsView({ newInvoice }: { newInvoice: boolean }) {
 	useEffect(() => {
 		useEntryIntent.setState({ invoicePending: false })
 	}, [])
+	const { documentId } = useSearch({ strict: false })
 	const [view, setView] = useState<View>(
-		newInvoice ? { mode: "new", kind: "invoice" } : { mode: "list" }
+		newInvoice
+			? { mode: "new", kind: "invoice" }
+			: documentId
+				? { mode: "open", id: documentId }
+				: { mode: "list" }
 	)
 	const documents = useDocuments()
 	const open = (d: DocumentRecord) => setView({ mode: "open", id: d.id })
-	const back = () => setView({ mode: "list" })
+	const navigate = useNavigate()
+	const back = () => {
+		setView({ mode: "list" })
+		if (documentId)
+			void navigate({ to: "/documents", search: {}, replace: true })
+	}
 
 	if (view.mode === "new") {
 		return (
@@ -150,17 +162,24 @@ function NewDocument({
 }) {
 	const t = useTranslations("documents")
 	const errorMessage = useErrorMessage()
+	const dirty = useRef(false)
+	const leave = () => {
+		if (!dirty.current || window.confirm(t("discardEdits"))) onBack()
+	}
 	const defaults = useNewDocumentDefaults(kind)
 	return (
 		<Card>
 			<CardHeader>
-				<BackButton onBack={onBack} />
+				<BackButton onBack={leave} />
 				<CardTitle>{t("newTitle", { kind: t(`kind_${kind}`) })}</CardTitle>
 				<CardDescription>{t("taxNote")}</CardDescription>
 			</CardHeader>
 			<CardContent>
 				{defaults.data ? (
 					<DocumentEditor
+						onDirtyChange={(v) => {
+							dirty.current = v
+						}}
 						kind={kind}
 						defaults={defaults.data}
 						onSaved={onOpen}
@@ -189,19 +208,26 @@ function OpenDocument({
 	onOpen: (d: DocumentRecord) => void
 }) {
 	const t = useTranslations("documents")
+	const dirty = useRef(false)
+	const leave = () => {
+		if (!dirty.current || window.confirm(t("discardEdits"))) onBack()
+	}
 	const title = d.number
 		? `${t(`kind_${d.kind}`)} ${d.number}`
 		: t("draftTitle", { kind: t(`kind_${d.kind}`) })
 	return (
 		<Card>
 			<CardHeader>
-				<BackButton onBack={onBack} />
+				<BackButton onBack={leave} />
 				<CardTitle>{title}</CardTitle>
 				<CardDescription>{t("taxNote")}</CardDescription>
 			</CardHeader>
 			<CardContent>
 				{d.status === "draft" ? (
 					<DocumentEditor
+						onDirtyChange={(v) => {
+							dirty.current = v
+						}}
 						// 別の書類を開いたら、フォームを作り直す
 						key={d.id}
 						kind={d.kind}
@@ -298,7 +324,22 @@ function DocumentList({
 						</p>
 					) : rows.length === 0 ? (
 						<p className="py-6 text-center text-muted-foreground text-sm">
-							{documents.isPending ? t("loading") : t("empty")}
+							{documents.isPending
+								? t("loading")
+								: documents.data?.length
+									? t("filterEmpty")
+									: t("empty")}
+							{Boolean(documents.data?.length) && (
+								<Button
+									variant="link"
+									onClick={() => {
+										setKind("all")
+										setStatus("all")
+									}}
+								>
+									{t("clearFilters")}
+								</Button>
+							)}
 						</p>
 					) : (
 						<div className="overflow-x-auto rounded-lg border">

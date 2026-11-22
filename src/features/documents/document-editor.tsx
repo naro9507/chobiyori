@@ -49,7 +49,7 @@ function parsePrice(text: string) {
 		.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
 		.replace(/[,，¥￥円\s]/g, "")
 		.replace(/^[▲△ー−]/, "-")
-	if (normalized === "") return 0
+	if (normalized === "") return Number.NaN
 	return /^-?\d+$/.test(normalized) ? Number(normalized) : Number.NaN
 }
 
@@ -107,6 +107,7 @@ export function DocumentEditor({
 	kind,
 	document,
 	defaults,
+	onDirtyChange,
 	onSaved,
 	onIssued,
 	onDeleted,
@@ -114,6 +115,7 @@ export function DocumentEditor({
 	kind: DocumentKind
 	document?: DocumentRecord
 	defaults: { issueDate: string; dueDate: string | null; notes: string }
+	onDirtyChange: (dirty: boolean) => void
 	onSaved: (d: DocumentRecord) => void
 	onIssued: (d: DocumentRecord) => void
 	onDeleted: () => void
@@ -139,20 +141,39 @@ export function DocumentEditor({
 					lines: [{ ...emptyLine }],
 				}
 	)
+	const [original, setOriginal] = useState(form)
+	useEffect(() => {
+		onDirtyChange(form !== original)
+	}, [form, original, onDirtyChange])
+	const [attempted, setAttempted] = useState(false)
+	const [issuing, setIssuing] = useState(false)
+	const [savedId, setSavedId] = useState(document?.id ?? null)
+	const priceInvalid = (line: LineForm) =>
+		!Number.isSafeInteger(parsePrice(line.unitPrice))
 	const input = toInput(form)
 	const debouncedInput = useDebounced(input)
 	// 品名を 1 つも入れていないうちは、紙面を作らない（入力前からエラーを出さない）
 	const started = debouncedInput.lines.some((l) => l.name.trim() !== "")
-	const preview = usePreview(null, started ? debouncedInput : null)
+	const preview = usePreview(
+		null,
+		started &&
+			debouncedInput.lines.every((l) => Number.isSafeInteger(l.unitPrice))
+			? debouncedInput
+			: null
+	)
 	// 登録番号なしの様式（免税の年など）は消費税を足さないので、税率の欄を出さない
 	const taxMode = useDocumentTaxMode(form.issueDate).data
 	const withTax = taxMode !== "simple"
 	const error = save.error ?? action.error
 	const errorFor = (field: string) => {
+		if (issuing && field === "recipientName" && !form.recipientName.trim())
+			return t("needRecipient")
 		const e = fieldError(error, field)
 		return e ? errorMessage(e) : undefined
 	}
 	const lineErrorFor = (index: number, field: string) => {
+		if (attempted && field === "unitPrice" && priceInvalid(form.lines[index]))
+			return t("needPrice")
 		const e = lineFieldError(error, index, field)
 		return e ? errorMessage(e) : undefined
 	}
@@ -180,25 +201,37 @@ export function DocumentEditor({
 		)
 	}
 
-	const saveDraft = () =>
+	const saveDraft = () => {
+		setAttempted(true)
+		if (form.lines.some(priceInvalid)) return
 		save.mutate(
-			{ id: document?.id ?? null, input },
-			{ onSuccess: (saved) => onSaved(saved) }
+			{ id: savedId, input },
+			{
+				onSuccess: (saved) => {
+					setOriginal(form)
+					onSaved(saved)
+				},
+			}
 		)
-
+	}
 	const issue = () => {
+		setAttempted(true)
+		setIssuing(true)
+		if (form.lines.some(priceInvalid) || !form.recipientName.trim()) return
 		if (!window.confirm(t("issueConfirm"))) return
 		save.mutate(
-			{ id: document?.id ?? null, input },
+			{ id: savedId, input },
 			{
-				onSuccess: (saved) =>
+				onSuccess: (saved) => {
+					setSavedId(saved.id)
+					setOriginal(form)
 					action.mutate(
 						{ type: "issue", id: saved.id },
 						{
 							onSuccess: (issued) => onIssued(issued as DocumentRecord),
-							onError: () => onSaved(saved),
 						}
-					),
+					)
+				},
 			}
 		)
 	}
@@ -407,11 +440,19 @@ export function DocumentEditor({
 					/>
 				</Field>
 
-				{error && !(isAppError(error) && error.field) && (
-					<p role="alert" className="text-destructive text-sm">
-						{errorMessage(error)}
-					</p>
+				{!document && savedId !== null && action.error && (
+					<p role="status">{t("draftRetained")}</p>
 				)}
+				{error &&
+					(!(isAppError(error) && error.field) || error.field === "amount") && (
+						<p role="alert" className="text-destructive text-sm">
+							{isAppError(error) &&
+							error.field === "amount" &&
+							form.kind === "invoice"
+								? t("invoicePositive")
+								: errorMessage(error)}
+						</p>
+					)}
 				<div className="flex flex-wrap gap-2">
 					<Button type="submit" variant="outline" disabled={busy}>
 						{t("saveDraft")}

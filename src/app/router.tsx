@@ -24,6 +24,8 @@ import { AppRoot } from "./app-root"
 import { navItems, type ScreenId } from "./navigation"
 
 type ScreenSearch = {
+	receiptId?: number
+	documentId?: number
 	q?: string
 	article?: string
 	tab?: "opening"
@@ -75,6 +77,14 @@ const screenRoutes = navItems.map((item) => {
 		getParentRoute: () => rootRoute,
 		path: item.path,
 		validateSearch: (search: Record<string, unknown>): ScreenSearch => ({
+			receiptId:
+				Number.isSafeInteger(search.receiptId) && Number(search.receiptId) > 0
+					? Number(search.receiptId)
+					: undefined,
+			documentId:
+				Number.isSafeInteger(search.documentId) && Number(search.documentId) > 0
+					? Number(search.documentId)
+					: undefined,
 			tab: search.tab === "opening" ? "opening" : undefined,
 			editTransaction:
 				Number.isSafeInteger(search.editTransaction) &&

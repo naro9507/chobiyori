@@ -13,6 +13,7 @@ pub struct ReceivedBill {
     due_date: String,
     amount: Option<i64>,
     paid: bool,
+    transaction_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -26,7 +27,7 @@ pub struct ReceivedBillInput {
 
 pub fn list(conn: &Connection) -> AppResult<Vec<ReceivedBill>> {
     let mut stmt = conn.prepare(
-        "SELECT id, payee, due_date, amount, paid FROM received_bills ORDER BY paid, due_date, id",
+        "SELECT id, payee, due_date, amount, paid, transaction_id FROM received_bills ORDER BY paid, due_date, id",
     )?;
     let bills = stmt.query_map([], |row| {
         Ok(ReceivedBill {
@@ -35,6 +36,7 @@ pub fn list(conn: &Connection) -> AppResult<Vec<ReceivedBill>> {
             due_date: row.get(2)?,
             amount: row.get(3)?,
             paid: row.get(4)?,
+            transaction_id: row.get(5)?,
         })
     })?;
     Ok(bills.collect::<Result<_, _>>()?)
@@ -74,6 +76,19 @@ pub fn save(conn: &Connection, input: &ReceivedBillInput) -> AppResult<()> {
         )?,
     };
     found(changed)
+}
+
+pub fn link_payment(conn: &Connection, id: i64, transaction_id: i64) -> AppResult<()> {
+    let changed = conn.execute(
+        "UPDATE received_bills SET transaction_id = ?2
+         WHERE id = ?1 AND paid = 1 AND transaction_id IS NULL
+           AND EXISTS (SELECT 1 FROM transactions WHERE id = ?2)",
+        params![id, transaction_id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::new(ErrorCode::InvalidFormat));
+    }
+    Ok(())
 }
 
 pub fn set_paid(conn: &Connection, id: i64, paid: bool) -> AppResult<()> {

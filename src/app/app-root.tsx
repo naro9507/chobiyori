@@ -42,6 +42,10 @@ function Books(): ReactNode {
 }
 
 function OpenedBooks() {
-	useEffect(() => () => useSimpleEntryDrafts.setState({ forms: {} }), [])
+	useEffect(
+		() => () =>
+			useSimpleEntryDrafts.setState({ forms: {}, confirmedShares: {} }),
+		[]
+	)
 	return <AppShell />
 }

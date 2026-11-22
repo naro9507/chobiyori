@@ -27,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // 保存先と取り込むファイルを選ぶ画面。Rust 側からだけ開く
         .plugin(tauri_plugin_dialog::init())
+        .manage(commands::export::SavedExports::default())
         .manage(commands::import::ImportState::default())
         .manage(commands::inbox::StatementState::default())
         .manage(commands::filing_calendar_sync::CalendarSyncState::default())
@@ -112,6 +113,7 @@ pub fn run() {
             commands::journal::list_transactions,
             commands::journal::create_transaction,
             commands::journal::create_simple_transaction,
+            commands::journal::preview_business_share,
             commands::journal::update_transaction,
             commands::journal::delete_transaction,
             commands::reports::trial_balance,
@@ -120,6 +122,7 @@ pub fn run() {
             commands::books::expense_book,
             commands::books::sales_book,
             commands::export::export_report,
+            commands::export::reveal_export,
             commands::export::export_filing_calendar,
             commands::filing_calendar_sync::filing_calendar_connection,
             commands::filing_calendar_sync::connect_filing_calendar,
@@ -132,6 +135,7 @@ pub fn run() {
             commands::received_bills::list_received_bills,
             commands::received_bills::save_received_bill,
             commands::received_bills::set_received_bill_paid,
+            commands::received_bills::link_bill_payment,
             commands::received_bills::delete_received_bill,
             commands::import::choose_import_file,
             commands::import::preview_import,

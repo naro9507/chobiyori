@@ -65,11 +65,11 @@ export function ReceiptFieldsForm({
 		return errorMessage(e)
 	}
 
-	const submit = (e: FormEvent) => {
+	const submit = async (e: FormEvent) => {
 		e.preventDefault()
 		if (accountId === null) return
-		save.mutate(
-			{
+		try {
+			await save.mutateAsync({
 				id: receipt.id,
 				fields: {
 					date: date.trim(),
@@ -81,9 +81,11 @@ export function ReceiptFieldsForm({
 					points: Number(points) || 0,
 					pointsAs,
 				},
-			},
-			{ onSuccess: onDone }
-		)
+			})
+		} catch {
+			return
+		}
+		onDone?.()
 	}
 
 	const digits = (value: string) => value.replace(/[^0-9]/g, "")

@@ -74,7 +74,7 @@ function validRegistrationNo(text: string) {
 
 /** 開始時点の残高として読めない入力か（空は 0 として扱う）。 */
 function badBalance(text: string) {
-	return Number.isNaN(parseSignedAmount(text))
+	return Boolean(text.trim()) && !Number.isSafeInteger(parseSignedAmount(text))
 }
 
 type Form = {
@@ -83,7 +83,7 @@ type Form = {
 	industry: string
 	address: string
 	invoiceRegistrationNo: string
-	filingType: FilingType
+	filingType: FilingType | "undecided"
 	taxStatus: TaxStatus
 	fiscalYear: string
 	template: IndustryTemplate
@@ -101,18 +101,20 @@ function toInput(form: Form): SetupInput {
 			invoiceRegistrationNo: form.invoiceRegistrationNo || null,
 		},
 		fiscalYear: Number(form.fiscalYear),
-		filingType: form.filingType,
+		filingType: form.filingType === "undecided" ? "white" : form.filingType,
 		taxStatus: form.taxStatus,
 		template: form.template,
 		accounts: form.accounts.map(({ name, kind, balance }) => ({
 			name,
 			kind,
-			balance: signedAmountForCommand(balance || "0"),
+			balance: balance.trim() ? signedAmountForCommand(balance) : null,
 		})),
-		openingBalances: form.openingBalances.map(({ accountCode, amount }) => ({
-			accountCode,
-			amount: signedAmountForCommand(amount || "0"),
-		})),
+		openingBalances: form.openingBalances
+			.filter((row) => row.amount.trim() !== "")
+			.map(({ accountCode, amount }) => ({
+				accountCode,
+				amount: signedAmountForCommand(amount || "0"),
+			})),
 		features: defaultFeatures,
 	}
 }
@@ -134,7 +136,7 @@ export function SetupPage() {
 		industry: "",
 		address: "",
 		invoiceRegistrationNo: "",
-		filingType: "blue65",
+		filingType: "undecided",
 		taxStatus: "exempt",
 		fiscalYear: String(new Date().getFullYear()),
 		template: "general",
@@ -328,10 +330,13 @@ export function SetupPage() {
 									aria-labelledby={filingId}
 									value={form.filingType}
 									onValueChange={(value) =>
-										update({ filingType: value as FilingType })
+										update({ filingType: value as Form["filingType"] })
 									}
 									className="sm:grid-cols-2"
 								>
+									<RadioCardsItem value="undecided">
+										{t("filingUndecided")}
+									</RadioCardsItem>
 									{filingTypes.map((type) => (
 										<RadioCardsItem key={type} value={type} className="py-2">
 											{t(`filing_${type}`)}

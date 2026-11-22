@@ -45,7 +45,7 @@ import { ReceiptImage } from "./receipt-image"
 const statuses: InboxStatus[] = ["pending", "posted", "ignored"]
 
 /** 確認待ちの候補を見て、1 件ずつ、またはまとめて確定する。 */
-export function ReviewPanel() {
+export function ReviewPanel({ receiptId }: { receiptId?: number }) {
 	const t = useTranslations("inbox")
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
@@ -58,6 +58,9 @@ export function ReviewPanel() {
 	const list = items.data ?? []
 	const selected =
 		list.find((i) => i.id === selectedId) ??
+		(status === "pending" && selectedId === null && receiptId
+			? list.find((i) => i.receiptId === receiptId)
+			: undefined) ??
 		(status === "pending" ? list[0] : undefined)
 	const drawings = masters.accounts.find(
 		(a) => a.statementLine === "bs.owner_drawings"

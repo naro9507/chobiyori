@@ -12,8 +12,9 @@ import {
 	useFiscalYear,
 	useTransactions,
 } from "@/features/journal/journal-api"
-import { JournalGrid } from "@/features/journal/journal-grid"
+import { GridEditor, JournalGrid } from "@/features/journal/journal-grid"
 import { SimpleEntry } from "@/features/journal/simple-entry"
+import { useJournalMasters } from "@/features/journal/use-master-items"
 import { currentMonth } from "@/features/reports/reports-api"
 import { useFeatures } from "@/features/setup/setup"
 import { RecurringPanel } from "@/features/templates/recurring-panel"
@@ -134,6 +135,59 @@ export function TransactionsPage({
 	)
 }
 
+function SimpleEdit({
+	transaction,
+	month,
+	onDone,
+}: {
+	transaction: Transaction
+	month: number
+	onDone: () => void
+}) {
+	const t = useTranslations("journal")
+	const masters = useJournalMasters()
+	const debit = masters.accountById(transaction.lines[0].accountId)
+	const credit = masters.accountById(transaction.lines[1].accountId)
+	const labels: [string, string] | null =
+		debit?.category === "expense" || debit?.category === "cogs"
+			? [t("expenseAccount"), t("expensePayment")]
+			: credit?.category === "revenue"
+				? [t("incomePayment"), t("incomeAccount")]
+				: null
+	return (
+		<div className="overflow-x-auto rounded-lg border">
+			<table className="w-full text-sm">
+				<thead>
+					<tr>
+						{[
+							t("day"),
+							labels?.[0] ?? t("debit"),
+							labels?.[1] ?? t("credit"),
+							t("amount"),
+							t("summary"),
+							t("partner"),
+							t("actions"),
+						].map((name) => (
+							<th key={name} scope="col" className="px-2 py-2 text-left">
+								{name}
+							</th>
+						))}
+					</tr>
+				</thead>
+				<tbody>
+					<GridEditor
+						fiscalYear={transaction.fiscalYear}
+						month={month}
+						transaction={transaction}
+						accountLabels={labels ?? undefined}
+						focusOnMount
+						onDone={onDone}
+					/>
+				</tbody>
+			</table>
+		</div>
+	)
+}
 function EditTransactionPage({
 	id,
 	fiscalYear,
@@ -170,6 +224,12 @@ function EditTransactionPage({
 				<QueryMessage query={query} fiscalYear={fiscalYear} />
 			) : !transaction ? (
 				<p role="status">{t("entryNotFound")}</p>
+			) : transaction.entryMode === "simple" && isSingleEntry(transaction) ? (
+				<SimpleEdit
+					transaction={transaction}
+					month={month}
+					onDone={() => done()}
+				/>
 			) : isSingleEntry(transaction) ? (
 				<JournalGrid
 					fiscalYear={fiscalYear}

@@ -54,7 +54,8 @@
 		"firstStepsDismiss": "Close this guide",
 		"firstAccounts": "Check the accounts you use",
 		"firstOpening": "Enter your opening balances, or confirm zero balances",
-		"firstTransaction": "Record your first sale or expense"
+		"firstTransaction": "Record your first sale or expense",
+		"setupRecovery": "Create a recovery code in case you forget your password"
 	},
 	"settings": {
 		"language": "Display language",
@@ -137,7 +138,7 @@
 		"invoiceRegistrationNoHint": "If registered, enter the number on your registration notice (T followed by 13 digits). Leave this blank if you have not registered.",
 		"invoiceRegistrationNoLookup": "Check a number on the National Tax Agency website",
 		"filingTitle": "Filing type",
-		"filingDescription": "If unsure, choose the blue return (650,000 yen deduction). Without the blue return application, choose the white return.",
+		"filingDescription": "Check your application records or ask your tax office about blue-return approval. If unsure, start provisionally with white and update Settings after checking.",
 		"filing_blue65": "Blue return (650,000 yen deduction)",
 		"filing_blue55": "Blue return (550,000 yen deduction)",
 		"filing_blue10": "Blue return (100,000 yen, simple bookkeeping)",
@@ -160,7 +161,7 @@
 		"fiscalYear": "Year",
 		"fiscalYearHint": "e.g. 2026",
 		"templateTitle": "Choose your type of business",
-		"templateBody": "Standard accounts that match the blue return statement (cash, sales, supplies and so on) are added, plus accounts and home-use split rules common in your business. On the Master data screen, you can add or rename accounts and adjust the percentage splits to reflect your actual business use.",
+		"templateBody": "Add common accounts and allocation examples for your industry. You can change them later in Masters.",
 		"back": "Back",
 		"next": "Next",
 		"start": "Start",
@@ -182,7 +183,8 @@
 		"template_itWeb": "IT and web development",
 		"template_itWebHint": "Software, hosting and more. Home-office split",
 		"template_delivery": "Transport and delivery",
-		"template_deliveryHint": "Fuel, road tolls and more. Vehicle and phone splits"
+		"template_deliveryHint": "Fuel, road tolls and more. Vehicle and phone splits",
+		"filingUndecided": "Unsure (start provisionally with a white return)"
 	},
 	"master": {
 		"tabsLabel": "Master data type",
@@ -375,7 +377,13 @@
 		"reviewSaved": "Review or edit this entry",
 		"backToEntry": "Back to transaction entry",
 		"entryNotFound": "This transaction could not be found.",
-		"edit": "Edit"
+		"edit": "Edit",
+		"allocationExample": "The configured business share is {percent}%. Check your usage records before applying it.",
+		"findExpense": "Find an expense account by item or purpose (e.g. pen)",
+		"suppliesKeywords": "stationery pen pencil paper notebook supplies",
+		"noCandidates": "No matches. Try another name or code.",
+		"splitPreview": "Business share ¥{business}; personal share ¥{private}",
+		"billExpense": "Record this received bill payment as an expense: {name}."
 	},
 	"reports": {
 		"trialBalance": "Trial balance",
@@ -511,7 +519,8 @@
 		"noPartner": "No partner (includes the opening balance)",
 		"noPartnerAccounts": "There are no accounts receivable or payable accounts.",
 		"sales": "Sales book",
-		"salesHint": "View transactions grouped by sales account."
+		"salesHint": "View transactions grouped by sales account.",
+		"showFile": "Show saved file in folder"
 	},
 	"data": {
 		"importTitle": "Import books",
@@ -836,7 +845,8 @@
 		"ignoredRowsTitle": "Rows excluded from the import: {count}.",
 		"otherIgnoredRows": "{count} more",
 		"sourceRow": "{file}, row {row}",
-		"similarStatement": "Another statement row has the same date, amount, and merchant"
+		"similarStatement": "Another statement row has the same date, amount, and merchant",
+		"formatAdvanced": "Adjust file format, encoding and column mapping"
 	},
 	"attachments": {
 		"title": "Files: {name}",
@@ -918,7 +928,9 @@
 		"dateRequired": "Enter the date shown on the receipt.",
 		"dateInvalid": "Enter a valid date in year-month-day order, such as 2026-11-19.",
 		"totalInvalid": "Enter a total of at least 1 yen, including tax.",
-		"reducedAmountInvalid": "Enter a reduced-rate amount no greater than the total including tax plus the amount paid with points."
+		"reducedAmountInvalid": "Enter a reduced-rate amount no greater than the total including tax plus the amount paid with points.",
+		"deleteConfirm": "Delete {name} from these books? Its image will be removed if unused elsewhere.",
+		"manualAdded": "One receipt was added for review."
 	},
 	"receiptSettings": {
 		"title": "Receipt reading",
@@ -1127,7 +1139,11 @@
 		"assetPurchaseNote": "To record the payment for an asset, choose \"Payment for the purchase\" when you register it, or record it on the Transactions screen (for example, Tools and equipment / Ordinary deposits).",
 		"purchasePayment": "Payment for the purchase",
 		"purchasePaymentHint": "Choose the account you paid from to also record the purchase (asset / account) on the date first used. If you paid with personal money, choose Owner's contributions.",
-		"purchaseNotRecorded": "Don't record (already recorded in Transactions)"
+		"purchaseNotRecorded": "Don't record (already recorded in Transactions)",
+		"openingInvalid": "Enter a number such as 10000 or 10,000.",
+		"openAllocation": "Review allocation rules",
+		"openLedger": "Check the ledger",
+		"openEntry": "Review or enter transactions"
 	},
 	"security": {
 		"createTitle": "Choose a password for your books",
@@ -1291,7 +1307,15 @@
 		"save": "Save",
 		"cancel": "Cancel",
 		"delete": "Delete",
-		"deleteConfirm": "Delete this payment due date?"
+		"deleteConfirm": "Delete this payment due date?",
+		"enterExpense": "Enter this payment as an expense",
+		"lookupMonth": "Transaction month in {year}",
+		"linked": "Recorded in transaction #{id}",
+		"linkExisting": "Choose an existing transaction",
+		"existingTransaction": "Existing transaction",
+		"chooseTransaction": "Choose a transaction",
+		"linkPayment": "Link this transaction",
+		"replaceDraft": "Replace the current expense draft with this payment?"
 	},
 	"documents": {
 		"choosePaymentAccount": "Choose the account that received the payment",
@@ -1405,7 +1429,14 @@
 		"savePayment": "Record the payment",
 		"linesHintNoTax": "Documents with this issue date use the format without a registration number, so no consumption tax is added. Enter unit prices as the amounts you will receive. Enter discounts like \"-1000\". Quantities can have decimals such as 1.5.",
 		"unitPriceNoTax": "Unit price",
-		"previewEmpty": "Enter an item name to see the page here."
+		"previewEmpty": "Enter an item name to see the page here.",
+		"needPrice": "Enter a unit price. Enter 0 for a free item.",
+		"needRecipient": "Enter the recipient before issuing the document.",
+		"filterEmpty": "No documents match these filters.",
+		"clearFilters": "Clear filters",
+		"discardEdits": "Discard your changes and return to the list? Cancel to keep editing.",
+		"invoicePositive": "Check the prices and quantities. The invoice total must be at least one yen.",
+		"draftRetained": "Draft saved. Correct the error and issue it again."
 	},
 	"documentSettings": {
 		"title": "Invoices and other documents",
@@ -1782,7 +1813,7 @@
 		"noTarget": "Do not link",
 		"invoices": "Invoices (unpaid)",
 		"invoiceOption": "{number} {name} ({amount} yen left)",
-		"saleNotRecorded": "(issue the invoice first to record the sale)",
+		"saleNotRecorded": "(Sale has not yet been recorded for this invoice)",
 		"plans": "Recurring sales",
 		"planOption": "{partner} {name} {month} ({amount} yen left)",
 		"linkTitle": "Link this deposit",
@@ -1791,7 +1822,8 @@
 		"remaining": "{amount} yen left",
 		"sameAmount": "Same amount",
 		"sameName": "Same name",
-		"chooseTarget": "Choose another"
+		"chooseTarget": "Choose another",
+		"openUnposted": "Open invoice {number} to record the sale"
 	},
 	"tutorial": {
 		"collapse": "Collapse tutorial",
@@ -1912,7 +1944,7 @@
 		"closing": "Close the year and file",
 		"closingBody": "Use the checklist on the Year-end closing screen to go through opening balances, fixed assets and inventory. Check the statement figures and the filing guide, then copy them into the National Tax Agency's filing site.",
 		"supplies": "Buy stationery with cash",
-		"suppliesBody": "Expense / Supplies / Cash. For ¥1,200, debit Supplies and credit Cash. Enter the actual date and amount.",
+		"suppliesBody": "Pens and stationery are examples of supplies. Open this example for a cash purchase.",
 		"cashSales": "Receive cash sales",
 		"cashSalesBody": "Income / Sales / Cash. For ¥5,000, debit Cash and credit Sales.",
 		"journal": "Journal entry",
@@ -1973,7 +2005,7 @@
 		"topicHelp": "Help with {topic}",
 		"missingExampleAccounts": "This example’s accounts cannot be used. Check that the accounts are active and the payment account is enabled in Master.",
 		"sharedExpenses": "Split a shared business and personal expense",
-		"sharedExpensesBody": "In Master data > Business-use split rules, register a business share based on records such as floor area or usage time, and set it on the account. In Quick entry, enter the full amount you paid. The preset shares are examples, not rates you can always deduct. See NTA No.2210.",
+		"sharedExpensesBody": "For shared internet and mobile bills, use your usage records to estimate the business share of communication expenses. Review allocation rules in Masters.",
 		"teachingMaterials": "Buy teaching materials with cash",
 		"teachingMaterialsBody": "Expense / Teaching materials / Cash. For ¥3,000, debit Teaching materials and credit Cash. Uses the school template’s accounts.",
 		"tuition": "Receive monthly tuition by bank transfer",
@@ -1995,7 +2027,10 @@
 		"collectReceivable": "Collect a sale previously recorded as receivable",
 		"collectReceivableBody": "Income / Accounts receivable / Ordinary deposits. Debit Ordinary deposits and credit Accounts receivable. The sale is already recorded, so don't choose Sales again. For an invoice payment, also choose the invoice under \"Link a payment\" in Quick entry.",
 		"personalExpense": "I paid a business expense with personal funds",
-		"personalExpenseBody": "Under Transactions > Quick entry > Expense, choose \"I paid with personal funds or a personal card\" as where it was paid from. Enter what it was spent on and the amount; it is recorded against owner's contributions."
+		"personalExpenseBody": "Under Transactions > Quick entry > Expense, choose \"I paid with personal funds or a personal card\" as where it was paid from. Enter what it was spent on and the amount; it is recorded against owner's contributions.",
+		"bankFee": "Record a bank transfer fee",
+		"bankFeeBody": "For a bank transfer fee, select Expense, choose the applicable fees account, and enter the amount paid from the bank.",
+		"replaceEntry": "Keep the date, amount and memo and replace the type, accounts and other choices? Cancel to keep your draft."
 	},
 	"commands": {
 		"title": "Command palette",
@@ -2018,7 +2053,7 @@
 		"remove": "Remove",
 		"balance": "Opening balance (JPY)",
 		"opening": "Opening balances and starting a business",
-		"openingHint": "Enter each account’s starting balance. If you have loans or other balances, you can add them below.",
+		"openingHint": "Leave balances blank if you need to look them up. Balances are saved as a draft. Review and confirm them in Opening balances from Home.",
 		"firstYear": "About start-up costs (for your first business year)",
 		"startupHint": "Special expenses for preparing to start a business may qualify as startup costs. Distinguish asset purchases and prepaid expenses. Record startup costs as an asset and post the amortization expense in the chosen year; amortization is not automatic. Discretionary amortization is limited to the unamortized balance. Keep spending and amortization records. Opening capital is opening assets minus liabilities.",
 		"features": "Items to display",

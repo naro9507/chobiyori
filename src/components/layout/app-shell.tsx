@@ -25,12 +25,15 @@ export function AppShell() {
 
 	return (
 		<div className="flex h-full min-h-0">
-			<a
-				href="#main"
+			<button
+				type="button"
+				onClick={() => {
+					document.getElementById("main")?.focus()
+				}}
 				className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2"
 			>
 				{tApp("skipToContent")}
-			</a>
+			</button>
 			<nav
 				aria-label={t("label")}
 				className="flex w-60 shrink-0 flex-col gap-5 overflow-y-auto border-sidebar-border border-r bg-sidebar px-3 py-5 text-sidebar-foreground"
@@ -81,7 +84,7 @@ export function AppShell() {
 					</ul>
 				))}
 			</nav>
-			<main id="main" className="min-w-0 flex-1 overflow-y-auto">
+			<main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-y-auto">
 				<WhatsNewBanner />
 				<UpdateDialog />
 				<FilingCalendarSyncWorker />

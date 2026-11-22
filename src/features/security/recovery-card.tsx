@@ -23,7 +23,7 @@ export function RecoveryCard() {
 	const currentError = fieldError(issue.error, "currentPassword")
 
 	return (
-		<Card>
+		<Card id="recovery-code">
 			<CardHeader>
 				<CardTitle>{t("recoveryTitle")}</CardTitle>
 				<CardDescription>{t("recoveryDescription")}</CardDescription>
