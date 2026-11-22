@@ -22,3 +22,8 @@ pub fn set_received_bill_paid(db: State<'_, Database>, id: i64, paid: bool) -> A
 pub fn delete_received_bill(db: State<'_, Database>, id: i64) -> AppResult<()> {
     received_bills::delete(&db.conn(), id)
 }
+
+#[tauri::command]
+pub fn link_bill_payment(db: State<'_, Database>, id: i64, transaction_id: i64) -> AppResult<()> {
+    chobiyori_storage::received_bills::link_payment(&db.conn(), id, transaction_id)
+}

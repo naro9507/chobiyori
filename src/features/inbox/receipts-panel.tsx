@@ -51,6 +51,7 @@ export function ReceiptsPanel() {
 	const receipts = useReceipts()
 	const add = useAddReceipts()
 	const invalidate = useInvalidateReceiptsAfterReading()
+	const [manualAdded, setManualAdded] = useState<number | null>(null)
 	const [progress, setProgress] = useState<Progress>({ kind: "idle" })
 	const [selectedId, setSelectedId] = useState<number | null>(null)
 	const list = (receipts.data ?? []).filter((r) => r.inboxItemId === null)
@@ -139,14 +140,20 @@ export function ReceiptsPanel() {
 				</div>
 			)}
 			<p aria-live="polite" className="text-sm">
+				{manualAdded && t("manualAdded")}
 				{add.data && t("added", add.data)}
 				{progress.kind === "reading" && t("reading", progress)}
 				{progress.kind === "waiting" && t("rateLimitWait", progress)}
 				{progress.kind === "finished" && t("readFinished", progress)}
 			</p>
-			{progress.kind === "finished" && (
+			{(manualAdded || progress.kind === "finished") && (
 				<Button asChild size="sm" variant="outline" className="w-fit">
-					<Link to="/inbox">{inbox("reviewImported")}</Link>
+					<Link
+						to="/inbox"
+						search={manualAdded ? { receiptId: manualAdded } : {}}
+					>
+						{inbox("reviewImported")}
+					</Link>
 				</Button>
 			)}
 			{progress.kind === "stopped" && (
@@ -194,7 +201,10 @@ export function ReceiptsPanel() {
 									</p>
 									<ReceiptFieldsForm
 										receipt={selected}
-										onDone={() => setSelectedId(null)}
+										onDone={() => {
+											setSelectedId(null)
+											setManualAdded(selected.id)
+										}}
 									/>
 								</div>
 							</div>
@@ -276,7 +286,14 @@ function ReceiptRow({
 					size="sm"
 					variant="ghost"
 					disabled={remove.isPending}
-					onClick={() => remove.mutate(receipt.id)}
+					onClick={() => {
+						if (
+							window.confirm(
+								t("deleteConfirm", { name: receipt.attachment.fileName })
+							)
+						)
+							remove.mutate(receipt.id)
+					}}
 				>
 					{t("delete")}
 				</Button>

@@ -246,6 +246,11 @@ describe("家事按分と税区分", () => {
 			within(form).getByLabelText("何に使ったか"),
 			"603 水道光熱費"
 		)
+		const apply = within(form).getByRole("checkbox", {
+			name: /事業で使った割合だけ/,
+		})
+		expect(apply).not.toBeChecked()
+		await user.click(apply)
 		const percent = within(form).getByLabelText("事業で使った割合（%）")
 		expect(percent).toHaveValue("60")
 		await user.clear(percent)

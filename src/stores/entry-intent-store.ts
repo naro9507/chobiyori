@@ -4,6 +4,8 @@ export type EntryDraft = {
 	accountCode: string
 	paymentCode: string
 	memo: string
+	amount?: string
+	billId?: number
 }
 export const useEntryIntent = create<{
 	revision: number

@@ -15,6 +15,7 @@ import { useInboxPendingCount } from "@/features/inbox/inbox-api"
 import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
+import { useBookStatus } from "@/features/security/security-api"
 import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
@@ -29,6 +30,7 @@ export function HomePage() {
 	const month = currentMonth(fiscalYear)
 	const years = useFiscalYears().data
 	const firstYear = years?.length === 1 && years[0].year === fiscalYear
+	const book = useBookStatus().data
 	const opening = useOpeningBalances(firstYear ? fiscalYear : null)
 	const { firstStepsDismissed, dismissFirstSteps } = useOnboarding()
 	// 開業時の残高を確定したら、最初の案内は役目を終えるので出さない。
@@ -75,6 +77,18 @@ export function HomePage() {
 						</ol>
 					</CardContent>
 				</Card>
+			)}
+			{book?.state === "encrypted" && book.hasRecoveryCode === false && (
+				<p className="text-sm">
+					<Link
+						className="text-primary underline"
+						to="/settings"
+						search={{ view: "security" }}
+						hash="recovery-code"
+					>
+						{t("setupRecovery")}
+					</Link>
+				</p>
 			)}
 			<DeadlineNotices />
 			{features.recurring && (

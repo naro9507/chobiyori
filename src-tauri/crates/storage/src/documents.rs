@@ -722,6 +722,9 @@ pub fn issue(
         if draft.recipient_name.is_empty() {
             return Err(AppError::field(ErrorCode::Required, "recipientName"));
         }
+        if draft.kind == DocumentKind::Invoice && draft.totals.total <= 0 {
+            return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
+        }
         let year = journal::parse_date(&draft.issue_date)
             .map(|(y, _, _)| y)
             .ok_or(AppError::field(ErrorCode::InvalidFormat, "issueDate"))?;
@@ -1145,6 +1148,21 @@ mod tests {
                 .trade_name,
             "新しい屋号"
         );
+    }
+
+    #[test]
+    fn zero_total_invoice_stays_a_draft_without_receiving_a_number() {
+        let db = set_up_db();
+        let mut i = input(DocumentKind::Invoice);
+        i.lines = vec![line("制作", 100, 0, 10)];
+        let d = create(&db, &i).unwrap();
+        assert_eq!(
+            issue(&db, d.id, &fake_pdf).unwrap_err(),
+            AppError::field(ErrorCode::OutOfRange, "amount")
+        );
+        let after = get(&db.conn(), d.id).unwrap();
+        assert_eq!(after.status, DocumentStatus::Draft);
+        assert!(after.number.is_none());
     }
 
     #[test]

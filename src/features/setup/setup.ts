@@ -106,7 +106,7 @@ export type FeatureSettings = {
 export type SetupAccount = {
 	name: string
 	kind: "cash" | "bank" | "card" | "eMoney"
-	balance: number
+	balance: number | null
 }
 export const defaultFeatures: FeatureSettings = {
 	inventory: true,

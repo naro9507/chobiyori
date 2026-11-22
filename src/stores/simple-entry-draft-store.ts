@@ -5,6 +5,7 @@ export const kindChoices = ["income", "expense", "transfer", "owner"] as const
 export type KindChoice = (typeof kindChoices)[number]
 
 export type SimpleEntryFormState = {
+	billId?: number
 	choice: KindChoice
 	ownerKind: "owner_draw" | "owner_contribution"
 	unpaid: boolean
@@ -25,8 +26,9 @@ export type SimpleEntryFormState = {
 // 下書きは帳簿を開いている間だけ保ち、端末のストレージには保存しない。
 export const useSimpleEntryDrafts = create<{
 	forms: Record<string, SimpleEntryFormState>
+	confirmedShares: Record<string, { configured: number; percent: string }>
 	saving: ReadonlySet<string>
-}>(() => ({ forms: {}, saving: new Set() }))
+}>(() => ({ forms: {}, confirmedShares: {}, saving: new Set() }))
 
 export function rememberSimpleEntry(key: string, form: SimpleEntryFormState) {
 	useSimpleEntryDrafts.setState(({ forms }) => ({

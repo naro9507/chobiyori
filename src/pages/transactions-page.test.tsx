@@ -323,6 +323,12 @@ describe("かんたん入力", () => {
 			within(form).getByRole("link", { name: "この取引を確認・修正" })
 		)
 		expect(await screen.findByLabelText("変更する行の金額")).toHaveValue("1200")
+		expect(screen.getByLabelText("変更する行の何に使ったか")).toHaveValue(
+			"610 消耗品費"
+		)
+		expect(screen.getByLabelText("変更する行のどこから払ったか")).toHaveValue(
+			"101 現金"
+		)
 	})
 
 	it("ヘルプやタブに移動しても同じ年度の下書きが残る", async () => {

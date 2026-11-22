@@ -373,3 +373,21 @@ describe("レシート", () => {
 		)
 	})
 })
+
+it("レシートの削除を取り消すと画像は残る", async () => {
+	const user = userEvent.setup()
+	renderPage("/inbox?view=receipts")
+	const buttons = await screen.findAllByRole("button", { name: "消す" })
+	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
+	try {
+		await user.click(buttons[0])
+		expect(confirm).toHaveBeenCalledWith(
+			expect.stringContaining(receipts[0].attachment.fileName)
+		)
+		expect(
+			mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
+		).toBe(false)
+	} finally {
+		confirm.mockRestore()
+	}
+})

@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/i18n/use-translations"
 
 /** 候補の 1 件。`search` はコード以外に探す対象（和名・英名・かな）。 */
 export type ComboboxItem = {
@@ -55,9 +56,11 @@ export function MasterCombobox({
 	value: number | null
 	onChange: (id: number | null) => void
 } & Omit<ComponentProps<"input">, "value" | "onChange">) {
+	const t = useTranslations("journal")
 	const listId = useId()
 	const selected = items.find((i) => i.id === value)
 	const [text, setText] = useState(display(selected))
+	const [unmatched, setUnmatched] = useState(false)
 	const [open, setOpenState] = useState(false)
 	const [active, setActive] = useState(0)
 	const inputRef = useRef<HTMLInputElement>(null)
@@ -98,14 +101,15 @@ export function MasterCombobox({
 	// 外から値が変わったとき（保存後に空にする、行を選び直すなど）は表示を合わせる
 	const selectedText = display(selected)
 	useEffect(() => {
-		setText(selectedText)
-	}, [selectedText])
+		if (!unmatched) setText(selectedText)
+	}, [selectedText, unmatched])
 
 	const options = open ? filterItems(items, text) : []
 
 	const choose = (item: ComboboxItem | undefined) => {
 		setOpen(false)
 		if (item) {
+			setUnmatched(false)
 			setText(display(item))
 			onChange(item.id)
 		}
@@ -125,8 +129,9 @@ export function MasterCombobox({
 		if (item) {
 			choose(item)
 		} else {
+			setUnmatched(true)
+			onChange(null)
 			setOpen(false)
-			setText(selectedText)
 		}
 	}
 
@@ -168,6 +173,7 @@ export function MasterCombobox({
 				value={text}
 				onChange={(e) => {
 					setText(e.target.value)
+					if (unmatched && !e.target.value) setUnmatched(false)
 					setOpen(true)
 					setActive(0)
 				}}
@@ -175,6 +181,11 @@ export function MasterCombobox({
 				onBlur={commit}
 				onKeyDown={onKeyDown}
 			/>
+			{text.trim() && ((open && !options.length) || (!open && unmatched)) && (
+				<p role="status" className="text-muted-foreground text-xs">
+					{t("noCandidates")}
+				</p>
+			)}
 			{options.length > 0 && (
 				<div
 					ref={listRef}

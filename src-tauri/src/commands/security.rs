@@ -35,6 +35,7 @@ pub struct BookStatus {
     pub state: BookState,
     /// パスワードで開けたあとか
     pub unlocked: bool,
+    pub has_recovery_code: bool,
     /// パスワード・復旧コードの入力の制限
     #[serde(flatten)]
     pub attempts: Attempts,
@@ -44,6 +45,7 @@ pub struct BookStatus {
 pub async fn book_status(app: AppHandle, files: State<'_, BookFiles>) -> AppResult<BookStatus> {
     Ok(BookStatus {
         state: vault::state(&files.path)?,
+        has_recovery_code: recovery::is_issued(&files.path),
         unlocked: app.try_state::<Database>().is_some(),
         attempts: unlock_guard::status(&unlock_guard::path_for(&files.path)),
     })

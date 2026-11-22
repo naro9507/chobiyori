@@ -273,6 +273,15 @@ pub(crate) fn owner_accounts(conn: &Connection) -> AppResult<OwnerAccounts> {
 
 /// かんたん入力の取引を保存する。仕訳（借方 1 行 + 貸方 1 行）に直してから、同じ検証を通す。
 pub fn create_simple(db: &Database, year: i64, input: &SimpleInput) -> AppResult<Transaction> {
+    create_simple_for_bill(db, year, input, None)
+}
+
+pub fn create_simple_for_bill(
+    db: &Database,
+    year: i64,
+    input: &SimpleInput,
+    bill_id: Option<i64>,
+) -> AppResult<Transaction> {
     db.transaction(|tx| {
         if !(1..=journal::AMOUNT_MAX).contains(&input.amount) {
             return Err(AppError::field(ErrorCode::OutOfRange, "amount"));
@@ -343,14 +352,24 @@ pub fn create_simple(db: &Database, year: i64, input: &SimpleInput) -> AppResult
                 }
             }
         }
-        insert(tx, year, &transaction).map_err(|error| {
+        let saved = insert(tx, year, &transaction).map_err(|error| {
             let error = journal::simple_error(input.kind, error);
             if input.kind == SimpleKind::UnpaidIncome && error.field == Some("paymentAccountId") {
                 AppError::field(error.code, "kind")
             } else {
                 error
             }
-        })
+        })?;
+        if let Some(id) = bill_id {
+            if !matches!(
+                input.kind,
+                SimpleKind::Expense | SimpleKind::PersonalExpense
+            ) {
+                return Err(AppError::field(ErrorCode::InvalidFormat, "kind"));
+            }
+            super::received_bills::link_payment(tx, id, saved.id)?;
+        }
+        Ok(saved)
     })
 }
 
@@ -827,6 +846,35 @@ pub(crate) mod tests {
         let t = create(&db, 2026, &input).unwrap();
         assert_eq!(t.lines[0].tax_category, Some(TaxCategory::OutOfScope));
         assert!(!t.lines[0].is_qualified_invoice);
+    }
+
+    #[test]
+    fn recording_a_bill_payment_is_atomic_and_cannot_duplicate_the_expense() {
+        let db = set_up_db();
+        let (id, cash, supplies) = {
+            let conn = db.conn();
+            conn.execute("INSERT INTO received_bills(payee,due_date,amount,paid) VALUES ('Test','2026-03-01',1200,1)",[]).unwrap();
+            (
+                conn.last_insert_rowid(),
+                account(&conn, "101"),
+                account(&conn, "610"),
+            )
+        };
+        let input = simple(SimpleKind::Expense, Some(supplies), cash, 1200);
+        let before = list(&db.conn(), 2026, None).unwrap().len();
+        let tx = create_simple_for_bill(&db, 2026, &input, Some(id)).unwrap();
+        assert!(create_simple_for_bill(&db, 2026, &input, Some(id)).is_err());
+        let conn = db.conn();
+        assert_eq!(list(&conn, 2026, None).unwrap().len(), before + 1);
+        assert_eq!(
+            conn.query_row(
+                "SELECT transaction_id FROM received_bills WHERE id=?1",
+                [id],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            tx.id
+        );
     }
 
     #[test]

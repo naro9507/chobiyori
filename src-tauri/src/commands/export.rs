@@ -6,12 +6,30 @@ use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use chobiyori_storage::Database;
 use tauri::{AppHandle, State};
 
+#[derive(Default)]
+pub struct SavedExports(std::sync::Mutex<std::collections::VecDeque<(String, std::path::PathBuf)>>);
+
+#[tauri::command]
+pub fn reveal_export(exports: State<'_, SavedExports>, receipt: String) -> AppResult<()> {
+    let path = exports
+        .0
+        .lock()
+        .map_err(|_| AppError::new(ErrorCode::FileRead))?
+        .iter()
+        .find(|(key, _)| key == &receipt)
+        .map(|(_, p)| p.clone())
+        .ok_or(AppError::new(ErrorCode::NotFound))?;
+    tauri_plugin_opener::reveal_item_in_dir(path).map_err(|_| AppError::new(ErrorCode::FileRead))
+}
+
 /// 帳簿を出力する。保存したファイルの名前を返す。保存先を選ばずにやめたら `None`。
 #[tauri::command]
 pub async fn export_report(
     app: AppHandle,
     db: State<'_, Database>,
     request: ExportRequest,
+    exports: State<'_, SavedExports>,
+    receipt: Option<String>,
 ) -> AppResult<Option<String>> {
     // フォントが見つからない・Shift_JIS で書けないなどは、保存先を選ぶ前に知らせる
     let file = export::build(&db.conn(), &request)?;
@@ -23,6 +41,14 @@ pub async fn export_report(
         return Ok(None);
     };
     std::fs::write(&path, &file.bytes).map_err(|_| AppError::new(ErrorCode::FileWrite))?;
+    if let Some(receipt) = receipt {
+        let mut recent = exports
+            .0
+            .lock()
+            .map_err(|_| AppError::new(ErrorCode::FileWrite))?;
+        recent.push_front((receipt, path.clone()));
+        recent.truncate(32);
+    }
     Ok(Some(files::file_name(&path)))
 }
 

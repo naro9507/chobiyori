@@ -70,6 +70,15 @@ function OpeningForm({
 		const amount = parseSignedAmount(texts[id] ?? "")
 		return amount === null || Number.isNaN(amount) ? 0 : amount
 	}
+	const invalidIds = new Set(
+		accounts
+			.filter((a) => {
+				const text = (texts[a.id] ?? "").trim()
+				return text !== "" && !Number.isSafeInteger(parseSignedAmount(text))
+			})
+			.map((a) => a.id)
+	)
+	const invalid = invalidIds.size > 0
 	const sum = (debit: boolean) =>
 		accounts
 			.filter((a) => (a.category === "asset") === debit)
@@ -136,7 +145,14 @@ function OpeningForm({
 											inputMode="numeric"
 											className="num h-9 text-right"
 											disabled={data.confirmed}
-											aria-invalid={errorLine === a.id ? true : undefined}
+											aria-invalid={
+												invalidIds.has(a.id) || errorLine === a.id || undefined
+											}
+											aria-describedby={
+												invalidIds.has(a.id)
+													? `amount-error-${a.id}`
+													: undefined
+											}
 											value={texts[a.id] ?? ""}
 											onChange={(e) =>
 												setTexts((prev) => ({
@@ -145,6 +161,14 @@ function OpeningForm({
 												}))
 											}
 										/>
+										{invalidIds.has(a.id) && (
+											<p
+												id={`amount-error-${a.id}`}
+												className="text-destructive text-sm"
+											>
+												{t("openingInvalid")}
+											</p>
+										)}
 									</td>
 								</tr>
 							)
@@ -154,11 +178,15 @@ function OpeningForm({
 			</div>
 			<dl className="grid gap-x-8 gap-y-1.5 text-sm sm:grid-cols-[auto_auto] sm:justify-start">
 				<dt className="text-muted-foreground">{t("openingAssets")}</dt>
-				<dd className="num font-bold">{formatAmount(assets)}</dd>
+				<dd className="num font-bold">
+					{invalid ? "—" : formatAmount(assets)}
+				</dd>
 				<dt className="text-muted-foreground">{t("openingLiabilities")}</dt>
-				<dd className="num font-bold">{formatAmount(others)}</dd>
+				<dd className="num font-bold">
+					{invalid ? "—" : formatAmount(others)}
+				</dd>
 			</dl>
-			{assets === others ? (
+			{invalid ? null : assets === others ? (
 				<Badge variant="success" className="w-fit">
 					<CircleCheck aria-hidden="true" />
 					{t("openingBalanced")}
@@ -189,7 +217,7 @@ function OpeningForm({
 					<>
 						<Button
 							variant="outline"
-							disabled={save.isPending || !dirty}
+							disabled={invalid || save.isPending || !dirty}
 							onClick={() => save.mutate(rows)}
 						>
 							{save.isPending && (
@@ -198,7 +226,9 @@ function OpeningForm({
 							{t("save")}
 						</Button>
 						<Button
-							disabled={dirty || assets !== others || confirm.isPending}
+							disabled={
+								invalid || dirty || assets !== others || confirm.isPending
+							}
 							onClick={() => confirm.mutate(true)}
 						>
 							{t("openingConfirm")}

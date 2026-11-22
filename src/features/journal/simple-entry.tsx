@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
@@ -90,17 +90,19 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	const [draft] = useState(() => useEntryIntent.getState().draft)
 	const draftKey = String(fiscalYear)
 	const [validation, setValidation] = useState(false)
+	const prior = useSimpleEntryDrafts.getState().forms[draftKey]
 	const initialDate =
 		fiscalYear !== null && !today().startsWith(String(fiscalYear))
 			? `${fiscalYear}-01-01`
 			: today()
 	const [initialForm] = useState<Form>(() => ({
+		billId: draft?.billId,
 		unpaid: false,
 		purposeId: "",
 		choice: draft?.kind ?? "expense",
 		ownerKind: "owner_draw",
-		date: initialDate,
-		amount: "",
+		date: draft && prior ? prior.date : initialDate,
+		amount: draft?.amount ?? (draft ? prior?.amount : undefined) ?? "",
 		accountId: draft
 			? String(
 					masters.accounts.find((a) => a.code === draft.accountCode)?.id ?? ""
@@ -112,7 +114,10 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 				)
 			: "",
 		partnerId: "",
-		memo: draft?.memo ?? "",
+		memo:
+			draft?.amount !== undefined
+				? draft.memo
+				: (draft && prior?.memo) || draft?.memo || "",
 		allocate: false,
 		allocationPercent: "",
 		depositKey: "",
@@ -175,7 +180,23 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 
 	const activeAccounts = masters.accounts.filter((a) => a.isActive)
 	const paymentAccounts = activeAccounts.filter((a) => a.isPaymentAccount)
-	const contentAccounts = activeAccounts.filter((a) => !a.isPaymentAccount)
+	const [accountQuery, setAccountQuery] = useState("")
+	const accountMatches = new Set(
+		masters.accountItems
+			.filter((i) =>
+				`${i.label} ${i.search} ${i.code}`
+					.toLocaleLowerCase()
+					.includes(accountQuery.trim().toLocaleLowerCase())
+			)
+			.map((i) => i.id)
+	)
+	const contentAccounts = activeAccounts.filter(
+		(a) =>
+			!a.isPaymentAccount &&
+			(form.choice !== "expense" ||
+				accountMatches.has(a.id) ||
+				String(a.id) === form.accountId)
+	)
 	const activePartners = masters.partnerItems
 
 	// 経費の科目に按分ルールがあれば、按分の欄を出す（割合はルールのものを初めに入れる）
@@ -188,10 +209,19 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 			features.allocation && form.choice === "expense" && accountId
 				? masters.allocationPercentOf(Number(accountId))
 				: null
+		const confirmed =
+			useSimpleEntryDrafts.getState().confirmedShares[
+				`${draftKey}:${accountId}`
+			]
+		const reuse = percent !== null && confirmed?.configured === percent
 		setForm({
 			accountId,
-			allocate: percent !== null,
-			allocationPercent: percent === null ? "" : String(percent),
+			allocate: reuse,
+			allocationPercent: reuse
+				? confirmed.percent
+				: percent === null
+					? ""
+					: String(percent),
 		})
 	}
 
@@ -199,6 +229,31 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 	if (unpaid) kind = "unpaid_income"
 	if (personal) kind = "personal_expense"
 	const parsedAmount = parseAmount(form.amount)
+	const percent = parseAmount(form.allocationPercent)
+	const ruleId = masters.accountById(
+		Number(form.accountId)
+	)?.defaultAllocationRuleId
+	const rounding = ruleId ? masters.ruleById(ruleId)?.rounding : undefined
+	const split = useQuery({
+		queryKey: ["allocation-preview", parsedAmount, percent, rounding],
+		enabled:
+			!form.purposeId &&
+			rulePercent !== null &&
+			form.allocate &&
+			!!rounding &&
+			Number.isSafeInteger(parsedAmount) &&
+			Number.isSafeInteger(percent) &&
+			(percent ?? -1) >= 0 &&
+			(percent ?? 101) <= 100 &&
+			(parsedAmount ?? 0) > 0,
+		queryFn: () =>
+			callCommand<[number, number]>("preview_business_share", {
+				amount: parsedAmount,
+				percent,
+				rounding,
+			}),
+		retry: false,
+	})
 	const invalid = {
 		date: !form.date
 			? t("dateRequired")
@@ -293,6 +348,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 				return
 			}
 			const transaction = await create.mutateAsync({
+				billId: form.billId,
 				kind,
 				date: form.date,
 				amount,
@@ -308,7 +364,19 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						? amountForCommand(form.allocationPercent)
 						: null,
 			})
-			complete(form, transaction, { partnerId: "" })
+			if (rulePercent !== null && form.accountId)
+				useSimpleEntryDrafts.setState((s) => {
+					const shares = { ...s.confirmedShares }
+					const key = `${draftKey}:${form.accountId}`
+					if (form.allocate)
+						shares[key] = {
+							configured: rulePercent,
+							percent: form.allocationPercent,
+						}
+					else delete shares[key]
+					return { confirmedShares: shares }
+				})
+			complete(form, transaction, { partnerId: "", billId: undefined })
 		} catch {
 			// 入力欄に対応するエラーは mutation から表示する。
 		} finally {
@@ -333,7 +401,13 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 		}
 		const order = categoryOrder[form.choice === "income" ? "income" : "expense"]
 		return (unpaid ? ["revenue" as const] : order).map((category) => {
-			const inCategory = contentAccounts.filter((a) => a.category === category)
+			const inCategory = contentAccounts
+				.filter((a) => a.category === category)
+				.sort(
+					(a, b) =>
+						Number(b.isSystem && b.code === "610") -
+						Number(a.isSystem && a.code === "610")
+				)
 			if (inCategory.length === 0) return null
 			return (
 				<optgroup key={category} label={tMaster(`category_${category}`)}>
@@ -378,30 +452,37 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 					aria-label={t("simple")}
 					className="flex flex-col gap-5"
 				>
+					{form.billId && (
+						<p className="text-sm">{t("billExpense", { name: form.memo })}</p>
+					)}
 					<fieldset disabled={saving} className="flex flex-col gap-5">
-						{(Boolean(activePurposes?.length) || Boolean(form.purposeId)) && (
-							<Field label={tMaster("purposes")} hint={tMaster("purposeEntry")}>
-								<NativeSelect
-									disabled={saving}
-									value={form.purposeId}
-									onChange={(event) => {
-										setForm({ purposeId: event.target.value })
-									}}
+						{!form.billId &&
+							(Boolean(activePurposes?.length) || Boolean(form.purposeId)) && (
+								<Field
+									label={tMaster("purposes")}
+									hint={tMaster("purposeEntry")}
 								>
-									<option value="">{t("purposeManual")}</option>
-									{form.purposeId && !purpose && (
-										<option value={form.purposeId} disabled>
-											{t("purposeUnavailable")}
-										</option>
-									)}
-									{activePurposes?.map((item) => (
-										<option key={item.id} value={item.id}>
-											{item.code} {displayName(item, locale)}
-										</option>
-									))}
-								</NativeSelect>
-							</Field>
-						)}
+									<NativeSelect
+										disabled={saving}
+										value={form.purposeId}
+										onChange={(event) => {
+											setForm({ purposeId: event.target.value })
+										}}
+									>
+										<option value="">{t("purposeManual")}</option>
+										{form.purposeId && !purpose && (
+											<option value={form.purposeId} disabled>
+												{t("purposeUnavailable")}
+											</option>
+										)}
+										{activePurposes?.map((item) => (
+											<option key={item.id} value={item.id}>
+												{item.code} {displayName(item, locale)}
+											</option>
+										))}
+									</NativeSelect>
+								</Field>
+							)}
 						{purpose && (
 							<div className="flex flex-col gap-1 text-sm">
 								<p>
@@ -429,7 +510,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							</div>
 						)}
 
-						{!form.purposeId && (
+						{!form.purposeId && !form.billId && (
 							<fieldset
 								id="tutorial-entry-kind"
 								tabIndex={-1}
@@ -443,6 +524,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									onValueChange={(value) =>
 										setForm({
 											choice: value as KindChoice,
+											billId: undefined,
 											accountId: "",
 											unpaid: false,
 											paymentAccountId: personal ? "" : form.paymentAccountId,
@@ -564,6 +646,22 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									className="num text-right"
 								/>
 							</Field>
+							{!form.purposeId && form.choice === "expense" && (
+								<Field
+									label={t("findExpense")}
+									hint={
+										accountQuery.trim() && accountMatches.size === 0
+											? t("noCandidates")
+											: undefined
+									}
+								>
+									<Input
+										type="search"
+										value={accountQuery}
+										onChange={(e) => setAccountQuery(e.target.value)}
+									/>
+								</Field>
+							)}
 							{!form.purposeId && form.choice !== "owner" && !linked && (
 								<Field
 									term="account"
@@ -645,12 +743,25 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 								<legend className="px-1 font-medium text-sm">
 									{t("allocationTitle")} <TermHelp term="allocation" />
 								</legend>
+								<p className="text-sm text-muted-foreground">
+									{t("allocationExample", { percent: rulePercent })}
+								</p>
 								<LabeledCheckbox
 									className=""
 									label={t("allocate")}
 									checked={form.allocate}
 									onChange={(e) => setForm({ allocate: e.target.checked })}
 								/>
+								{form.allocate &&
+									Array.isArray(split.data) &&
+									split.data.length === 2 && (
+										<p aria-live="polite" className="text-sm">
+											{t("splitPreview", {
+												business: formatAmount(split.data[0]),
+												private: formatAmount(split.data[1]),
+											})}
+										</p>
+									)}
 								{form.allocate && (
 									<Field
 										term="allocation"

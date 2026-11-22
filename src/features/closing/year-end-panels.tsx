@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { CircleCheck, Loader2 } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -158,6 +159,31 @@ export function ChecklistPanel({
 									</span>
 								)}
 							</div>
+							{!item.done && !destination && (
+								<Link
+									className="ml-auto text-primary text-sm underline"
+									to={
+										item.item === "allocation"
+											? "/master"
+											: item.item === "cashCount"
+												? "/ledgers"
+												: "/transactions"
+									}
+									search={
+										item.item === "allocation"
+											? { view: "allocationRules" }
+											: {}
+									}
+								>
+									{t(
+										item.item === "allocation"
+											? "openAllocation"
+											: item.item === "cashCount"
+												? "openLedger"
+												: "openEntry"
+									)}
+								</Link>
+							)}
 							{!item.done && destination && (
 								<Button
 									type="button"

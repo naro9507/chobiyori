@@ -234,6 +234,8 @@ beforeEach(() => {
 					},
 					data: "AA==",
 				}
+			case "reveal_export":
+				return null
 			case "export_report":
 				return "仕訳帳_2014_01-12.pdf"
 			default:
@@ -297,7 +299,17 @@ describe("帳簿", () => {
 		)
 		await user.click(screen.getByRole("button", { name: "CSV で保存" }))
 		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			receipt: expect.any(String),
 			request: expect.objectContaining({ search }),
+		})
+		const exported = mocks.callCommand.mock.calls.find(
+			([command]) => command === "export_report"
+		)
+		await user.click(
+			await screen.findByRole("button", { name: "保存したファイルを表示" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("reveal_export", {
+			receipt: exported?.[1].receipt,
 		})
 		await user.click(
 			await screen.findByRole("button", {
@@ -385,6 +397,7 @@ describe("帳簿", () => {
 		await user.click(screen.getByRole("button", { name: "PDF で保存" }))
 
 		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			receipt: expect.any(String),
 			request: {
 				target: { kind: "journal" },
 				format: "pdf",

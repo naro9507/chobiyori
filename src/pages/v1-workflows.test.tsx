@@ -489,3 +489,67 @@ it("基本操作の案内を最後まで進めるとホームから消え、ヘ�
 	await screen.findByRole("heading", { name: "事業者情報と年度を確かめる" })
 	await user.click(screen.getByRole("button", { name: "中断する" }))
 })
+
+it("ヘルプの売上案内は収入で開き、品名でも記入例を検索できる", async () => {
+	const user = userEvent.setup()
+	renderApp()
+	const search = await screen.findByRole("searchbox")
+	for (const word of ["ボールペン", "ネット代", "スマホ代", "振込手数料"]) {
+		await user.clear(search)
+		await user.type(search, word)
+		expect(
+			screen.queryAllByRole("heading", { level: 3 }).length
+		).toBeGreaterThan(0)
+	}
+	await user.clear(search)
+	await user.click(
+		screen.getByRole("link", { name: "かんたん入力で売上を記録する" })
+	)
+	const form = within(await screen.findByRole("form", { name: "かんたん入力" }))
+	expect(form.getByRole("radio", { name: "収入" })).toBeChecked()
+})
+
+it("本文へ移動してもハッシュルートと記帳中の内容を維持する", async () => {
+	const user = userEvent.setup()
+	window.history.replaceState({}, "", "/#/transactions")
+	const router = createAppRouter()
+	render(
+		<AppProviders>
+			<RouterProvider router={router} />
+		</AppProviders>
+	)
+	const form = within(await screen.findByRole("form", { name: "かんたん入力" }))
+	await user.type(form.getByLabelText("金額"), "4500")
+	screen.getByRole("button", { name: "本文へ移動" }).focus()
+	await user.keyboard("{Enter}")
+	expect(window.location.hash).toBe("#/transactions")
+	expect(screen.getByRole("main")).toHaveFocus()
+	expect(form.getByLabelText("金額")).toHaveValue("4500")
+})
+it("記入例の適用を取り消すと編集中の金額とメモが残る", async () => {
+	const user = userEvent.setup()
+	renderApp("/transactions")
+	const form = within(await screen.findByRole("form", { name: "かんたん入力" }))
+	const amount = form.getByLabelText("金額")
+	await user.clear(amount)
+	await user.type(amount, "4500")
+	await user.type(form.getByLabelText("メモ"), "携帯料金")
+	const menu = within(
+		screen.getByRole("navigation", { name: "メインメニュー" })
+	)
+	await user.click(menu.getByRole("link", { name: "ヘルプ" }))
+	await user.type(await screen.findByRole("searchbox"), "ボールペン")
+	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
+	try {
+		await user.click(screen.getByRole("button", { name: "この形で入力" }))
+		expect(confirm).toHaveBeenCalledOnce()
+		await user.click(menu.getByRole("link", { name: "取引入力" }))
+		const restored = within(
+			await screen.findByRole("form", { name: "かんたん入力" })
+		)
+		expect(restored.getByLabelText("金額")).toHaveValue("4500")
+		expect(restored.getByLabelText("メモ")).toHaveValue("携帯料金")
+	} finally {
+		confirm.mockRestore()
+	}
+})

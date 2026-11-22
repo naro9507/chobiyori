@@ -146,7 +146,12 @@ export type ExportRequest = {
 /** 帳簿を CSV か PDF で保存する。保存先を選ぶ画面は Rust 側で開く。やめたら null。 */
 export function useExport() {
 	return useMutation({
-		mutationFn: (request: ExportRequest) =>
-			callCommand<string | null>("export_report", { request }),
+		mutationFn: ({
+			request,
+			receipt,
+		}: {
+			request: ExportRequest
+			receipt: string
+		}) => callCommand<string | null>("export_report", { request, receipt }),
 	})
 }

@@ -19,7 +19,7 @@ const views = ["receipts", "statement", "reconcile", "settings"] as const
 /** 取込受信箱。確認待ちを起点に、取り込みや設定へ進む。 */
 export function InboxPage() {
 	const t = useTranslations("inbox")
-	const { view } = useSearch({ strict: false })
+	const { view, receiptId } = useSearch({ strict: false })
 	const fiscalYear = useFiscalYear()
 	const { data } = useReconciliation(fiscalYear)
 	const hasReconciliation =
@@ -92,7 +92,7 @@ export function InboxPage() {
 							? t("importSettings")
 							: t(`tab_${activeView ?? "review"}`)}
 					</h2>
-					{!activeView && <ReviewPanel />}
+					{!activeView && <ReviewPanel key={receiptId} receiptId={receiptId} />}
 					{activeView === "receipts" && <ReceiptsPanel />}
 					{activeView === "reconcile" && <ReconcilePanel />}
 					{activeView === "statement" && <StatementPanel />}

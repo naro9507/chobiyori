@@ -8,6 +8,7 @@ import {
 	subAccountKind,
 	useMasterList,
 } from "@/features/master/master-api"
+import { useTranslations } from "@/i18n/use-translations"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { Transaction } from "./journal-api"
 import type { ComboboxItem } from "./master-combobox"
@@ -37,6 +38,7 @@ export function useJournalMasters(
 	} = {}
 ) {
 	const locale = useSettingsStore((state) => state.locale)
+	const t = useTranslations("journal")
 	const accounts = useMasterList(accountKind)
 	const partners = useMasterList(partnerKind)
 	const subAccounts = useMasterList(subAccountKind)
@@ -44,7 +46,12 @@ export function useJournalMasters(
 
 	const accountItems = (accounts.data ?? [])
 		.filter((a) => a.isActive || keep.accounts?.includes(a.id))
-		.map((a) => toItem(a, locale))
+		.map((a) => {
+			const item = toItem(a, locale)
+			if (a.code === "610" && a.isSystem)
+				item.search = `${item.search} ${t("suppliesKeywords")}`
+			return item
+		})
 	const partnerItems = (partners.data ?? [])
 		.filter((p) => p.isActive || keep.partners?.includes(p.id))
 		.map((p) => toItem(p, locale))

@@ -49,7 +49,7 @@ pub struct SetupInput {
 pub struct SetupAccount {
     pub name: String,
     pub kind: SetupAccountKind,
-    pub balance: i64,
+    pub balance: Option<i64>,
 }
 
 chobiyori_core::string_enum! {
@@ -209,7 +209,7 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
         for (index, account) in input.accounts.iter().enumerate() {
             let name = master::required(&account.name, NAME_MAX, "accountName")
                 .map_err(|e| AppError::line(e.code, index, "accountName"))?;
-            if account.balance.abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
+            if account.balance.unwrap_or_default().abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
                 return Err(AppError::line(ErrorCode::OutOfRange, index, "openingBalance"));
             }
             // 口座は、同じ種類の標準の科目のすぐあとに並べる
@@ -234,8 +234,9 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
                 )?;
                 tx.last_insert_rowid()
             };
-            tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, account.balance])?;
-            if category == "asset" { asset_total += account.balance; } else { liability_total += account.balance; }
+            let Some(balance)=account.balance else {continue;};
+            tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) VALUES (?1, ?2, ?3)", params![year, id, balance])?;
+            if category == "asset" { asset_total += balance; } else { liability_total += balance; }
         }
         let mut seen = std::collections::HashSet::new();
         for (index, row) in input.opening_balances.iter().enumerate() {
@@ -254,9 +255,9 @@ pub fn complete(db: &Database, input: &SetupInput) -> AppResult<SetupStatus> {
         if (asset_total - liability_total).abs_diff(0) > chobiyori_core::journal::AMOUNT_MAX as u64 {
             return Err(AppError::new(ErrorCode::OutOfRange));
         }
-        if !input.accounts.is_empty() || !input.opening_balances.is_empty() {
+        if input.accounts.iter().any(|a|a.balance.is_some()) || !input.opening_balances.is_empty() {
             tx.execute("INSERT INTO opening_balances (fiscal_year, account_id, amount) SELECT ?1, id, ?2 FROM accounts WHERE code = '302'", params![year, asset_total - liability_total])?;
-            tx.execute("UPDATE fiscal_years SET opening_confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE year = ?1", [year])?;
+
         }
         save_features(tx, &input.features)?;
         tx.execute("INSERT INTO settings (key, value) VALUES ('industry_template', ?1)", [input.template.as_str()])?;
@@ -502,17 +503,17 @@ pub(crate) mod tests {
             SetupAccount {
                 name: "現金".into(),
                 kind: SetupAccountKind::Cash,
-                balance: 1_000,
+                balance: Some(1_000),
             },
             SetupAccount {
                 name: "ゆうちょ".into(),
                 kind: SetupAccountKind::Bank,
-                balance: 2_000,
+                balance: Some(2_000),
             },
             SetupAccount {
                 name: "カード".into(),
                 kind: SetupAccountKind::Card,
-                balance: 500,
+                balance: Some(500),
             },
         ];
         let mut bad = setup.clone();
@@ -656,22 +657,22 @@ mod extended_tests {
             SetupAccount {
                 name: "Cash".into(),
                 kind: SetupAccountKind::Cash,
-                balance: 20_000,
+                balance: Some(20_000),
             },
             SetupAccount {
                 name: "Bank".into(),
                 kind: SetupAccountKind::Bank,
-                balance: 100_000,
+                balance: Some(100_000),
             },
             SetupAccount {
                 name: "Card".into(),
                 kind: SetupAccountKind::Card,
-                balance: 5_000,
+                balance: Some(5_000),
             },
             SetupAccount {
                 name: "E-money".into(),
                 kind: SetupAccountKind::EMoney,
-                balance: 3_000,
+                balance: Some(3_000),
             },
         ];
         i.opening_balances = vec![SetupOpening {
@@ -692,6 +693,39 @@ mod extended_tests {
             && a.category == master::AccountCategory::Liability));
     }
     #[test]
+    fn blank_opening_balance_keeps_the_account_and_defers_confirmation() {
+        let db = Database::open_in_memory().unwrap();
+        let mut s = input();
+        s.accounts = vec![SetupAccount {
+            kind: SetupAccountKind::Bank,
+            name: "Bank".into(),
+            balance: None,
+        }];
+        complete(&db, &s).unwrap();
+        let c = db.conn();
+        assert!(c
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM accounts WHERE code='W001')",
+                [],
+                |r| r.get::<_, bool>(0)
+            )
+            .unwrap());
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM opening_balances", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert!(c
+            .query_row(
+                "SELECT opening_confirmed_at IS NULL FROM fiscal_years",
+                [],
+                |r| r.get::<_, bool>(0)
+            )
+            .unwrap());
+    }
+
+    #[test]
     fn invalid_opening_rolls_back_the_entire_setup() {
         let db = Database::open_in_memory().unwrap();
         let mut i = input();
@@ -699,12 +733,12 @@ mod extended_tests {
             SetupAccount {
                 name: "Cash".into(),
                 kind: SetupAccountKind::Cash,
-                balance: 500,
+                balance: Some(500),
             },
             SetupAccount {
                 name: "Bank".into(),
                 kind: SetupAccountKind::Bank,
-                balance: chobiyori_core::journal::AMOUNT_MAX + 1,
+                balance: Some(chobiyori_core::journal::AMOUNT_MAX + 1),
             },
         ];
         assert!(complete(&db, &i).is_err());

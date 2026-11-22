@@ -14,7 +14,7 @@
 		"inbox": "取込受信箱",
 		"ledgers": "帳簿",
 		"reports": "集計",
-		"receivables": "売上管理",
+		"receivables": "定期売上",
 		"closing": "決算",
 		"master": "マスタ",
 		"data": "データ",
@@ -54,7 +54,8 @@
 		"firstStepsDismiss": "この案内を閉じる",
 		"firstAccounts": "使う口座を確認する（マスタの「勘定科目」）",
 		"firstOpening": "開業時の残高を入れる（残高がなければ 0 円のまま確定）",
-		"firstTransaction": "最初の売上や経費を記録する"
+		"firstTransaction": "最初の売上や経費を記録する",
+		"setupRecovery": "パスワードを忘れたときの復旧コードを発行する"
 	},
 	"settings": {
 		"language": "表示する言語",
@@ -85,7 +86,7 @@
 		"documentsGroup": "発行する書類・メール",
 		"documentsSummary": "見積書・納品書・請求書・領収書に載せる情報やロゴ、振込先、メール送信を設定します。",
 		"menusGroup": "帳簿に表示するメニュー・入力項目",
-		"menusSummary": "「請求書」「売上管理」のメニューや、取引入力の「家事按分」などの表示を切り替えます。",
+		"menusSummary": "「請求書」「定期売上」のメニューや、取引入力の「家事按分」などの表示を切り替えます。",
 		"receiptsGroup": "レシートの読み取り",
 		"receiptsSummary": "受け取ったレシートを写真から読み取るために、Gemini の API キーなどを設定します。",
 		"externalGroup": "外部アカウント連携",
@@ -138,7 +139,7 @@
 		"invoiceRegistrationNoHint": "登録済みの方は、登録通知書に記載された番号（T＋13桁の数字）を入力してください。未登録の方は空欄で進めます。",
 		"invoiceRegistrationNoLookup": "国税庁の公表サイトで番号を確認",
 		"filingTitle": "申告の区分",
-		"filingDescription": "分からなければ、青色申告（65 万円控除）を選んでください。届出を出していない場合は白色申告です。",
+		"filingDescription": "青色申告の届出・承認状況を申請書の控えや税務署で確かめて選んでください。不明な場合は仮に白色で始め、確認後に設定で変更できます。",
 		"filing_blue65": "青色申告（65 万円控除）",
 		"filing_blue55": "青色申告（55 万円控除）",
 		"filing_blue10": "青色申告（10 万円控除・簡易簿記）",
@@ -161,7 +162,7 @@
 		"fiscalYear": "年度（西暦）",
 		"fiscalYearHint": "例: 2026",
 		"templateTitle": "業種を選んでください",
-		"templateBody": "青色申告決算書に合わせた標準の科目（現金、売上高、消耗品費など）に、業種でよく使う科目と家事按分のルールを足します。科目の追加や名前の変更、実際の使い方に合わせた按分割合の調整は、あとからマスタ画面でできます。",
+		"templateBody": "この業種でよく使う科目と家事按分の例を追加します。あとからマスタで変更できます。",
 		"back": "戻る",
 		"next": "次へ",
 		"start": "はじめる",
@@ -183,7 +184,8 @@
 		"template_itWeb": "IT・Web制作",
 		"template_itWebHint": "ソフトウェア利用料・サーバー代など。自宅兼事務所の按分",
 		"template_delivery": "運送・配達",
-		"template_deliveryHint": "燃料費・有料道路料金など。車や通信費の按分"
+		"template_deliveryHint": "燃料費・有料道路料金など。車や通信費の按分",
+		"filingUndecided": "まだ分からない（仮に白色で開始）"
 	},
 	"master": {
 		"tabsLabel": "マスタの種類",
@@ -376,7 +378,13 @@
 		"reviewSaved": "この取引を確認・修正",
 		"backToEntry": "取引入力へ戻る",
 		"entryNotFound": "この取引は見つかりませんでした。",
-		"edit": "修正する"
+		"edit": "修正する",
+		"allocationExample": "設定されている事業割合は {percent}% です。自分の使用記録を確認してから適用してください。",
+		"findExpense": "品名・用途で科目を探す（例：ボールペン）",
+		"suppliesKeywords": "文房具 筆記具 ボールペン ペン ノート コピー用紙",
+		"noCandidates": "候補がありません。別の名前か番号を入力してください。",
+		"splitPreview": "この支払いの事業分 {business} 円・私用分 {private} 円",
+		"billExpense": "受け取った請求書の支払い「{name}」を経費として記帳します。"
 	},
 	"reports": {
 		"trialBalance": "合計残高試算表",
@@ -526,7 +534,8 @@
 		"noPartner": "取引先なし（期首残高を含む）",
 		"noPartnerAccounts": "売掛金・買掛金の科目がありません。",
 		"sales": "売上帳",
-		"salesHint": "売上高の科目ごとに、取引の明細を表示します。"
+		"salesHint": "売上高の科目ごとに、取引の明細を表示します。",
+		"showFile": "保存したファイルを表示"
 	},
 	"data": {
 		"exportBookHistory": "帳簿の変更履歴",
@@ -853,7 +862,8 @@
 		"ignoredRowsTitle": "取込から除いた行が {count} 件あります。",
 		"otherIgnoredRows": "ほか {count} 行",
 		"sourceRow": "{file} の {row} 行目",
-		"similarStatement": "同じ日付・金額・店名の明細あり"
+		"similarStatement": "同じ日付・金額・店名の明細あり",
+		"formatAdvanced": "読み取り形式を調整する（文字コード・列の割り当てなど）"
 	},
 	"attachments": {
 		"title": "証憑: {name}",
@@ -935,7 +945,9 @@
 		"dateRequired": "レシートの日付を入れてください。",
 		"dateInvalid": "日付を「2026-11-19」のように、年・月・日の順に入れてください。",
 		"totalInvalid": "合計（税込）に 1 円以上の金額を入れてください。",
-		"reducedAmountInvalid": "軽減税率の対象額は、合計（税込）とポイントで払った額を足した額以下にしてください。"
+		"reducedAmountInvalid": "軽減税率の対象額は、合計（税込）とポイントで払った額を足した額以下にしてください。",
+		"deleteConfirm": "「{name}」を帳簿から削除しますか？　ほかで使っていない添付画像も削除されます。",
+		"manualAdded": "レシートを確認待ちに1件追加しました。"
 	},
 	"receiptSettings": {
 		"title": "レシートの読み取り",
@@ -1145,7 +1157,11 @@
 		"assetPurchaseNote": "資産を買ったときの支払いは、登録するときに「買ったときの支払い」を選ぶと一緒に記録できます。取引入力で「工具器具備品 / 普通預金」のように記録してもかまいません。",
 		"purchasePayment": "買ったときの支払い",
 		"purchasePaymentHint": "支払った口座を選ぶと、使い始めた日の「資産 / 口座」の取引も一緒に記録します。私用のお金で買ったときは事業主借を選びます。",
-		"purchaseNotRecorded": "記録しない（取引入力で記録した）"
+		"purchaseNotRecorded": "記録しない（取引入力で記録した）",
+		"openingInvalid": "10000 または 10,000 のように数字で入力してください。",
+		"openAllocation": "家事按分ルールを確認",
+		"openLedger": "帳簿を照合する",
+		"openEntry": "取引を確認・入力する"
 	},
 	"security": {
 		"createTitle": "帳簿のパスワードを決めてください",
@@ -1316,7 +1332,15 @@
 		"save": "保存",
 		"cancel": "キャンセル",
 		"delete": "削除",
-		"deleteConfirm": "この支払期限を削除しますか？"
+		"deleteConfirm": "この支払期限を削除しますか？",
+		"enterExpense": "この支払いを経費として入力",
+		"lookupMonth": "{year}年度の取引月",
+		"linked": "取引 #{id} と記帳済み",
+		"linkExisting": "記帳済みの取引を選ぶ",
+		"existingTransaction": "記帳済みの取引",
+		"chooseTransaction": "取引を選んでください",
+		"linkPayment": "この取引と結び付ける",
+		"replaceDraft": "編集中の経費を、この支払いの入力に置き換えますか？"
 	},
 	"documents": {
 		"choosePaymentAccount": "入金した口座を選んでください",
@@ -1430,7 +1454,14 @@
 		"savePayment": "入金を記録する",
 		"linesHintNoTax": "この発行日は登録番号なしの様式なので、消費税は足しません。単価は受け取る金額で入れてください。値引きは「-1000」のように入れます。数量は 1.5 のように小数も使えます。",
 		"unitPriceNoTax": "単価",
-		"previewEmpty": "品名を入れると、ここに紙面が出ます。"
+		"previewEmpty": "品名を入れると、ここに紙面が出ます。",
+		"needPrice": "単価を数字で入力してください。無料の明細には 0 を入力します。",
+		"needRecipient": "発行するには宛名を入力してください。",
+		"filterEmpty": "この条件に合う書類はありません。",
+		"clearFilters": "絞り込みを解除",
+		"discardEdits": "入力内容を破棄して一覧に戻りますか？ 続けて編集するにはキャンセルしてください。",
+		"invoicePositive": "合計が1円以上になるよう、請求書の単価と数量を確認してください。",
+		"draftRetained": "下書きは保存しました。入力を直して、もう一度発行してください。"
 	},
 	"documentSettings": {
 		"title": "請求書などの書類",
@@ -1734,7 +1765,7 @@
 		"calendarAuthorizing": "ブラウザでカレンダーへのアクセスを許可し、帳日和に戻ってください。"
 	},
 	"receivables": {
-		"tabsLabel": "売上管理の表示",
+		"tabsLabel": "定期売上の表示",
 		"monthly": "月ごとの入金",
 		"year": "年間の一覧",
 		"plans": "定期売上のプラン",
@@ -1810,7 +1841,7 @@
 		"noTarget": "つなげない",
 		"invoices": "請求書（未入金）",
 		"invoiceOption": "{number} {name}（残り {amount} 円）",
-		"saleNotRecorded": "（先に請求書を発行して売上を記録してください）",
+		"saleNotRecorded": "（この請求書の売上はまだ記帳されていません）",
 		"plans": "定期売上",
 		"planOption": "{partner} {name} {month}（残り {amount} 円）",
 		"linkTitle": "入金をつなげる",
@@ -1819,7 +1850,8 @@
 		"remaining": "残り {amount} 円",
 		"sameAmount": "金額が同じ",
 		"sameName": "名前が同じ",
-		"chooseTarget": "ほかから選ぶ"
+		"chooseTarget": "ほかから選ぶ",
+		"openUnposted": "請求書 {number} を開いて売上を記帳する"
 	},
 	"tutorial": {
 		"collapse": "チュートリアルを折りたたむ",
@@ -1940,7 +1972,7 @@
 		"closing": "決算・申告をしたい",
 		"closingBody": "決算のチェックリストから、期首残高・固定資産・棚卸を確認します。決算書の金額と申告の案内を確認し、国税庁の作成コーナーへ転記します。",
 		"supplies": "現金で文房具を購入",
-		"suppliesBody": "支出・消耗品費・現金。例：1,200 円なら、借方は消耗品費、貸方は現金です。金額と日付は実際の取引に合わせて入力します。",
+		"suppliesBody": "ペン・ボールペンなどの文房具は消耗品費の例です。現金で支払った場合の入力例を開けます。",
 		"cashSales": "現金で売上を受け取った",
 		"cashSalesBody": "収入・売上高・現金。例：5,000 円なら、借方は現金、貸方は売上高です。",
 		"journal": "仕訳",
@@ -1983,7 +2015,7 @@
 		"screen_ledgersBody": "仕訳帳・総勘定元帳・現金出納帳と預金出納帳・経費帳・売掛帳と買掛帳を見て、CSV や PDF で保存できます。",
 		"screen_reports": "集計",
 		"screen_reportsBody": "試算表と口座の残高を見られます。数字はすべて仕訳から計算します。",
-		"screen_receivables": "売上管理",
+		"screen_receivables": "定期売上",
 		"screen_receivablesBody": "月謝や会費など、毎月決まった売上と入金を管理します。",
 		"screen_closing": "決算",
 		"screen_closingBody": "期首残高・減価償却・棚卸を済ませ、青色申告決算書に転記する金額を出します。確定申告と消費税の申告で入れる値と、翌年への繰越もここで扱います。",
@@ -2001,7 +2033,7 @@
 		"topicHelp": "{topic}の説明",
 		"missingExampleAccounts": "この例の科目・口座を使えません。マスタで科目の有効状態と、支払・入金口座の設定を確認してください。",
 		"sharedExpenses": "事業と私用に共通する支出を分けたい",
-		"sharedExpensesBody": "マスタの「家事按分ルール」で、使用面積・使用時間などの記録に基づく事業割合を登録し、勘定科目に設定します。かんたん入力には支払った全額を入れます。初期の割合は入力例であり、一律に経費にできる割合ではありません。国税庁 No.2210 も参照できます。",
+		"sharedExpensesBody": "ネット代・スマホ代など仕事と私用を兼ねる支払いは、通信費の事業割合を使用記録に基づいて設定します。マスタの「家事按分ルール」で変更できます。",
 		"teachingMaterials": "教室で使う教材を現金で購入",
 		"teachingMaterialsBody": "支出・教材費・現金。例：3,000 円なら、借方は教材費、貸方は現金です。教室・スクールのテンプレートの科目を使います。",
 		"tuition": "毎月の月謝を振込で受け取った",
@@ -2023,7 +2055,10 @@
 		"collectReceivable": "未入金だった売上が振り込まれた",
 		"collectReceivableBody": "収入・売掛金・普通預金。借方は普通預金、貸方は売掛金です。すでに売上を記録しているため、売上高をもう一度選ばないようにします。請求書への入金なら、かんたん入力で該当の請求書も選んでください。",
 		"personalExpense": "私用のお金やカードで立て替えた",
-		"personalExpenseBody": "「取引入力 → かんたん入力 → 支出」で、支払元に「私用のお金・カードで立て替えた」を選びます。何に使ったかと金額を入れると、事業主借を使って記録します。"
+		"personalExpenseBody": "「取引入力 → かんたん入力 → 支出」で、支払元に「私用のお金・カードで立て替えた」を選びます。何に使ったかと金額を入れると、事業主借を使って記録します。",
+		"bankFee": "振込手数料を記録する",
+		"bankFeeBody": "振込手数料は支出です。かんたん入力で「何に使ったか」から支払手数料など実際に使う科目を選び、銀行口座から支払った金額を入力します。",
+		"replaceEntry": "作業中の入力があります。日付・金額・メモを引き継ぎ、取引の種類・科目・支払い方法などを選び直しますか？ キャンセルで下書きを残します。"
 	},
 	"commands": {
 		"title": "コマンドパレット",
@@ -2046,7 +2081,7 @@
 		"remove": "削除",
 		"balance": "開始時点の残高（円）",
 		"opening": "期首残高と開業の案内",
-		"openingHint": "口座ごとに開始時点の残高を入力します。借入金などがあれば、その他の期首残高も入力できます。",
+		"openingHint": "まだ調べていない残高は空欄で進めます。入力した残高は下書きとして保存します。あとでホームから「期首残高」を開いて確認・確定してください。",
 		"firstYear": "開業費について（開業 1 年目の方へ）",
 		"startupHint": "開業準備のために特別に支出した費用は、開業費として扱う場合があります。資産の購入代金や前払費用は分けて考えます。開業費は資産として記録し、必要経費にする年の償却額を仕訳で記録します（自動償却はしません）。任意償却では未償却残高の範囲で金額を選び、支出内容と償却の記録を残します。元入金は、期首の資産と負債の差額です。",
 		"features": "表示する項目",
@@ -2075,7 +2110,7 @@
 		"featuresLater": "後から「設定」の「帳簿に表示するメニュー・入力項目」で変更できます。",
 		"screens_inventory": "オンにすると、決算に「棚卸」が表示されます。",
 		"screens_receivables": "オンにすると、左メニューに「請求書」、帳簿に「売掛帳・買掛帳」、かんたん入力に「入金をつなげる」が表示されます。",
-		"screens_recurring": "オンにすると、左メニューに「売上管理」、取引入力に「毎月の取引」が表示されます。",
+		"screens_recurring": "オンにすると、左メニューに「定期売上」、取引入力に「毎月の取引」が表示されます。",
 		"screens_allocation": "オンにすると、マスタに「家事按分ルール」、かんたん入力に家事按分の入力欄が表示されます。",
 		"balanceInvalid": "残高は整数で入れてください（マイナスも入れられます）。"
 	}

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { NativeSelect } from "@/components/ui/input"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
@@ -27,52 +28,66 @@ export function DepositTargetSelect({
 	const invoices = targets?.invoices ?? []
 	const months = targets?.planMonths ?? []
 	return (
-		<NativeSelect
-			id={id}
-			value={value}
-			onChange={(e) => onChange(e.target.value)}
-			{...rest}
-		>
-			<option value="">{t("noTarget")}</option>
-			{invoices.length > 0 && (
-				<optgroup label={t("invoices")}>
-					{invoices.map((i) => (
-						<option
-							key={i.documentId}
-							value={targetKey({ kind: "invoice", documentId: i.documentId })}
-							disabled={!i.saleRecorded}
-						>
-							{t("invoiceOption", {
-								number: i.number ?? "",
-								name: i.recipientName,
-								amount: formatAmount(i.remaining),
-							})}
-							{i.saleRecorded ? "" : ` ${t("saleNotRecorded")}`}
-						</option>
-					))}
-				</optgroup>
-			)}
-			{months.length > 0 && (
-				<optgroup label={t("plans")}>
-					{months.map((p) => (
-						<option
-							key={`${p.planId}-${p.month}`}
-							value={targetKey({
-								kind: "plan",
-								planId: p.planId,
-								month: p.month,
-							})}
-						>
-							{t("planOption", {
-								partner: masters.partnerLabel(p.partnerId),
-								name: p.name,
-								month: p.month,
-								amount: formatAmount(p.remaining),
-							})}
-						</option>
-					))}
-				</optgroup>
-			)}
-		</NativeSelect>
+		<>
+			<NativeSelect
+				id={id}
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				{...rest}
+			>
+				<option value="">{t("noTarget")}</option>
+				{invoices.length > 0 && (
+					<optgroup label={t("invoices")}>
+						{invoices.map((i) => (
+							<option
+								key={i.documentId}
+								value={targetKey({ kind: "invoice", documentId: i.documentId })}
+								disabled={!i.saleRecorded}
+							>
+								{t("invoiceOption", {
+									number: i.number ?? "",
+									name: i.recipientName,
+									amount: formatAmount(i.remaining),
+								})}
+								{i.saleRecorded ? "" : ` ${t("saleNotRecorded")}`}
+							</option>
+						))}
+					</optgroup>
+				)}
+				{months.length > 0 && (
+					<optgroup label={t("plans")}>
+						{months.map((p) => (
+							<option
+								key={`${p.planId}-${p.month}`}
+								value={targetKey({
+									kind: "plan",
+									planId: p.planId,
+									month: p.month,
+								})}
+							>
+								{t("planOption", {
+									partner: masters.partnerLabel(p.partnerId),
+									name: p.name,
+									month: p.month,
+									amount: formatAmount(p.remaining),
+								})}
+							</option>
+						))}
+					</optgroup>
+				)}
+			</NativeSelect>
+			{invoices
+				.filter((i) => !i.saleRecorded)
+				.map((i) => (
+					<Link
+						key={i.documentId}
+						className="block text-primary text-sm underline"
+						to="/documents"
+						search={{ documentId: i.documentId }}
+					>
+						{t("openUnposted", { number: i.number ?? i.recipientName })}
+					</Link>
+				))}
+		</>
 	)
 }

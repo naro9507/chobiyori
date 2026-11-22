@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input"
 import { helpSections, matchesHelp } from "@/features/help/help-content"
 import { useHelpArticles } from "@/features/help/use-help-articles"
 import { useJournalMasters } from "@/features/journal/use-master-items"
+import { useFiscalYear } from "@/features/setup/fiscal-years"
 import { useTranslations } from "@/i18n/use-translations"
 import { useEntryIntent } from "@/stores/entry-intent-store"
+import { useSimpleEntryDrafts } from "@/stores/simple-entry-draft-store"
 import { useTransactionsTab } from "@/stores/transactions-tab-store"
 
 export function HelpPage() {
@@ -39,6 +41,24 @@ export function HelpPage() {
 				account.isActive &&
 				account.isPaymentAccount
 		)
+	const year = useFiscalYear()
+	const canReplace = () => {
+		const d = useSimpleEntryDrafts.getState().forms[String(year)]
+		return (
+			!d ||
+			!(
+				d.amount ||
+				d.memo ||
+				d.accountId ||
+				d.paymentAccountId ||
+				d.purposeId ||
+				d.partnerId ||
+				d.depositKey ||
+				d.unpaid
+			) ||
+			window.confirm(t("replaceEntry"))
+		)
+	}
 	const articles = visibleArticles.filter((a) =>
 		selectedArticle
 			? a.id === selectedArticle
@@ -120,7 +140,18 @@ export function HelpPage() {
 										<Link
 											to={a.path}
 											search={{ article: a.id, view: a.view }}
-											onClick={() => {
+											onClick={(e) => {
+												if (a.id === "sales" && !canReplace()) {
+													e.preventDefault()
+													return
+												}
+												if (a.id === "sales")
+													useEntryIntent.getState().transaction({
+														kind: "income",
+														accountCode: "",
+														paymentCode: "",
+														memo: "",
+													})
 												if (a.path === "/transactions")
 													useTransactionsTab.getState().setTab("simple")
 											}}
@@ -138,7 +169,12 @@ export function HelpPage() {
 												disabled={!canUseExample(a.example)}
 												variant="outline"
 												onClick={() => {
-													if (!a.example || !canUseExample(a.example)) return
+													if (
+														!a.example ||
+														!canUseExample(a.example) ||
+														!canReplace()
+													)
+														return
 													useEntryIntent.getState().transaction({
 														...a.example,
 														memo: t(a.id),

@@ -123,6 +123,7 @@ export function useInvalidateBooks() {
 			queryClient.invalidateQueries({ queryKey: ["recurring"] }),
 			queryClient.invalidateQueries({ queryKey: calendarPlanKey }),
 			queryClient.invalidateQueries({ queryKey: ["documents"] }),
+			queryClient.invalidateQueries({ queryKey: ["received-bills"] }),
 			queryClient.invalidateQueries({ queryKey: ["deposit-targets"] }),
 			queryClient.invalidateQueries({ queryKey: ["deposit-suggestions"] }),
 			queryClient.invalidateQueries({ queryKey: ["master"] }),
@@ -143,8 +144,9 @@ export function useSaveTransaction(fiscalYear: number | null) {
 export function useCreateSimpleTransaction(fiscalYear: number | null) {
 	const onSuccess = useInvalidateBooks()
 	return useMutation({
-		mutationFn: (input: SimpleInput) =>
+		mutationFn: ({ billId, ...input }: SimpleInput & { billId?: number }) =>
 			callCommand<Transaction>("create_simple_transaction", {
+				...(billId === undefined ? {} : { billId }),
 				fiscalYear,
 				input,
 			}),
