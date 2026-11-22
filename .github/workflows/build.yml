@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   release-ci:
+    timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-26.04
     permissions:
