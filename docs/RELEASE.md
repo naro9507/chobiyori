@@ -67,7 +67,7 @@ GitHub の Settings → Actions → General で「Allow GitHub Actions to create
 1. 「vX.Y.Z」PR（タイトルも本文もタグ名だけ）の CI の結果を確かめ、`main` にマージする。PR が見つからない場合は、`main` に変更メモがあることを確認し、Actions の「Prepare release PR」を `main` で手動実行できる。
 2. マージすると、Actions の「Tag release」がマージ結果のコミットに `vX.Y.Z` タグを付け、配布ビルドを始める。タグが作成済みなら何もしない。
 
-Actions で「CI」と「Build installers」の結果を確認する。「Publish latest release」が最新の正式版タグの配布ファイルを確認し、下書きを Latest として公開する。公開だけを再確認するときは「Publish latest release」の「Run workflow」を使う。
+「Build installers」の実行画面で進捗を確認できる。`release-ci` がタグと同じコミットの `main` の CI を待つ。これと Windows・macOS の両ビルドがすべて成功すると、後続の `publish` が最新の正式版タグの配布ファイルを検証し、下書きを Latest として公開する。失敗したジョブは同じ実行画面から再実行できる。以前のタグの下書きなど、CI とビルドがすでに成功していて公開だけを再確認するときは「Publish latest release」を `main` で手動実行する。
 
 バージョンは必ず前より大きい番号にする。同じか小さい番号では、更新として扱われない。
 
