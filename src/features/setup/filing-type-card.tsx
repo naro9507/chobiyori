@@ -100,11 +100,22 @@ export function FilingTypeCard({ fiscalYear }: { fiscalYear: number | null }) {
 									setFilingChoice(e.target.value as FilingType)
 								}}
 							>
-								{filingTypes.map((type) => (
-									<option key={type} value={type}>
-										{tSetup(`filing_${type}`)}
-									</option>
-								))}
+								{filingTypes
+									.filter(
+										(type) =>
+											year.year < 2027 ||
+											type !== "blue55" ||
+											filingType === type
+									)
+									.map((type) => (
+										<option key={type} value={type}>
+											{tSetup(
+												year.year >= 2027 && type === "blue55"
+													? "filing_blue55_paper2027"
+													: `filing_${type}`
+											)}
+										</option>
+									))}
 							</NativeSelect>
 						</Field>
 						<Field

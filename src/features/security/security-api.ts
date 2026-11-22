@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { calendarPlanKey } from "@/features/filing/calendar-query"
+import type { TaxCategory } from "@/features/master/master-api"
 import { callCommand } from "@/lib/tauri"
 
 /** Rust 側 `commands::security::BookStatus` と同じ形。 */
@@ -208,7 +209,17 @@ export type HistoryEntry = {
 export type HistoryTransaction = {
 	date: string
 	memo: string
-	lines: { side: "debit" | "credit"; accountId: number; amount: number }[]
+	lines: {
+		id: number
+		side: "debit" | "credit"
+		accountId: number
+		accountLabel?: string
+		subAccountLabel?: string | null
+		partnerLabel?: string | null
+		amount: number
+		memo?: string
+		taxCategory?: TaxCategory | null
+	}[]
 }
 
 type HistoryPage = {

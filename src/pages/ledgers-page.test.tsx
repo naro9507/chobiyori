@@ -234,6 +234,8 @@ beforeEach(() => {
 					},
 					data: "AA==",
 				}
+			case "reveal_export":
+				return null
 			case "export_report":
 				return "仕訳帳_2014_01-12.pdf"
 			default:
@@ -255,6 +257,7 @@ describe("帳簿", () => {
 				.map((c) => c.textContent)
 		).toEqual([
 			"3/05",
+			"1",
 			"104 普通預金",
 			"8,000",
 			"401 売上高",
@@ -268,7 +271,7 @@ describe("帳簿", () => {
 			within(rows[3])
 				.getAllByRole("cell")
 				.map((c) => c.textContent)
-		).toEqual(["", "", "", "206 預り金", "5,000", "", "", ""])
+		).toEqual(["", "", "", "", "206 預り金", "5,000", "", "", ""])
 		expect(rows[4]).toHaveTextContent("108,000")
 		// サイドメニューで選んだ年度で読む
 		expect(mocks.callCommand).toHaveBeenCalledWith("journal_book", {
@@ -277,6 +280,49 @@ describe("帳簿", () => {
 			toMonth: 12,
 		})
 		expect(screen.getByLabelText("見る年度")).toHaveValue("2014")
+	})
+
+	it("帳簿の表示と出力に同じ条件を渡し、取引の科目から元帳を開ける", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		await screen.findByRole("table", { name: "仕訳帳" })
+		await user.type(screen.getByLabelText("金額（下限）"), "8000")
+		await user.type(screen.getByLabelText("取引先名・コード"), "試験商店")
+		await user.click(screen.getByRole("button", { name: "帳簿を検索" }))
+		const search = expect.objectContaining({
+			amountFrom: 8000,
+			partner: "試験商店",
+		})
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"journal_book",
+			expect.objectContaining({ search })
+		)
+		await user.click(screen.getByRole("button", { name: "CSV で保存" }))
+		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+			receipt: expect.any(String),
+			request: expect.objectContaining({ search }),
+		})
+		const exported = mocks.callCommand.mock.calls.find(
+			([command]) => command === "export_report"
+		)
+		await user.click(
+			await screen.findByRole("button", { name: "保存したファイルを表示" })
+		)
+		expect(mocks.callCommand).toHaveBeenCalledWith("reveal_export", {
+			receipt: exported?.[1].receipt,
+		})
+		await user.click(
+			await screen.findByRole("button", {
+				name: "取引番号 1 を総勘定元帳の 104 普通預金 で見る",
+			})
+		)
+		expect(
+			await screen.findByRole("tab", { name: "総勘定元帳", selected: true })
+		).toBeVisible()
+		expect(mocks.callCommand).toHaveBeenCalledWith(
+			"ledger",
+			expect.objectContaining({ accountId: 2, search: { transactionId: 1 } })
+		)
 	})
 
 	it("取引の証憑を開き、画面に出せない形式は保存して開くよう案内する", async () => {

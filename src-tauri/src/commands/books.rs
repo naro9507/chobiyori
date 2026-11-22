@@ -2,7 +2,7 @@
 
 use chobiyori_core::error::AppResult;
 use chobiyori_core::ledger::Ledger;
-use chobiyori_storage::books::{self, JournalBook};
+use chobiyori_storage::books::{self, BookSearch, JournalBook};
 use chobiyori_storage::Database;
 use tauri::State;
 
@@ -12,8 +12,15 @@ pub async fn journal_book(
     fiscal_year: i64,
     from_month: u32,
     to_month: u32,
+    search: Option<BookSearch>,
 ) -> AppResult<JournalBook> {
-    books::journal(&db.conn(), fiscal_year, from_month, to_month)
+    let conn = db.conn();
+    match search {
+        Some(search) => {
+            books::search_journal(&conn, fiscal_year, from_month, to_month, Some(&search))
+        }
+        None => books::journal(&conn, fiscal_year, from_month, to_month),
+    }
 }
 
 /// 1 つの科目の元帳。現金出納帳・預金出納帳もこれで読む。
@@ -24,8 +31,20 @@ pub async fn ledger(
     from_month: u32,
     to_month: u32,
     account_id: i64,
+    search: Option<BookSearch>,
 ) -> AppResult<Ledger> {
-    books::ledger(&db.conn(), fiscal_year, from_month, to_month, account_id)
+    let conn = db.conn();
+    match search {
+        Some(search) => books::search_ledger(
+            &conn,
+            fiscal_year,
+            from_month,
+            to_month,
+            account_id,
+            &search,
+        ),
+        None => books::ledger(&conn, fiscal_year, from_month, to_month, account_id),
+    }
 }
 
 #[tauri::command]

@@ -65,7 +65,7 @@ pub fn unneutralize(field: &str) -> &str {
     }
 }
 
-fn write(records: impl IntoIterator<Item = Vec<String>>) -> AppResult<String> {
+pub(crate) fn write(records: impl IntoIterator<Item = Vec<String>>) -> AppResult<String> {
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
         .flexible(true)
@@ -99,14 +99,14 @@ pub const JOURNAL_COLUMNS: [&l::Text; 13] = [
     &l::QUALIFIED_INVOICE,
 ];
 
-/// 仕訳の CSV。取引番号は、ファイルの中で取引をまとめるための通し番号（1 から）。
+/// 仕訳の CSV。取引番号は元帳・変更履歴でも使う共通の番号。
 pub fn journal(book: &JournalBook, names: &Names, locale: Locale) -> AppResult<String> {
     let header = JOURNAL_COLUMNS
         .iter()
         .map(|c| c.get(locale).to_string())
         .collect();
     let mut records = vec![header];
-    for (index, t) in book.transactions.iter().enumerate() {
+    for t in &book.transactions {
         for line in &t.lines {
             let side = match line.side {
                 Side::Debit => l::DEBIT.get(locale),
@@ -114,7 +114,7 @@ pub fn journal(book: &JournalBook, names: &Names, locale: Locale) -> AppResult<S
             };
             let partner = line.partner_id.and_then(|id| names.partner(id));
             records.push(vec![
-                (index + 1).to_string(),
+                t.id.to_string(),
                 t.date.clone(),
                 side.to_string(),
                 names

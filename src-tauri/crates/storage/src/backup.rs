@@ -333,6 +333,7 @@ pub fn restore(db: &Database, source: &Path, password: Option<&str>, dir: &Path)
 
     let ready = connect(&incoming, key.as_ref().map(Password::as_str))?;
     migrate(&ready)?;
+    audit::ensure_restore_preserves_book_history(&live, &ready)?;
     // 別の端末で作ったログイン設定を引き継がない。
     ready.execute(
         "DELETE FROM settings WHERE key=?1",
@@ -523,8 +524,20 @@ mod tests {
         add(&previous, 500);
         {
             let conn = previous.conn();
-            conn.execute_batch("DROP TABLE received_bills; PRAGMA user_version = 14;")
-                .unwrap();
+            conn.execute_batch(
+                "DROP TABLE received_bills;
+                DROP TRIGGER audit_logs_no_update;
+                DROP TRIGGER audit_logs_no_delete;
+                DROP TRIGGER opening_history_insert;
+                DROP TRIGGER opening_history_delete;
+                DROP TRIGGER opening_history_update;
+                DROP TRIGGER opening_history_visibility;
+                DROP TRIGGER account_label_history;
+                DROP TRIGGER sub_account_label_history;
+                DROP TRIGGER partner_label_history;
+                PRAGMA user_version = 14;",
+            )
+            .unwrap();
         }
         let name = create(&previous, old.path(), BackupKind::Manual).unwrap();
 
@@ -546,6 +559,44 @@ mod tests {
                 .transactions,
             1
         );
+    }
+
+    #[test]
+    fn restore_keeps_2027_book_history_and_accepts_a_complete_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let backups = dir.path().join("backups");
+        let db = books(dir.path());
+        let (cash, sales) = {
+            let conn = db.conn();
+            conn.execute("INSERT INTO fiscal_years (year, filing_type, tax_status) VALUES (2027, 'blue65', 'exempt')", []).unwrap();
+            (account(&conn, "101"), account(&conn, "401"))
+        };
+        let first =
+            transactions::create(&db, 2027, &entry("2027-01-10", cash, sales, 1000)).unwrap();
+        let old = create(&db, &backups, BackupKind::Manual).unwrap();
+        transactions::delete(&db, first.id).unwrap();
+        let second =
+            transactions::create(&db, 2027, &entry("2027-01-11", cash, sales, 2000)).unwrap();
+        assert!(second.id > first.id);
+        assert_eq!(
+            restore(&db, &backups.join(old), None, &backups)
+                .unwrap_err()
+                .code,
+            ErrorCode::BackupMissingBookHistory
+        );
+        let history = audit::book_history(&db.conn(), 2027).unwrap();
+        assert_eq!(history.len(), 3);
+        assert_eq!(history[1][3], "delete");
+        assert!(history[1][4].contains("accountLabel"));
+        let complete = create(&db, &backups, BackupKind::Manual).unwrap();
+        restore(&db, &backups.join(complete), None, &backups).unwrap();
+        assert_eq!(audit::book_history(&db.conn(), 2027).unwrap(), history);
+        assert_eq!(transactions::get(&db.conn(), second.id).unwrap(), second);
+        assert!(db.conn().execute("DELETE FROM audit_logs", []).is_err());
+        assert!(db
+            .conn()
+            .execute("UPDATE audit_logs SET at = 'test'", [])
+            .is_err());
     }
 
     #[test]

@@ -474,11 +474,14 @@ pub fn statement(
                 .map(|l| values.get(&l.key).copied().unwrap_or(0))
                 .sum()
         } else if def.deduction {
-            let limit = layout
+            let mut limit = layout
                 .deduction
                 .get(filing_type.as_str())
                 .copied()
                 .unwrap_or(0);
+            if filing_type == FilingType::Blue55 {
+                limit = limit.min(super::filing::paper_deduction_cap(year));
+            }
             let before = values.get("income_before_deduction").copied().unwrap_or(0);
             limit.min(before.max(0))
         } else if !def.formula.is_empty() {

@@ -18,6 +18,7 @@ export type LedgerRow = {
 	/** 相手の科目。null は諸口（相手が 2 科目以上） */
 	counterAccountId: number | null
 	partnerId: number | null
+	partnerIds?: number[]
 	memo: string
 	debit: number
 	credit: number
@@ -40,24 +41,46 @@ export type Period = {
 	toMonth: number
 }
 
+export type BookSearch = {
+	dateFrom?: string
+	dateTo?: string
+	amountFrom?: number
+	amountTo?: number
+	partner?: string
+	transactionId?: number
+}
+
 function enabled(period: Period) {
 	return period.fiscalYear !== null && period.fromMonth <= period.toMonth
 }
 
-export function useJournalBook(period: Period) {
+export function useJournalBook(period: Period, search?: BookSearch) {
 	return useQuery({
-		queryKey: ["books", "journal", period],
-		queryFn: () => callCommand<JournalBook>("journal_book", period),
+		queryKey: ["books", "journal", period, search],
+		queryFn: () =>
+			callCommand<JournalBook>("journal_book", {
+				...period,
+				...(search && { search }),
+			}),
 		enabled: enabled(period),
 		retry: false,
 	})
 }
 
 /** 1 つの科目の元帳。現金出納帳・預金出納帳もこれで読む。 */
-export function useLedger(period: Period, accountId: number | null) {
+export function useLedger(
+	period: Period,
+	accountId: number | null,
+	search?: BookSearch
+) {
 	return useQuery({
-		queryKey: ["books", "ledger", period, accountId],
-		queryFn: () => callCommand<Ledger>("ledger", { ...period, accountId }),
+		queryKey: ["books", "ledger", period, accountId, search],
+		queryFn: () =>
+			callCommand<Ledger>("ledger", {
+				...period,
+				accountId,
+				...(search && { search }),
+			}),
 		enabled: enabled(period) && accountId !== null,
 		retry: false,
 	})
@@ -96,6 +119,7 @@ export type ExportTarget =
 	| { kind: "journal" }
 	| { kind: "ledger"; accountId: number }
 	| { kind: "allLedgers" }
+	| { kind: "bookHistory" }
 	| { kind: "cashBook"; accountId: number }
 	| { kind: "expenseBook" }
 	| { kind: "salesBook" }
@@ -116,6 +140,7 @@ export type ExportRequest = {
 	fiscalYear: number
 	fromMonth: number
 	toMonth: number
+	search?: BookSearch
 }
 
 /** 帳簿を CSV か PDF で保存する。保存先を選ぶ画面は Rust 側で開く。やめたら null。 */

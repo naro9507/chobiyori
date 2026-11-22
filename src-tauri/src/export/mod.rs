@@ -32,6 +32,7 @@ pub enum ExportTarget {
     },
     /// 動きのあるすべての科目の元帳
     AllLedgers,
+    BookHistory,
     CashBook {
         account_id: i64,
     },
@@ -64,6 +65,7 @@ pub struct ExportRequest {
     pub fiscal_year: i64,
     pub from_month: u32,
     pub to_month: u32,
+    pub search: Option<books::BookSearch>,
 }
 
 /// 出力するファイル。名前は保存先を選ぶ画面の初期値。
@@ -109,7 +111,16 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
         to,
         from_year_start: from_month == 1,
     };
-    let period = format!("{year}_{from_month:02}-{to_month:02}");
+    let mut period = format!("{year}_{from_month:02}-{to_month:02}");
+    if request.search.is_some()
+        && matches!(
+            request.target,
+            ExportTarget::Journal | ExportTarget::Ledger { .. }
+        )
+    {
+        period.push('_');
+        period.push_str(labels::BOOK_SEARCH_RESULT.get(locale));
+    }
     let ext = match request.format {
         ExportFormat::Csv => "csv",
         ExportFormat::Pdf => "pdf",
@@ -138,8 +149,34 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
                 csv::partners(&partners::list(conn)?, locale),
             )
         }
+        ExportTarget::BookHistory => {
+            if request.format != ExportFormat::Csv {
+                return Err(AppError::field(ErrorCode::InvalidFormat, "format"));
+            }
+            let headers = [
+                labels::HISTORY_TIME,
+                labels::HISTORY_ENTITY,
+                labels::HISTORY_ID,
+                labels::HISTORY_ACTION,
+                labels::HISTORY_BEFORE,
+                labels::HISTORY_AFTER,
+            ];
+            let header = headers
+                .iter()
+                .map(|label| label.get(locale).to_string())
+                .collect();
+            let rows = chobiyori_storage::audit::book_history(conn, year)?;
+            return Ok(ExportFile {
+                name: format!("{}_{year}.csv", labels::BOOK_HISTORY.get(locale)),
+                bytes: csv::encode(
+                    &csv::write(std::iter::once(header).chain(rows))?,
+                    request.encoding,
+                )?,
+            });
+        }
         ExportTarget::Journal => {
-            let book = books::journal(conn, year, from_month, to_month)?;
+            let book =
+                books::search_journal(conn, year, from_month, to_month, request.search.as_ref())?;
             if request.format == ExportFormat::Csv {
                 return Ok(ExportFile {
                     name: format!("{}_{period}.{ext}", labels::JOURNAL.get(locale)),
@@ -149,8 +186,21 @@ pub fn build(conn: &Connection, request: &ExportRequest) -> AppResult<ExportFile
             report::journal(&book, &names()?, &ctx)
         }
         ExportTarget::Ledger { account_id } => {
-            let ledger = books::ledger(conn, year, from_month, to_month, account_id)?;
-            report::ledgers(LedgerKind::General, &[ledger], &names()?, &ctx)
+            let ledger = match &request.search {
+                Some(search) => {
+                    books::search_ledger(conn, year, from_month, to_month, account_id, search)?
+                }
+                None => books::ledger(conn, year, from_month, to_month, account_id)?,
+            };
+            let mut report = report::ledgers(LedgerKind::General, &[ledger], &names()?, &ctx);
+            if request.search.is_some() {
+                for section in &mut report.sections {
+                    section.rows.pop();
+                    section.rows.remove(0);
+                    section.carry_label_column = None;
+                }
+            }
+            report
         }
         ExportTarget::AllLedgers => report::ledgers(
             LedgerKind::General,
@@ -227,6 +277,7 @@ mod tests {
             fiscal_year: 2026,
             from_month: 3,
             to_month: 3,
+            search: None,
         }
     }
 
@@ -271,6 +322,60 @@ mod tests {
         assert_eq!(lines[1], "101 現金,2026-03-01,,前月繰越,,,100000");
         assert_eq!(lines[2], "101 現金,2026-03-06,消耗品費,,,1200,98800");
         assert_eq!(*lines.last().unwrap(), "101 現金,合計,,,50000,4500,145500");
+    }
+
+    #[test]
+    fn both_books_and_their_csv_exports_search_and_share_the_transaction_number() {
+        let db = chobiyori_storage::test_support::set_up_db();
+        let (cash, sales, partner) = {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO partners (id, code, name_ja) VALUES (52, 'ACME', '試験商店')",
+                [],
+            )
+            .unwrap();
+            (account(&conn, "101"), account(&conn, "401"), 52)
+        };
+        use chobiyori_storage::{test_support::entry, transactions::create};
+        create(&db, 2026, &entry("2026-03-01", cash, sales, 1_000)).unwrap();
+        let mut input = entry("2026-03-12", cash, sales, 2_000);
+        input.lines[1].partner_id = Some(partner);
+        let found = create(&db, 2026, &input).unwrap();
+        input.date = "2026-03-20".into();
+        create(&db, 2026, &input).unwrap();
+        let search = books::BookSearch {
+            date_from: Some("2026-03-10".into()),
+            date_to: Some("2026-03-15".into()),
+            amount_from: Some(2_000),
+            amount_to: Some(2_000),
+            partner: Some("acme".into()),
+            ..Default::default()
+        };
+        let conn = db.conn();
+        let journal = books::search_journal(&conn, 2026, 3, 3, Some(&search)).unwrap();
+        assert_eq!(journal.transactions, vec![found.clone()]);
+        let ledger = books::search_ledger(&conn, 2026, 3, 3, cash, &search).unwrap();
+        assert_eq!(ledger.rows[0].transaction_id, found.id);
+        assert_eq!(ledger.rows[0].balance, 3_000);
+        assert_eq!(ledger.rows.len(), 1);
+
+        let mut req = request(ExportTarget::Journal, ExportFormat::Csv);
+        req.search = Some(search);
+        let journal = text(&build(&conn, &req).unwrap());
+        let lines: Vec<_> = journal.lines().skip(1).collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines
+            .iter()
+            .all(|line| line.starts_with(&format!("{},2026-03-12,", found.id))));
+        req.target = ExportTarget::Ledger { account_id: cash };
+        let ledger = text(&build(&conn, &req).unwrap());
+        assert_eq!(ledger.lines().count(), 2);
+        assert!(ledger
+            .lines()
+            .last()
+            .unwrap()
+            .ends_with(&format!(",3000,{}", found.id)));
+        assert!(ledger.contains("試験商店"));
     }
 
     #[test]

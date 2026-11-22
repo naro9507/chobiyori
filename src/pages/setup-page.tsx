@@ -339,7 +339,11 @@ export function SetupPage() {
 									</RadioCardsItem>
 									{filingTypes.map((type) => (
 										<RadioCardsItem key={type} value={type} className="py-2">
-											{t(`filing_${type}`)}
+											{t(
+												Number(form.fiscalYear) >= 2027 && type === "blue55"
+													? "filing_blue55_paper2027"
+													: `filing_${type}`
+											)}
 										</RadioCardsItem>
 									))}
 								</RadioCards>

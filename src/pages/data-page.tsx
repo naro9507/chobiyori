@@ -417,6 +417,7 @@ function IssueList({ preview }: { preview: ImportPreview }) {
 type ExportItemId =
 	| "exportJournal"
 	| "exportAllLedgers"
+	| "exportBookHistory"
 	| "exportExpenseBook"
 	| "exportTrialBalance"
 	| "exportStatement"
@@ -427,6 +428,7 @@ const exportItems: { id: ExportItemId; target: ExportTarget; pdf: boolean }[] =
 	[
 		{ id: "exportJournal", target: { kind: "journal" }, pdf: true },
 		{ id: "exportAllLedgers", target: { kind: "allLedgers" }, pdf: true },
+		{ id: "exportBookHistory", target: { kind: "bookHistory" }, pdf: false },
 		{ id: "exportExpenseBook", target: { kind: "expenseBook" }, pdf: true },
 		{ id: "exportTrialBalance", target: { kind: "trialBalance" }, pdf: true },
 		{ id: "exportStatement", target: { kind: "statement" }, pdf: true },
