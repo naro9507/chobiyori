@@ -152,6 +152,10 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 		if (entry.entity === "invoice_registration") {
 			return t("invoiceRegistrationSaved")
 		}
+		if (entry.entity === "opening_balance") return t("openingChanged")
+		if (entry.entity === "account" || entry.entity === "sub_account")
+			return t("accountChanged")
+		if (entry.entity === "partner") return t("partnerChanged")
 		if (entry.entity === "whiteDeduction") {
 			const amount = typeof detail.amount === "number" ? detail.amount : 0
 			return t("whiteDeductionSaved", { amount: formatAmount(amount) })
@@ -248,7 +252,26 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 								<span className="num w-44 shrink-0 text-muted-foreground">
 									{when(entry.at)}
 								</span>
-								<span className="whitespace-pre-wrap">{text(entry)}</span>
+								<div className="min-w-0 space-y-1">
+									<span className="whitespace-pre-wrap">{text(entry)}</span>
+									{[
+										"transaction",
+										"opening_balance",
+										"account",
+										"sub_account",
+										"partner",
+									].includes(entry.entity) && (
+										<details>
+											<summary className="cursor-pointer text-muted-foreground text-xs">
+												{entry.entity === "transaction" &&
+												entry.entityId != null
+													? t("transactionNumber", { id: entry.entityId })
+													: t("showBookHistory")}
+											</summary>
+											<RecordDetails entry={entry} />
+										</details>
+									)}
+								</div>
 							</li>
 						))}
 					</ul>
@@ -290,5 +313,47 @@ function HistoryList({ fiscalYear }: { fiscalYear: number | null }) {
 				)}
 			</CardContent>
 		</Card>
+	)
+}
+
+function RecordDetails({ entry }: { entry: HistoryEntry }) {
+	const t = useTranslations("history")
+	const book = useTranslations("ledgers")
+	const master = useTranslations("master")
+	return (
+		<div className="grid gap-2 py-2 sm:grid-cols-2">
+			{(["before", "after"] as const).map((side) => {
+				const record = entry[side]
+				if (!record) return null
+				return (
+					<div key={side} className="min-w-0 space-y-1 rounded border p-2">
+						<p className="font-medium">{t(side)}</p>
+						{isTransaction(record) ? (
+							<ul className="space-y-1">
+								{record.lines.map((line) => (
+									<li key={line.id} className="break-words">
+										{[
+											book(line.side),
+											line.accountLabel ?? line.accountId,
+											line.subAccountLabel,
+											formatAmount(line.amount),
+											line.partnerLabel,
+											line.memo,
+											line.taxCategory ? master(`tax_${line.taxCategory}`) : "",
+										]
+											.filter(Boolean)
+											.join(" / ")}
+									</li>
+								))}
+							</ul>
+						) : (
+							<pre className="whitespace-pre-wrap break-all text-xs">
+								{JSON.stringify(record, null, 2)}
+							</pre>
+						)}
+					</div>
+				)
+			})}
+		</div>
 	)
 }

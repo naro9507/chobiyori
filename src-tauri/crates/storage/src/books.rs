@@ -7,12 +7,91 @@ use crate::accounts::{self, Account};
 use crate::transactions::{self, Transaction};
 use chobiyori_core::balance::{signed, Totals};
 use chobiyori_core::error::{AppError, AppResult, ErrorCode};
-use chobiyori_core::journal::{period_range, Side};
+use chobiyori_core::journal::{parse_date, period_range, Side};
 use chobiyori_core::ledger::{self, Ledger, LedgerEntry};
 use chobiyori_core::master::AccountCategory;
 use rusqlite::{params, Connection};
-use serde::Serialize;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookSearch {
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub amount_from: Option<i64>,
+    pub amount_to: Option<i64>,
+    pub partner: Option<String>,
+    pub transaction_id: Option<i64>,
+}
+
+impl BookSearch {
+    fn validate(&self, year: i64) -> AppResult<()> {
+        for (date, field) in [(&self.date_from, "dateFrom"), (&self.date_to, "dateTo")] {
+            if date
+                .as_deref()
+                .is_some_and(|date| parse_date(date).is_none_or(|(y, _, _)| y != year))
+            {
+                return Err(AppError::field(ErrorCode::OutOfRange, field));
+            }
+        }
+        if self
+            .date_from
+            .as_ref()
+            .zip(self.date_to.as_ref())
+            .is_some_and(|(a, b)| a > b)
+        {
+            return Err(AppError::field(ErrorCode::OutOfRange, "dateTo"));
+        }
+        if self.amount_from.is_some_and(|amount| amount < 0) {
+            return Err(AppError::field(ErrorCode::OutOfRange, "amountFrom"));
+        }
+        if self
+            .amount_to
+            .is_some_and(|amount| amount < self.amount_from.unwrap_or(0))
+        {
+            return Err(AppError::field(ErrorCode::OutOfRange, "amountTo"));
+        }
+        if self.transaction_id.is_some_and(|id| id <= 0) {
+            return Err(AppError::field(ErrorCode::OutOfRange, "transactionId"));
+        }
+        Ok(())
+    }
+
+    fn matches_date_and_id(&self, date: &str, id: i64) -> bool {
+        self.date_from.as_deref().is_none_or(|from| date >= from)
+            && self.date_to.as_deref().is_none_or(|to| date <= to)
+            && self.transaction_id.is_none_or(|expected| id == expected)
+    }
+
+    fn matches_amount(&self, amount: i64) -> bool {
+        self.amount_from.is_none_or(|from| amount >= from)
+            && self.amount_to.is_none_or(|to| amount <= to)
+    }
+
+    fn partner_ids(&self, conn: &Connection) -> AppResult<Option<HashSet<i64>>> {
+        let Some(query) = self
+            .partner
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        else {
+            return Ok(None);
+        };
+        let query = query.to_lowercase();
+        Ok(Some(
+            super::partners::list(conn)?
+                .into_iter()
+                .filter(|p| {
+                    [&p.code, &p.name_ja, &p.name_en, &p.kana]
+                        .into_iter()
+                        .any(|name| name.to_lowercase().contains(&query))
+                })
+                .map(|p| p.id)
+                .collect(),
+        ))
+    }
+}
 
 /// 仕訳帳。期間の取引を日付の順に並べたもの。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -29,8 +108,41 @@ pub fn journal(
     from_month: u32,
     to_month: u32,
 ) -> AppResult<JournalBook> {
+    search_journal(conn, year, from_month, to_month, None)
+}
+
+pub fn search_journal(
+    conn: &Connection,
+    year: i64,
+    from_month: u32,
+    to_month: u32,
+    search: Option<&BookSearch>,
+) -> AppResult<JournalBook> {
     let (from, to) = period_range(year, from_month, to_month)?;
-    let transactions = transactions::list_between(conn, year, &from, &to)?;
+    let mut transactions = transactions::list_between(conn, year, &from, &to)?;
+    if let Some(search) = search {
+        search.validate(year)?;
+        let partners = search.partner_ids(conn)?;
+        transactions.retain(|t| {
+            search.matches_date_and_id(&t.date, t.id)
+                && partners.as_ref().is_none_or(|ids| {
+                    t.lines
+                        .iter()
+                        .any(|line| line.partner_id.is_some_and(|id| ids.contains(&id)))
+                })
+                && (t
+                    .lines
+                    .iter()
+                    .any(|line| search.matches_amount(line.amount))
+                    || search.matches_amount(
+                        t.lines
+                            .iter()
+                            .filter(|line| line.side == Side::Debit)
+                            .map(|line| line.amount)
+                            .sum(),
+                    ))
+        });
+    }
     let total = |side: Side| -> i64 {
         transactions
             .iter()
@@ -59,6 +171,28 @@ pub fn ledger(
     ledgers_for(conn, year, from_month, to_month, &[account])?
         .pop()
         .ok_or(AppError::new(ErrorCode::NotFound))
+}
+
+/// 検索結果の残高は元帳の各行の残高。検索した行だけで残高を計算し直さない。
+pub fn search_ledger(
+    conn: &Connection,
+    year: i64,
+    from_month: u32,
+    to_month: u32,
+    account_id: i64,
+    search: &BookSearch,
+) -> AppResult<Ledger> {
+    search.validate(year)?;
+    let partners = search.partner_ids(conn)?;
+    let mut ledger = ledger(conn, year, from_month, to_month, account_id)?;
+    ledger.rows.retain(|row| {
+        search.matches_date_and_id(&row.date, row.transaction_id)
+            && search.matches_amount(row.debit + row.credit)
+            && partners
+                .as_ref()
+                .is_none_or(|ids| row.partner_ids.iter().any(|id| ids.contains(id)))
+    });
+    Ok(ledger)
 }
 
 /// 経費帳。経費の科目ごとの元帳（動きのない科目は除く）。
@@ -170,6 +304,7 @@ pub fn partner_ledgers(
                     amount: line.amount,
                     counter_account_id: ledger::counter_account(&sides, line.side),
                     partner_id: line.partner_id,
+                    partner_ids: line.partner_id.into_iter().collect(),
                     memo: if line.memo.is_empty() {
                         t.memo.clone()
                     } else {
@@ -244,6 +379,9 @@ fn ledgers_for(
         accounts.iter().map(|a| (a.id, Vec::new())).collect();
     for t in transactions::list_between(conn, year, &from, &to)? {
         let sides: Vec<(Side, i64)> = t.lines.iter().map(|l| (l.side, l.account_id)).collect();
+        let mut partners: Vec<_> = t.lines.iter().filter_map(|line| line.partner_id).collect();
+        partners.sort_unstable();
+        partners.dedup();
         for line in &t.lines {
             if let Some(list) = entries.get_mut(&line.account_id) {
                 list.push(LedgerEntry {
@@ -253,6 +391,10 @@ fn ledgers_for(
                     amount: line.amount,
                     counter_account_id: ledger::counter_account(&sides, line.side),
                     partner_id: line.partner_id,
+                    // 決済口座など、相手の明細にだけ取引先がある行にも表示する。
+                    partner_ids: line
+                        .partner_id
+                        .map_or_else(|| partners.clone(), |id| vec![id]),
                     // 明細のメモがなければ、取引のメモ（摘要）を載せる
                     memo: if line.memo.is_empty() {
                         t.memo.clone()

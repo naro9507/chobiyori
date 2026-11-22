@@ -4,7 +4,7 @@
 //! 履歴は帳簿と一緒に暗号化される。履歴そのものは画面から消せない。
 
 use crate::transactions::Transaction;
-use chobiyori_core::error::AppResult;
+use chobiyori_core::error::{AppError, AppResult, ErrorCode};
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
@@ -17,13 +17,42 @@ pub(crate) fn transaction(
 ) -> AppResult<()> {
     let id = after.or(before).map(|t| t.id);
     let year = after.or(before).map(|t| t.fiscal_year);
-    let json = |t: Option<&Transaction>| t.and_then(|t| serde_json::to_string(t).ok());
     conn.execute(
         "INSERT INTO audit_logs (entity, entity_id, action, fiscal_year, before_json, after_json)
          VALUES ('transaction', ?1, ?2, ?3, ?4, ?5)",
-        params![id, action, year, json(before), json(after)],
+        params![
+            id,
+            action,
+            year,
+            snapshot(conn, before)?,
+            snapshot(conn, after)?
+        ],
     )?;
     Ok(())
+}
+
+fn snapshot(conn: &Connection, transaction: Option<&Transaction>) -> AppResult<Option<String>> {
+    let Some(transaction) = transaction else {
+        return Ok(None);
+    };
+    let mut value =
+        serde_json::to_value(transaction).map_err(|_| AppError::new(ErrorCode::Database))?;
+    let mut labels = conn.prepare_cached(
+        "SELECT a.code || ' ' || a.name_ja,
+        p.code || ' ' || p.name_ja, s.code || ' ' || s.name_ja
+        FROM accounts a LEFT JOIN partners p ON p.id = ?2
+        LEFT JOIN sub_accounts s ON s.id = ?3 WHERE a.id = ?1",
+    )?;
+    for (i, line) in transaction.lines.iter().enumerate() {
+        let (account, partner, sub): (String, Option<String>, Option<String>) = labels.query_row(
+            params![line.account_id, line.partner_id, line.sub_account_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        value["lines"][i]["accountLabel"] = account.into();
+        value["lines"][i]["partnerLabel"] = partner.into();
+        value["lines"][i]["subAccountLabel"] = sub.into();
+    }
+    Ok(Some(value.to_string()))
 }
 
 /// 取引以外の操作（締め・締めの解除・復元・パスワードの変更など）を残す。`detail` は短い説明の JSON。
@@ -38,6 +67,43 @@ pub fn event(
         "INSERT INTO audit_logs (entity, action, fiscal_year, after_json) VALUES (?1, ?2, ?3, ?4)",
         params![entity, action, fiscal_year, detail.map(|d| d.to_string())],
     )?;
+    Ok(())
+}
+
+/// 令和9年分以降の帳簿の履歴を失う復元を防ぐ。別事業や、途中で分岐したバックアップも対象。
+pub(crate) fn ensure_restore_preserves_book_history(
+    live: &Connection,
+    backup: &Connection,
+) -> AppResult<()> {
+    let mut current = live.prepare(
+        "SELECT id, entity, entity_id, action, fiscal_year, before_json, after_json, at
+        FROM audit_logs WHERE fiscal_year >= 2027
+        AND entity IN ('transaction', 'opening_balance', 'account', 'sub_account', 'partner')",
+    )?;
+    let mut expected = backup.prepare(
+        "SELECT EXISTS (SELECT 1 FROM audit_logs
+        WHERE id = ?1 AND entity = ?2 AND entity_id IS ?3 AND action = ?4 AND fiscal_year = ?5
+        AND before_json IS ?6 AND after_json IS ?7 AND at = ?8)",
+    )?;
+    let mut rows = current.query([])?;
+    while let Some(row) = rows.next()? {
+        let exists: bool = expected.query_row(
+            params![
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, String>(7)?
+            ],
+            |row| row.get(0),
+        )?;
+        if !exists {
+            return Err(AppError::new(ErrorCode::BackupMissingBookHistory));
+        }
+    }
     Ok(())
 }
 
@@ -64,6 +130,8 @@ pub struct AuditPage {
 }
 
 const PAGE_SIZE: i64 = 50;
+const BOOK_HISTORY_ENTITIES: &str =
+    "('transaction', 'opening_balance', 'account', 'sub_account', 'partner')";
 
 #[derive(Default)]
 pub struct AuditFilters<'a> {
@@ -79,6 +147,7 @@ const FILTER: &str = "
       AND (?3 IS NULL OR unixepoch(at) >= ?3)
       AND (?4 IS NULL OR unixepoch(at) < ?4)
       AND (?2 IS NULL
+        OR (entity = 'transaction' AND CAST(entity_id AS TEXT) = ?2)
         OR instr(at, ?2) > 0
         OR instr(lower(CASE WHEN json_valid(before_json) THEN
             coalesce(before_json ->> 'date', '') || ' ' ||
@@ -137,6 +206,25 @@ pub fn list(
         page,
         page_size: PAGE_SIZE,
     })
+}
+
+pub fn book_history(conn: &Connection, year: i64) -> AppResult<Vec<Vec<String>>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT at, entity, entity_id, action, before_json, after_json
+         FROM audit_logs WHERE fiscal_year = ?1 AND entity IN {BOOK_HISTORY_ENTITIES} ORDER BY id"
+    ))?;
+    let rows = stmt.query_map([year], |r| {
+        Ok(vec![
+            r.get(0)?,
+            r.get(1)?,
+            r.get::<_, Option<i64>>(2)?
+                .map_or(String::new(), |id| id.to_string()),
+            r.get(3)?,
+            r.get::<_, Option<String>>(4)?.unwrap_or_default(),
+            r.get::<_, Option<String>>(5)?.unwrap_or_default(),
+        ])
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 #[cfg(test)]

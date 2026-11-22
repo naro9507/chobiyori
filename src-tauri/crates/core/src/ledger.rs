@@ -19,6 +19,7 @@ pub struct LedgerEntry {
     /// 相手の科目。相手が 2 科目以上なら `None`（帳簿では「諸口」と書く）
     pub counter_account_id: Option<i64>,
     pub partner_id: Option<i64>,
+    pub partner_ids: Vec<i64>,
     pub memo: String,
 }
 
@@ -30,6 +31,7 @@ pub struct LedgerRow {
     /// 相手の科目。`None` は諸口（相手が 2 科目以上）
     pub counter_account_id: Option<i64>,
     pub partner_id: Option<i64>,
+    pub partner_ids: Vec<i64>,
     pub memo: String,
     pub debit: i64,
     pub credit: i64,
@@ -92,6 +94,7 @@ pub fn ledger(
                 date: e.date,
                 counter_account_id: e.counter_account_id,
                 partner_id: e.partner_id,
+                partner_ids: e.partner_ids,
                 memo: e.memo,
                 debit,
                 credit,
@@ -131,6 +134,7 @@ mod tests {
             amount,
             counter_account_id: counter,
             partner_id: None,
+            partner_ids: Vec::new(),
             memo: String::new(),
         }
     }

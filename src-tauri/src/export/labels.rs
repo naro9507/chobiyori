@@ -110,6 +110,14 @@ texts! {
 
     // 仕訳の CSV（取込で読み戻す形式）の見出し
     TRANSACTION_NO = "取引番号", "Transaction no";
+    BOOK_HISTORY = "帳簿の変更履歴", "Book history";
+    BOOK_SEARCH_RESULT = "検索結果", "search results";
+    HISTORY_TIME = "記録日時（UTC）", "Recorded at (UTC)";
+    HISTORY_ENTITY = "対象", "Entity";
+    HISTORY_ID = "対象の番号", "Record number";
+    HISTORY_ACTION = "操作", "Action";
+    HISTORY_BEFORE = "変更前", "Before";
+    HISTORY_AFTER = "変更後", "After";
     SIDE = "貸借", "Side";
     ACCOUNT_CODE = "科目コード", "Account code";
     ACCOUNT_NAME = "科目名", "Account name";

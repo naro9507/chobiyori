@@ -155,6 +155,13 @@ fn insert(conn: &Connection, year: i64, input: &TransactionInput) -> AppResult<T
     insert_kind(conn, year, input, TransactionKind::Normal)
 }
 
+// 削除した最後の取引の番号も使い回さない。帳簿と変更履歴を同じ番号で追えるようにする。
+const INSERT_TRANSACTION: &str = "
+    INSERT INTO transactions (id, fiscal_year, date, kind, entry_mode, memo)
+    VALUES (max(coalesce((SELECT max(id) FROM transactions), 0),
+                coalesce((SELECT max(entity_id) FROM audit_logs WHERE entity = 'transaction'), 0)) + 1,
+            ?1, ?2, ?3, ?4, ?5)";
+
 /// 取引を検証して保存する。定型仕訳から作るときは `kind` を `Template` にする。
 pub(crate) fn insert_kind(
     conn: &Connection,
@@ -171,7 +178,7 @@ pub(crate) fn insert_kind(
     )?;
     ensure_date_open(conn, year, &valid.date)?;
     conn.execute(
-        "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
+        INSERT_TRANSACTION,
         params![year, valid.date, kind, input.entry_mode, valid.memo],
     )?;
     let id = conn.last_insert_rowid();
@@ -205,9 +212,7 @@ pub(crate) fn remove(conn: &Connection, id: i64) -> AppResult<()> {
 pub fn insert_many(conn: &Connection, year: i64, inputs: &[TransactionInput]) -> AppResult<usize> {
     ensure_year_open(conn, year)?;
     let masters = DbMasters::load(conn, year)?;
-    let mut insert = conn.prepare(
-        "INSERT INTO transactions (fiscal_year, date, kind, entry_mode, memo) VALUES (?1, ?2, ?3, ?4, ?5)",
-    )?;
+    let mut insert = conn.prepare(INSERT_TRANSACTION)?;
     for input in inputs {
         let valid = journal::validate(input, year, &masters, &AllowedInactive::default())?;
         ensure_date_open(conn, year, &valid.date)?;

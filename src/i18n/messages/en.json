@@ -121,6 +121,7 @@
 		"currentBadge": "Current version"
 	},
 	"setup": {
+		"filing_blue55_paper2027": "Blue return (paper filing, up to ¥100,000)",
 		"title": "Getting started",
 		"intro": "Set up your books in four steps. You can change these later in Settings.",
 		"progress": "Step {current} of {total}",
@@ -406,6 +407,7 @@
 		"hideUnusedAccounts": "Hide unused accounts"
 	},
 	"errors": {
+		"backupMissingBookHistory": "This backup is missing some of the current book history for 2027 or later. Choose a newer backup that includes it.",
 		"required": "Please fill this in.",
 		"tooLong": "This is too long. Please shorten it.",
 		"invalidFormat": "Please check the format.",
@@ -470,6 +472,19 @@
 		"loginExpired": "This PC's device login setup doesn't match these books. Open with your password and set it up again."
 	},
 	"ledgers": {
+		"bookSearch": "Search books",
+		"bookSearchHint": "Combine filters within the selected months. Enter the same value in both fields to find one date or amount. CSV and PDF use the same filters.",
+		"clearBookSearch": "Clear filters",
+		"invalidBookSearch": "Enter a starting date or amount no greater than the ending value.",
+		"noBookMatches": "No records match these filters.",
+		"dateFrom": "Transaction date from",
+		"dateTo": "Transaction date to",
+		"amountFrom": "Minimum amount",
+		"amountTo": "Maximum amount",
+		"partner": "Partner name or code",
+		"transactionId": "Transaction number",
+		"findJournalEntry": "Find transaction {id} in the journal",
+		"findLedgerEntry": "Find transaction {id} in the general ledger for {account}",
 		"tabsLabel": "Book",
 		"journal": "Journal",
 		"ledger": "General ledger",
@@ -514,6 +529,8 @@
 		"salesHint": "View transactions grouped by sales account."
 	},
 	"data": {
+		"exportBookHistory": "Book history",
+		"exportBookHistoryHint": "Export transaction, opening balance and name changes with timestamps and before and after records for this year.",
 		"importTitle": "Import books",
 		"importDescription": "You can check the contents before importing. Transactions already in your books are skipped, so importing the same file twice does not create duplicates.",
 		"excelBook": "Excel book",
@@ -958,6 +975,7 @@
 		"modelHint": "You normally don't need to change this. Change it if Google retires the model."
 	},
 	"closing": {
+		"deductionHint2027": "The ¥650,000 deduction requires filing via e-Tax by the deadline. The ¥750,000 deduction also requires qualifying electronic records. After confirming eligibility, you can change the transfer amounts in Income Tax.",
 		"tabsLabel": "Year-end tasks",
 		"tab_checklist": "Checklist",
 		"tab_opening": "Opening balances",
@@ -1221,6 +1239,13 @@
 		"close": "Close"
 	},
 	"history": {
+		"transactionNumber": "Transaction {id}",
+		"showBookHistory": "Record details",
+		"before": "Before",
+		"after": "After",
+		"accountChanged": "Account name or code changed",
+		"openingChanged": "Opening balance recorded or changed",
+		"partnerChanged": "Partner name or code changed",
 		"title": "Change history",
 		"description": "Entries added, changed or deleted in FY {year}, and actions like closing and restoring, newest first.",
 		"searchLabel": "Search change history",
@@ -1483,6 +1508,9 @@
 		"saved": "Saved."
 	},
 	"filing": {
+		"deductionTransferHint2027": "Before selecting ¥750,000, confirm your recordkeeping from the start of the year and the filing of any required notice with the tax office or a tax professional. Both ¥650,000 and ¥750,000 require timely e-Tax filing.",
+		"deductionTransferQualified": "Qualifying electronic books confirmed (up to ¥750,000)",
+		"deductionTransferPaper2027": "Paper filing (up to ¥100,000)",
 		"copy": "Copy",
 		"copied": "Copied",
 		"copyLabel": "Copy \"{label}\"",

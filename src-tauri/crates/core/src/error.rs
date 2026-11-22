@@ -97,6 +97,8 @@ pub enum ErrorCode {
     BooksLocked,
     /// バックアップのファイルが壊れている・帳簿のファイルでない・パスワードが合わない
     BackupInvalid,
+    /// 復元すると法定保存の対象となる帳簿の変更履歴が失われる
+    BackupMissingBookHistory,
     /// 発行した書類は書き換えられない（取り消して作り直す）
     DocumentIssued,
     /// 入金のある請求書は取り消せない

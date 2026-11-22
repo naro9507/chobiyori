@@ -174,6 +174,17 @@ pub fn set_tax_status(db: &Database, year: i64, status: TaxStatus) -> AppResult<
             if locked {
                 return Err(AppError::new(ErrorCode::MonthLocked));
             }
+            let mut stmt = tx.prepare(
+                "SELECT DISTINCT t.id FROM transactions t
+                JOIN journal_lines l ON l.transaction_id = t.id
+                JOIN accounts a ON a.id = l.account_id
+                WHERE t.fiscal_year = ?1 AND t.date >= ?2 AND l.tax_category = 'out_of_scope'
+                  AND coalesce(a.default_tax_category, 'out_of_scope') <> 'out_of_scope'",
+            )?;
+            let changed = stmt
+                .query_map(params![year, start], |row| row.get(0))?
+                .map(|id| transactions::get(tx, id?))
+                .collect::<AppResult<Vec<_>>>()?;
             updated = tx.execute(
                 "UPDATE journal_lines
                  SET tax_category = (SELECT a.default_tax_category FROM accounts a
@@ -186,6 +197,10 @@ pub fn set_tax_status(db: &Database, year: i64, status: TaxStatus) -> AppResult<
                        <> 'out_of_scope'",
                 params![year, start],
             )?;
+            for previous in changed {
+                let current = transactions::get(tx, previous.id)?;
+                audit::transaction(tx, "update", Some(&previous), Some(&current))?;
+            }
         }
         audit::event(
             tx,
@@ -457,9 +472,13 @@ pub struct IncomeGuide {
     pub income_before_deduction: i64,
     /// 青色申告特別控除の額（申告区分のとおり）
     pub deduction: i64,
-    /// e-Tax でも優良な電子帳簿でもないときの控除の額（65 万円 → 55 万円）
+    /// 通常の紙申告を選ぶときの控除額および上限
     pub deduction_on_paper: i64,
+    pub paper_deduction_cap: i64,
     pub income_on_paper: i64,
+    /// 保存と申告の条件を満たすことを利用者が確認した場合に使う試算
+    pub deduction_with_qualified_books: Option<i64>,
+    pub income_with_qualified_books: Option<i64>,
     /// 申告書の事業所得の所得金額
     pub income: i64,
     /// 決算書の金額に直すところがある（決算の画面で確かめる）
@@ -540,11 +559,12 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         .iter()
         .find(|l| l.key == "sales")
         .map_or(0, |l| l.amount);
-    let deduction_on_paper = if amounts.filing_type == FilingType::Blue65 {
-        st.deduction.min(filing::paper_deduction_cap())
-    } else {
-        st.deduction
-    };
+    let paper_deduction_cap = filing::paper_deduction_cap(year);
+    let deduction_on_paper = st.deduction.min(paper_deduction_cap);
+    let deduction_with_qualified_books = (amounts.filing_type == FilingType::Blue65)
+        .then(|| filing::qualified_books_deduction_cap(year))
+        .flatten()
+        .map(|limit| limit.min(st.income_before_deduction.max(0)));
     let mut returns = vec![
         item("return_revenue", "ア", "", "", business_revenue, false),
         item("return_income", "①", "", "", st.income, false),
@@ -582,7 +602,11 @@ pub fn income_guide(conn: &Connection, year: i64) -> AppResult<IncomeGuide> {
         income_before_deduction: st.income_before_deduction,
         deduction: st.deduction,
         deduction_on_paper,
+        paper_deduction_cap,
         income_on_paper: st.income_before_deduction - deduction_on_paper,
+        deduction_with_qualified_books,
+        income_with_qualified_books: deduction_with_qualified_books
+            .map(|amount| st.income_before_deduction - amount),
         income: st.income,
         issue_count: st.issues.len(),
     })
@@ -1183,5 +1207,35 @@ mod tests {
         let ret = &guide.sections[4].items;
         assert_eq!(ret[0].value, 300_000);
         assert_eq!(ret[1].value, guide.income);
+    }
+
+    #[test]
+    fn income_guide_distinguishes_the_2027_transfer_options() {
+        let db = set_up_db();
+        let (bank, sales) = {
+            let conn = db.conn();
+            conn.execute("INSERT INTO fiscal_years (year, filing_type, tax_status) VALUES (2027, 'blue65', 'exempt')", []).unwrap();
+            (account(&conn, "104"), account(&conn, "401"))
+        };
+        create(
+            &db,
+            2027,
+            &crate::test_support::entry("2027-02-01", bank, sales, 730_000),
+        )
+        .unwrap();
+        let conn = db.conn();
+        let guide = income_guide(&conn, 2027).unwrap();
+        assert_eq!(guide.deduction, 650_000);
+        assert_eq!(guide.deduction_on_paper, 100_000);
+        assert_eq!(guide.deduction_with_qualified_books, Some(730_000));
+        assert_eq!(guide.income_with_qualified_books, Some(0));
+        conn.execute(
+            "UPDATE fiscal_years SET filing_type = 'blue55' WHERE year = 2027",
+            [],
+        )
+        .unwrap();
+        let paper = income_guide(&conn, 2027).unwrap();
+        assert_eq!(paper.deduction, 100_000);
+        assert_eq!(paper.deduction_with_qualified_books, None);
     }
 }
