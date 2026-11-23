@@ -1,6 +1,7 @@
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Field } from "@/components/ui/field"
 import { Input, NativeSelect, Textarea } from "@/components/ui/input"
 import { partnerKind, useMasterList } from "@/features/master/master-api"
@@ -117,6 +118,8 @@ export function DocumentEditor({
 	onDeleted: () => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const errorMessage = useErrorMessage()
 	const partners = useMasterList(partnerKind)
 	const save = useSaveDocument()
@@ -210,11 +213,17 @@ export function DocumentEditor({
 			}
 		)
 	}
-	const issue = () => {
+	const issue = async () => {
 		setAttempted(true)
 		setIssuing(true)
 		if (form.lines.some(priceInvalid) || !form.recipientName.trim()) return
-		if (!window.confirm(t("issueConfirm"))) return
+		if (
+			!(await confirm({
+				message: t("issueConfirm"),
+				confirmLabel: t("issue"),
+			}))
+		)
+			return
 		save.mutate(
 			{ id: savedId, input },
 			{
@@ -232,8 +241,16 @@ export function DocumentEditor({
 		)
 	}
 
-	const remove = () => {
-		if (!document || !window.confirm(t("deleteConfirm"))) return
+	const remove = async () => {
+		if (
+			!document ||
+			!(await confirm({
+				message: t("deleteConfirm"),
+				confirmLabel: tApp("delete"),
+				destructive: true,
+			}))
+		)
+			return
 		action.mutate({ type: "delete", id: document.id }, { onSuccess: onDeleted })
 	}
 

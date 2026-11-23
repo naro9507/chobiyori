@@ -9,7 +9,8 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Checkbox, Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
@@ -255,8 +256,7 @@ function RestorePanel({
 					hint={t("backupPasswordHint")}
 					className="max-w-sm"
 				>
-					<Input
-						type="password"
+					<PasswordInput
 						autoComplete="off"
 						value={password}
 						disabled={busy}

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -112,8 +113,7 @@ export function ReceiptSettingsCard() {
 									hint={t("apiKeyHint")}
 									className="w-96"
 								>
-									<Input
-										type="password"
+									<PasswordInput
 										autoComplete="off"
 										value={key}
 										onChange={(e) => setKeyText(e.target.value)}

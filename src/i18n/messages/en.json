@@ -6,6 +6,13 @@
 		"loading": "Loading",
 		"chooseFiscalYear": "Fiscal year to view",
 		"listSeparator": ", ",
+		"confirmTitle": "Please confirm",
+		"showInput": "Show what you typed",
+		"hideInput": "Hide what you typed",
+		"cancel": "Cancel",
+		"delete": "Delete",
+		"discard": "Discard",
+		"replace": "Replace",
 		"parenthesized": " ({text})",
 		"range": "{from} – {to}",
 		"middleDot": " · "
@@ -1462,7 +1469,7 @@
 		"needRecipient": "Enter the recipient before issuing the document.",
 		"filterEmpty": "No documents match these filters.",
 		"clearFilters": "Clear filters",
-		"discardEdits": "Discard your changes and return to the list? Cancel to keep editing.",
+		"discardEdits": "Discard your changes and return to the list? Choose Cancel to keep editing.",
 		"invoicePositive": "Check the prices and quantities. The invoice total must be at least one yen.",
 		"draftRetained": "Draft saved. Correct the error and issue it again."
 	},
@@ -2061,7 +2068,7 @@
 		"personalExpenseBody": "Under Transactions > Quick entry > Expense, choose “I paid with personal funds or a personal card” as where it was paid from. Enter what it was spent on and the amount; it is recorded against owner's contributions.",
 		"bankFee": "Record a bank transfer fee",
 		"bankFeeBody": "For a bank transfer fee, select Expense, choose the applicable fees account, and enter the amount paid from the bank.",
-		"replaceEntry": "Keep the date, amount and memo and replace the type, accounts and other choices? Cancel to keep your draft."
+		"replaceEntry": "Keep the date, amount and memo and replace the type, accounts and other choices? Choose Cancel to keep your draft."
 	},
 	"commands": {
 		"title": "Command palette",

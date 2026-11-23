@@ -244,6 +244,45 @@ describe("起動時のパスワード", () => {
 		})
 	})
 
+	it("短すぎるパスワードは入力欄を離れたときに知らせ、直すと消える。入力は表示して確かめられる", async () => {
+		const user = userEvent.setup()
+		book = { state: "notCreated", unlocked: false, ...free }
+		renderApp()
+		const password = await screen.findByLabelText("パスワード")
+		await user.type(password, "short")
+		await user.tab()
+		expect(screen.getByText(/8 文字以上にしてください。/)).toBeInTheDocument()
+		await user.click(
+			screen.getByRole("button", { name: "パスワードを決めて始める" })
+		)
+		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+			"create_books",
+			expect.anything()
+		)
+
+		await user.type(password, "er password")
+		expect(screen.queryByText(/8 文字以上にしてください。/)).toBeNull()
+
+		expect(password).toHaveAttribute("type", "password")
+		await user.click(
+			screen.getAllByRole("button", { name: "入力した文字を表示する" })[0]
+		)
+		expect(password).toHaveAttribute("type", "text")
+
+		// 2 回目を離れたときに、違いを知らせる。合わせるとすぐ消える
+		const again = screen.getByLabelText("もう一度入れてください")
+		await user.type(again, "other")
+		await user.tab()
+		expect(
+			screen.getByText(/1 回目と 2 回目のパスワードが違います/)
+		).toBeVisible()
+		await user.clear(again)
+		await user.type(again, "shorter password")
+		expect(
+			screen.queryByText(/1 回目と 2 回目のパスワードが違います/)
+		).toBeNull()
+	})
+
 	it("保存した復旧コードでパスワードを再設定する", async () => {
 		const user = userEvent.setup()
 		renderApp()
