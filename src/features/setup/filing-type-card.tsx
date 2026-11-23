@@ -90,7 +90,13 @@ export function FilingTypeCard({ fiscalYear }: { fiscalYear: number | null }) {
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field
 							label={tSetup("filingTitle")}
-							hint={year.closed ? t("filingTypeClosed") : undefined}
+							hint={
+								year.closed
+									? t("filingTypeClosed")
+									: year.year >= 2027 && filingType === "blue10"
+										? t("blue10Hint2027")
+										: undefined
+							}
 						>
 							<NativeSelect
 								value={filingType}
