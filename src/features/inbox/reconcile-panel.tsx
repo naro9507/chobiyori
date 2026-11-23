@@ -62,11 +62,13 @@ function ItemList({
 	items: InboxItem[]
 }) {
 	const t = useTranslations("receipts")
+	const tApp = useTranslations("app")
 	const masters = useJournalMasters()
 	return (
 		<section aria-label={title} className="flex flex-col gap-2">
 			<h3 className="font-bold text-sm">
-				{title}（{items.length}）
+				{title}
+				{tApp("parenthesized", { text: items.length })}
 			</h3>
 			<p className="text-muted-foreground text-xs">{hint}</p>
 			{items.length === 0 ? (

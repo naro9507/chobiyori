@@ -373,6 +373,7 @@ function PreviewSummary({ preview }: { preview: ImportPreview }) {
 
 function IssueList({ preview }: { preview: ImportPreview }) {
 	const t = useTranslations("data")
+	const tApp = useTranslations("app")
 	const where = (issue: Issue) =>
 		issue.sheet
 			? t("whereSheet", { sheet: issue.sheet, row: issue.row })
@@ -396,7 +397,7 @@ function IssueList({ preview }: { preview: ImportPreview }) {
 							{t(`issue_${issue.code}`)}
 							{issue.value && (
 								<span className="ml-1 text-muted-foreground">
-									（{issue.value}）
+									{tApp("parenthesized", { text: issue.value })}
 								</span>
 							)}
 						</span>

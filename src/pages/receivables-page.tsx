@@ -751,6 +751,7 @@ function YearTab() {
 
 function PlansTab() {
 	const t = useTranslations("receivables")
+	const tApp = useTranslations("app")
 	const masters = useJournalMasters()
 	const plans = usePlans()
 	const remove = useDeletePlan()
@@ -779,7 +780,7 @@ function PlansTab() {
 								</span>
 								<span className="num">{formatAmount(p.amount)}</span>
 								<span className="num text-muted-foreground text-xs">
-									{p.startMonth} 〜 {p.endMonth ?? ""}
+									{tApp("range", { from: p.startMonth, to: p.endMonth ?? "" })}
 								</span>
 								<Button
 									variant="outline"

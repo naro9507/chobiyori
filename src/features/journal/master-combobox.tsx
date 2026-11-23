@@ -136,6 +136,8 @@ export function MasterCombobox({
 	}
 
 	const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+		// 日本語入力の変換中の Enter・矢印は、変換のために使う
+		if (event.nativeEvent.isComposing || event.keyCode === 229) return
 		if (event.key === "ArrowDown") {
 			event.preventDefault()
 			if (!open) setOpen(true)

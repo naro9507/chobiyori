@@ -18,6 +18,7 @@ import {
 /** 取込テンプレートの作成・編集と管理。 */
 export function FormatsPanel() {
 	const t = useTranslations("inbox")
+	const tApp = useTranslations("app")
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
 	const formats = useImportFormats()
@@ -62,7 +63,7 @@ export function FormatsPanel() {
 				<p className="text-muted-foreground text-xs">
 					{t(`kind_${f.sourceKind}`)}
 					{f.paymentAccountId !== null &&
-						` ・ ${masters.accountLabel(f.paymentAccountId)}`}
+						`${tApp("middleDot")}${masters.accountLabel(f.paymentAccountId)}`}
 				</p>
 			</div>
 			<div className="flex flex-wrap gap-2">

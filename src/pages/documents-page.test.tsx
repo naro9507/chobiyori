@@ -214,7 +214,7 @@ describe("書類の画面", () => {
 		await user.type(screen.getByLabelText("金額（円・任意）"), "12,345")
 		await user.click(screen.getByRole("button", { name: /^保存$/ }))
 		expect(await screen.findByText("株式会社サンプル")).toBeVisible()
-		expect(screen.getByText("12,345円")).toBeVisible()
+		expect(screen.getByText("12,345 円")).toBeVisible()
 		expect(screen.getByText("未払い")).toBeVisible()
 		await user.click(screen.getByRole("button", { name: "支払済みにする" }))
 		expect(await screen.findByText("支払済み")).toBeVisible()

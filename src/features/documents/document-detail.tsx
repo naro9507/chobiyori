@@ -40,6 +40,7 @@ export function DocumentDetail({
 	onOpen: (d: DocumentRecord) => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
 	const errorMessage = useErrorMessage()
 	const preview = usePreview(d.id, null)
 	const action = useDocumentAction()
@@ -73,7 +74,11 @@ export function DocumentDetail({
 								{formatAmount(d.paid)}
 								{d.paid < d.totals.total &&
 									!canceled &&
-									` （${t("remaining", { amount: formatAmount(d.totals.total - d.paid) })}）`}
+									tApp("parenthesized", {
+										text: t("remaining", {
+											amount: formatAmount(d.totals.total - d.paid),
+										}),
+									})}
 							</dd>
 							<dt className="text-muted-foreground">{t("sale")}</dt>
 							<dd>
@@ -362,6 +367,7 @@ function SalePanel({
 	onClose: () => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
 	const proposal = useSaleProposal(d.id)
@@ -397,7 +403,7 @@ function SalePanel({
 								<td>
 									{masters.accountLabel(l.accountId)}
 									{l.taxCategory === "taxable_sales_8" &&
-										` （${t("reduced8")}）`}
+										tApp("parenthesized", { text: t("reduced8") })}
 								</td>
 								<td className="num text-right">{formatAmount(l.amount)}</td>
 							</tr>

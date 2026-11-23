@@ -330,7 +330,7 @@ describe("端末ログインの設定", () => {
 		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
 			password: "correct horse",
 		})
-		expect(await screen.findByText("本人確認中…")).toBeInTheDocument()
+		expect(await screen.findByText("本人確認しています")).toBeInTheDocument()
 		expect(
 			screen.getByText(
 				"Windows Hello / Touch ID の画面で本人確認を行ってください。"

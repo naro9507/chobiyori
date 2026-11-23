@@ -672,11 +672,11 @@ describe("インボイスの登録と期限", () => {
 		)
 		expect(await google.findByText("未連携")).toBeInTheDocument()
 		await user.click(google.getByRole("button", { name: "連携する" }))
-		expect(await google.findByText("認証中…")).toBeInTheDocument()
+		expect(await google.findByText("認証しています")).toBeInTheDocument()
 		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
 		await act(async () => finishAuthorization())
 		expect(await google.findByText("連携済み")).toBeInTheDocument()
-		expect(await google.findByText("同期中…")).toBeInTheDocument()
+		expect(await google.findByText("同期しています")).toBeInTheDocument()
 		expect(outlook.getByText("未連携")).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携する" })

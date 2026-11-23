@@ -180,6 +180,7 @@ function BackupRow({
 	disabled: boolean
 }) {
 	const t = useTranslations("backup")
+	const tApp = useTranslations("app")
 	return (
 		<li
 			className={`flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0 ${selected ? "bg-accent" : ""}`}
@@ -187,7 +188,8 @@ function BackupRow({
 			<span className="flex flex-col">
 				<span className="num">{file.createdAt}</span>
 				<span className="text-muted-foreground text-xs">
-					{t(`kind_${file.kind}`)}・
+					{t(`kind_${file.kind}`)}
+					{tApp("middleDot")}
 					<span className="num">{formatSize(file.size)}</span>
 				</span>
 			</span>
