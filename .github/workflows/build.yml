@@ -17,6 +17,42 @@ permissions:
   contents: write
 
 jobs:
+  release-ci:
+    timeout-minutes: 10
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-26.04
+    permissions:
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: タグと同じコミットの main CI が成功するまで待つ
+        shell: bash
+        run: |
+          set -euo pipefail
+          # タグと main が同時に push され、CI の登録が少し遅れる場合も待つ。
+          for ((attempt=1; attempt<=30; attempt++)); do
+            run_id=$(gh api -X GET "repos/$GH_REPO/actions/workflows/ci.yml/runs" \
+              -f branch=main -f event=push -f head_sha="$GITHUB_SHA" -F per_page=1 \
+              --jq '.workflow_runs[0].id // empty')
+            [[ -z "$run_id" ]] || break
+            sleep 10
+          done
+          if [[ -z "$run_id" ]]; then
+            echo "::error::このタグのコミットに対応する main の CI が見つかりません"
+            exit 1
+          fi
+          echo "CI: $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$run_id"
+          while true; do
+            result=$(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq '.conclusion // "pending"')
+            case "$result" in
+              success) exit 0 ;;
+              pending) sleep 20 ;;
+              *) echo "::error::main の CI の結果: $result"; exit 1 ;;
+            esac
+          done
+
   build:
     strategy:
       fail-fast: false
@@ -142,3 +178,12 @@ jobs:
           path: |
             src-tauri/target/**/release/bundle/nsis/*.exe
             src-tauri/target/**/release/bundle/dmg/*.dmg
+
+  publish:
+    needs: [release-ci, build]
+    permissions:
+      actions: read
+      contents: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      built_tag: ${{ github.ref_name }}
