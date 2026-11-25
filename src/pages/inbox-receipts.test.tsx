@@ -17,6 +17,7 @@ import type {
 	Receipt,
 	ReceiptSettings,
 } from "@/features/inbox/inbox-api"
+import { useReceiptReading } from "@/features/inbox/receipt-reading-store"
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
@@ -159,6 +160,7 @@ beforeEach(() => {
 		}),
 	]
 	reads = 0
+	useReceiptReading.setState({ progress: { kind: "idle" } })
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
@@ -295,6 +297,47 @@ describe("レシート", () => {
 		)
 		expect(await screen.findByText(/2 枚を読み取りました/)).toBeInTheDocument()
 		expect(reads).toBe(2)
+	})
+
+	it("読み取りは画面を離れても続き、サイドメニューに進み具合を出す", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		// 1 枚目の読み取りを、画面を移るまで待たせる
+		let release = () => {}
+		const held = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const base = mocks.callCommand.getMockImplementation()
+		mocks.callCommand.mockImplementation(
+			async (command: string, args?: Record<string, unknown>) => {
+				if (command === "read_next_receipt" && reads === 0) await held
+				return base?.(command, args)
+			}
+		)
+		renderPage("/inbox?view=receipts")
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
+		const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+		expect(
+			await within(nav).findByText("レシートを読み取っています（0 / 2 枚）")
+		).toBeInTheDocument()
+		// ほかの画面に移っても読み続ける
+		await user.click(within(nav).getByRole("link", { name: "設定" }))
+		release()
+		const done = await within(nav).findByRole("link", {
+			name: /レシートを 2 枚読み取りました/,
+		})
+		expect(reads).toBe(2)
+		// 押すと確認待ちを開き、知らせは消える
+		await user.click(done)
+		expect(
+			within(nav).queryByText(/レシートを 2 枚読み取りました/)
+		).not.toBeInTheDocument()
 	})
 
 	it("同じ買い物の取引があれば、新しく作らずに紐付けられる", async () => {
