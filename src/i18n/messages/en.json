@@ -883,7 +883,7 @@
 		"notReady": "To read receipts, agree to where the images go and register an API key under \"Receipt reading\" in Settings. How to get a key is explained there. Until then, you can type the details while looking at the image.",
 		"added": "Added {added} (same image as before: {duplicates}, files that could not be added: {rejected}).",
 		"reading": "Reading ({done} done, {remaining} left)",
-		"rateLimitWait": "The reading limit was reached. Continuing after a short wait ({done} done)",
+		"rateLimitWait": "The reading limit was reached. Continuing in {seconds} seconds ({done} done)",
 		"readFinished": "Read {done}. Check them under \"To review\" and record them.",
 		"readStopped": "Stopped after reading {done}.",
 		"listLabel": "Receipts not yet in To review",

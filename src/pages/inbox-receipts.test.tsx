@@ -295,6 +295,40 @@ describe("レシート", () => {
 		expect(reads).toBe(2)
 	})
 
+	it("回数の上限に達したら、サービスが返した秒数だけ待って続ける", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		const implementation = mocks.callCommand.getMockImplementation()
+		let limited = false
+		mocks.callCommand.mockImplementation(
+			async (command: string, args?: Record<string, unknown>) => {
+				if (command === "read_next_receipt" && !limited) {
+					limited = true
+					throw { code: "rateLimited", retryAfter: 1 }
+				}
+				return implementation?.(command, args)
+			}
+		)
+		renderPage()
+		await user.click(
+			await screen.findByRole("link", { name: "レシートを追加" })
+		)
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
+		expect(
+			await screen.findByText(/1 秒待ってから続けます/)
+		).toBeInTheDocument()
+		expect(
+			await screen.findByText(/2 枚を読み取りました/, {}, { timeout: 3000 })
+		).toBeInTheDocument()
+		expect(reads).toBe(2)
+	})
+
 	it("同じ買い物の取引があれば、新しく作らずに紐付けられる", async () => {
 		const user = userEvent.setup()
 		receipts = [

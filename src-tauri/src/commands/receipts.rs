@@ -161,7 +161,7 @@ pub async fn read_next(
         Err(ReadError::Offline) => Err(AppError::new(ErrorCode::Offline)),
         Err(ReadError::ModelNotFound) => Err(AppError::new(ErrorCode::ModelNotFound)),
         Err(ReadError::QuotaExhausted) => Err(AppError::new(ErrorCode::QuotaExhausted)),
-        Err(ReadError::RateLimited { .. }) => Err(AppError::new(ErrorCode::RateLimited)),
+        Err(ReadError::RateLimited { retry_after }) => Err(AppError::rate_limited(retry_after)),
     })?;
     Ok(ReadOutcome {
         receipt,
@@ -428,6 +428,37 @@ mod tests {
             .unwrap();
         assert_eq!(count, 0);
         assert_eq!(inbox::pending_count(&db.conn()).unwrap(), 2);
+    }
+
+    #[test]
+    fn the_rate_limit_tells_the_screen_how_long_to_wait() {
+        let db = set_up_db();
+        let jpeg = chobiyori_storage::test_support::jpeg;
+        db.transaction(|tx| receipts::add_files(tx, &[("a.jpg".into(), jpeg(1))]))
+            .unwrap();
+        consent(&db);
+        let fake = Fake(Mutex::new(vec![
+            Err(ReadError::RateLimited {
+                retry_after: Some(7),
+            }),
+            Err(ReadError::RateLimited { retry_after: None }),
+        ]));
+        let error = block_on(read_next(&db, Some(&fake))).unwrap_err();
+        assert_eq!(error.code, ErrorCode::RateLimited);
+        assert_eq!(error.retry_after, Some(7));
+        assert_eq!(
+            serde_json::to_value(&error).unwrap()["retryAfter"],
+            serde_json::json!(7)
+        );
+        // 待つ秒数が分からないときは送らない（画面が決まった時間だけ待つ）
+        let error = block_on(read_next(&db, Some(&fake))).unwrap_err();
+        assert_eq!(error, AppError::new(ErrorCode::RateLimited));
+        assert!(serde_json::to_value(&error)
+            .unwrap()
+            .get("retryAfter")
+            .is_none());
+        // 読み取り待ちのまま
+        assert_eq!(receipts::waiting_count(&db.conn()).unwrap(), 1);
     }
 
     #[test]

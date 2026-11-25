@@ -32,13 +32,23 @@ import { ReceiptImage } from "./receipt-image"
 const settingsPath: string =
 	navItems.find((item) => item.id === "settings")?.path ?? "/"
 
-/** 回数の上限に達したとき、読み直すまで待つ時間 */
-const RATE_LIMIT_WAIT_MS = 30_000
+/** 回数の上限に達したとき、待つ秒数をサービスが教えてくれなければこれだけ待つ */
+const DEFAULT_WAIT_SECONDS = 30
+/** 教えてくれた秒数が長すぎても、これより長くは待たない（画面が止まって見えないように） */
+const MAX_WAIT_SECONDS = 120
+
+/** 読み直すまで待つ秒数。サービスが返した秒数を使い、なければ決まった時間にする。 */
+function waitSeconds(retryAfter: number | undefined): number {
+	if (retryAfter === undefined || !Number.isFinite(retryAfter)) {
+		return DEFAULT_WAIT_SECONDS
+	}
+	return Math.min(Math.max(Math.ceil(retryAfter), 1), MAX_WAIT_SECONDS)
+}
 
 type Progress =
 	| { kind: "idle" }
 	| { kind: "reading"; done: number; remaining: number }
-	| { kind: "waiting"; done: number }
+	| { kind: "waiting"; done: number; seconds: number }
 	| { kind: "finished"; done: number }
 	| { kind: "stopped"; done: number; error: unknown }
 
@@ -73,10 +83,9 @@ export function ReceiptsPanel() {
 				if (outcome.remaining === 0) break
 			} catch (error) {
 				if (isAppError(error) && error.code === "rateLimited") {
-					setProgress({ kind: "waiting", done })
-					await new Promise((resolve) =>
-						setTimeout(resolve, RATE_LIMIT_WAIT_MS)
-					)
+					const seconds = waitSeconds(error.retryAfter)
+					setProgress({ kind: "waiting", done, seconds })
+					await new Promise((resolve) => setTimeout(resolve, seconds * 1000))
 					continue
 				}
 				setProgress({ kind: "stopped", done, error })
