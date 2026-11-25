@@ -471,7 +471,7 @@
 		"invalidDate": "日付を確かめてください。暦にない日（11 月 31 日など）は入れられません。",
 		"invalidCode": "コードは半角の英数字で入れてください。",
 		"invalidRegistrationNo": "登録番号は T と 13 桁の数字で入れてください。",
-		"invalidApiKey": "APIキーに使えない文字が含まれています。Google AI Studio でコピーしたキーだけを貼り付けてください（半角の英数字、- と _ だけです）。",
+		"invalidApiKey": "APIキーに使えない文字が含まれています。Google AI Studio でコピーしたキーだけを貼り付けてください（半角の英数字、-、_、. だけです）。",
 		"invalidEmail": "メールアドレスの形を確かめてください。",
 		"calendarAuth": "カレンダーの認証が切れました。再連携してください。",
 		"calendarCancelled": "カレンダーの連携がキャンセルされたか、時間切れになりました。",

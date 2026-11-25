@@ -137,7 +137,7 @@ pub fn validate_key(key: &str) -> AppResult<String> {
     if key.len() > 200
         || !key
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
     {
         return Err(AppError::field(ErrorCode::InvalidFormat, "apiKey"));
     }
@@ -146,7 +146,10 @@ pub fn validate_key(key: &str) -> AppResult<String> {
 
 /// ゼロ幅の文字や BOM（コピーで付くことがある）。
 fn is_invisible(c: char) -> bool {
-    matches!(c, '\u{200B}'..='\u{200F}' | '\u{2060}' | '\u{FEFF}' | '\u{00AD}')
+    matches!(
+        c,
+        '\u{200B}'..='\u{200F}' | '\u{2060}' | '\u{FEFF}' | '\u{00AD}'
+    )
 }
 
 #[cfg(test)]
@@ -179,6 +182,8 @@ pub(crate) mod tests {
             validate_key(" ").unwrap_err(),
             AppError::field(ErrorCode::Required, "apiKey")
         );
+        // 新しい形式のキーには「.」が入る
+        assert_eq!(validate_key("AQ.Ab8-x_Z").unwrap(), "AQ.Ab8-x_Z");
         assert_eq!(
             validate_key("abc def").unwrap_err(),
             AppError::field(ErrorCode::InvalidFormat, "apiKey")
