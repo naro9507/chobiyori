@@ -185,7 +185,7 @@ pub(crate) mod tests {
         // 新しい形式のキーには「.」が入る
         assert_eq!(validate_key("AQ.Ab8-x_Z").unwrap(), "AQ.Ab8-x_Z");
         assert_eq!(
-            validate_key("abc def").unwrap_err(),
+            validate_key("abc/def").unwrap_err(),
             AppError::field(ErrorCode::InvalidFormat, "apiKey")
         );
         // 貼り付けで混ざる空白・改行・引用符・見えない文字は取り除く
