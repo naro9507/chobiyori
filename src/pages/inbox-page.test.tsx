@@ -268,36 +268,6 @@ describe("取込受信箱", () => {
 		expect(await screen.findByText("同じ取引があるかも")).toBeInTheDocument()
 	})
 
-	it("日付の年の帳簿がないときは、何が足りないかと直し方を出す", async () => {
-		const user = userEvent.setup()
-		const base = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(async (command: string, args) => {
-			if (command === "list_inbox")
-				return [
-					{ ...item(1, "文具店", 1080, 3), date: "2025-12-28" },
-					{ ...item(2, "書店", 500, 3), date: "2099-01-05" },
-				]
-			if (command === "confirm_inbox_item")
-				throw { code: "notFound", field: "fiscalYear" }
-			return base?.(command, args)
-		})
-		renderPage()
-		const form = await screen.findByRole("form", { name: "候補を確定する" })
-		// 入力が要る欄と、空でよい欄が分かる
-		expect(within(form).getByText("必須")).toBeInTheDocument()
-		expect(within(form).getAllByText("任意").length).toBeGreaterThan(0)
-		await user.click(within(form).getByRole("button", { name: "確定する" }))
-		expect(await within(form).findByRole("alert")).toHaveTextContent(
-			"2025 年は、帳簿をつけ始めた 2026 年より前なので"
-		)
-		await user.click(screen.getByRole("button", { name: "書店" }))
-		const next = await screen.findByRole("form", { name: "候補を確定する" })
-		await user.click(within(next).getByRole("button", { name: "確定する" }))
-		expect(await within(next).findByRole("alert")).toHaveTextContent(
-			"2099 年はまだ来ていない年なので確定できません。"
-		)
-	})
-
 	it("選んだ候補をまとめて候補どおりに確定する", async () => {
 		const user = userEvent.setup()
 		renderPage()

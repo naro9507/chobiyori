@@ -92,11 +92,47 @@ chobiyori/
 
 ## モックの環境
 
-`make dev-mock`（`pnpm dev:mock`）で、Rust 側の代わりに画面の中の偽の帳簿から返すモードで開く（`src/mock/`）。アプリを起動しなくても、画面の見た目や入力の流れをブラウザで確かめられる。本番のビルドには入らない。
+`src/mock/` に、Rust 側のコマンドの偽物を置いている。画面の `callCommand` を Tauri の `mockIPC` で横取りし、場面ごとの偽の帳簿から返す。同じものを、ブラウザで画面を見るとき（`make dev-mock`）とテストの両方で使う。本番のビルドには入らない。
 
-- 場面は URL の `?scenario=` で選ぶ（例: `http://localhost:5173/?scenario=newYear#/`）。場面の一覧と中身は `src/mock/data.ts` の `scenarios` と `createBook`。日付は今日の年を基準に作る。
-- 画面から保存・確定すると偽の帳簿が書き変わる。ページを読み直すと元に戻る。
-- コマンドの返し方は `src/mock/handlers.ts`。用意していないコマンドは、一覧（`list_*`）なら空、それ以外は「うまくいきませんでした」になり、コンソールに `[mock] 用意していないコマンド` と出る。画面を見るのに要るものから足していく。
+MSW は HTTP の通信を横取りする仕組みで、Tauri のコマンドは HTTP を通らないので使っていない。代わりに MSW と同じ使い方ができるようにしてある。
+
+| ファイル | 中身 |
+|---|---|
+| `data.ts` | 場面（`scenarios`）と偽の帳簿（`createBook`）。日付は今日の年を基準に作る |
+| `handlers.ts` | コマンドごとのふだんの返し方（`baseHandlers`）。帳簿を読み書きする |
+| `mock.ts` | `mock.reset()`・`mock.use()`・`mock.book()`・`mock.callsOf()` |
+| `install.ts` | `pnpm dev:mock` で読み込む入口 |
+| `vitest.ts` | テスト用の `setupMockCommands()` |
+
+### ブラウザで見る
+
+`make dev-mock`（`pnpm dev:mock`）で開く。
+
+- 場面は URL の `?scenario=` で選ぶ（例: `http://localhost:5173/?scenario=newYear#/`）。
+- 画面から保存・確定すると、偽の帳簿が書き変わる。ページを読み直すと元に戻る。
+- ブラウザのコンソールの `__mock` で、その場で返し方や帳簿を変えられる。
+  - 例: `__mock.use({ confirm_inbox_item: () => { throw { code: "yearClosed" } } })`
+  - 例: `__mock.book().inbox.length`
+
+### テストで使う
+
+`vi.mock("@/lib/tauri")` でコマンドごとに返す値を書く代わりに、場面の帳簿をそのまま使える（例: `src/pages/inbox-mock.test.tsx`）。
+
+```ts
+import { fail, mock, setupMockCommands } from "@/mock/vitest"
+
+setupMockCommands() // テストごとに場面を作り直す。引数で場面を選べる
+
+it("締めた年度は確定できない", async () => {
+	mock.use({ confirm_inbox_item: () => fail({ code: "yearClosed" }) }) // このテストだけの返し方
+	// 画面を操作する
+	expect(mock.callsOf("confirm_inbox_item")).toEqual([expect.objectContaining({ id: 1 })])
+})
+```
+
+### コマンドを足すとき
+
+- 用意していないコマンドは、一覧（`list_*`）なら空、それ以外は「うまくいきませんでした」になり、コンソールに `[mock] 用意していないコマンド` と出る。画面を見るのに要るものから `handlers.ts` に足す。
 - 返す形は、画面の型（`features/*/…-api.ts`）を使って書く。Rust 側の型と画面の型がずれていないかは、ここでは確かめられないので、アプリでも確かめる。
 
 ## Rust のコマンドを足すとき
