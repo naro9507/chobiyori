@@ -256,20 +256,20 @@ function MailForm({
 			className="flex flex-col gap-3 rounded-lg border p-4"
 		>
 			<h3 className="font-bold text-sm">{t("sendMail")}</h3>
-			<Field label={t("mailTo")}>
+			<Field required label={t("mailTo")}>
 				<Input
 					type="email"
 					value={draft.to}
 					onChange={(e) => setDraft({ ...draft, to: e.target.value })}
 				/>
 			</Field>
-			<Field label={t("mailSubject")}>
+			<Field optional label={t("mailSubject")}>
 				<Input
 					value={draft.subject}
 					onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
 				/>
 			</Field>
-			<Field label={t("mailBody")}>
+			<Field optional label={t("mailBody")}>
 				<Textarea
 					className="min-h-48"
 					value={draft.body}
@@ -486,14 +486,14 @@ function PaymentPanel({
 		>
 			<h3 className="font-bold text-sm">{t("recordPayment")}</h3>
 			<div className="flex flex-wrap gap-3">
-				<Field label={t("paymentDate")} className="w-44">
+				<Field required label={t("paymentDate")} className="w-44">
 					<Input
 						type="date"
 						value={date}
 						onChange={(e) => setDate(e.target.value)}
 					/>
 				</Field>
-				<Field label={t("amount")} className="w-40">
+				<Field required label={t("amount")} className="w-40">
 					<Input
 						inputMode="numeric"
 						className="num text-right"
@@ -501,7 +501,7 @@ function PaymentPanel({
 						onChange={(e) => setAmount(e.target.value)}
 					/>
 				</Field>
-				<Field label={t("paymentAccount")} className="w-56">
+				<Field required label={t("paymentAccount")} className="w-56">
 					<NativeSelect
 						value={account ?? ""}
 						onChange={(e) => setAccountId(Number(e.target.value))}

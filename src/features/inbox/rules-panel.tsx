@@ -188,6 +188,7 @@ function RuleForm({
 		>
 			<div className="grid gap-3 sm:grid-cols-2">
 				<Field
+					required
 					label={t("pattern")}
 					hint={t("patternHint")}
 					error={fieldMessage("pattern")}
@@ -208,7 +209,7 @@ function RuleForm({
 						<option value="equals">{t("match_equals")}</option>
 					</NativeSelect>
 				</Field>
-				<Field label={t("minAmount")}>
+				<Field optional label={t("minAmount")}>
 					<Input
 						inputMode="numeric"
 						value={input.minAmount ?? ""}
@@ -217,7 +218,11 @@ function RuleForm({
 						}
 					/>
 				</Field>
-				<Field label={t("maxAmount")} error={fieldMessage("maxAmount")}>
+				<Field
+					optional
+					label={t("maxAmount")}
+					error={fieldMessage("maxAmount")}
+				>
 					<Input
 						inputMode="numeric"
 						value={input.maxAmount ?? ""}
@@ -239,7 +244,11 @@ function RuleForm({
 			/>
 			{!input.result.ignore && (
 				<div className="grid gap-3 sm:grid-cols-2">
-					<Field label={t("accountSpend")} error={fieldMessage("accountId")}>
+					<Field
+						required
+						label={t("accountSpend")}
+						error={fieldMessage("accountId")}
+					>
 						<MasterCombobox
 							items={masters.accountItems}
 							value={input.result.accountId}
@@ -251,7 +260,7 @@ function RuleForm({
 							}
 						/>
 					</Field>
-					<Field label={t("partner")}>
+					<Field optional label={t("partner")}>
 						<MasterCombobox
 							items={masters.partnerItems}
 							value={input.result.partnerId}
@@ -260,7 +269,7 @@ function RuleForm({
 							}
 						/>
 					</Field>
-					<Field label={t("memo")}>
+					<Field optional label={t("memo")}>
 						<Input
 							value={input.result.memo}
 							onChange={(e) =>
@@ -271,7 +280,7 @@ function RuleForm({
 							}
 						/>
 					</Field>
-					<Field label={t("allocation")} hint={t("allocationHint")}>
+					<Field optional label={t("allocation")} hint={t("allocationHint")}>
 						<Input
 							inputMode="numeric"
 							value={input.result.allocationPercent ?? ""}

@@ -149,6 +149,7 @@ export function InvoiceRegistrationCard({
 					<h3 className="font-bold text-sm">{t("enterTitle")}</h3>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field
+							required
 							label={tSetup("invoiceRegistrationNo")}
 							error={
 								errorFor("registrationNo") ?? errorFor("invoiceRegistrationNo")
@@ -163,6 +164,7 @@ export function InvoiceRegistrationCard({
 							/>
 						</Field>
 						<Field
+							required
 							label={t("registeredOn")}
 							hint={t("registeredOnHint")}
 							error={errorFor("registeredOn")}

@@ -253,7 +253,7 @@ export function DocumentEditor({
 				}}
 			>
 				<div className="grid gap-4 sm:grid-cols-2">
-					<Field label={t("partner")} hint={t("partnerHint")}>
+					<Field optional label={t("partner")} hint={t("partnerHint")}>
 						<NativeSelect
 							value={form.partnerId ?? ""}
 							onChange={(e) =>
@@ -269,6 +269,7 @@ export function DocumentEditor({
 						</NativeSelect>
 					</Field>
 					<Field
+						required
 						label={t("recipientName")}
 						hint={t("recipientNameHint")}
 						error={errorFor("recipientName")}
@@ -279,6 +280,7 @@ export function DocumentEditor({
 						/>
 					</Field>
 					<Field
+						optional
 						label={t("recipientAddress")}
 						error={errorFor("recipientAddress")}
 						className="sm:col-span-2"
@@ -288,20 +290,25 @@ export function DocumentEditor({
 							onChange={(e) => set({ recipientAddress: e.target.value })}
 						/>
 					</Field>
-					<Field label={t("recipientEmail")} error={errorFor("recipientEmail")}>
+					<Field
+						optional
+						label={t("recipientEmail")}
+						error={errorFor("recipientEmail")}
+					>
 						<Input
 							type="email"
 							value={form.recipientEmail}
 							onChange={(e) => set({ recipientEmail: e.target.value })}
 						/>
 					</Field>
-					<Field label={t("subject")} error={errorFor("title")}>
+					<Field optional label={t("subject")} error={errorFor("title")}>
 						<Input
 							value={form.title}
 							onChange={(e) => set({ title: e.target.value })}
 						/>
 					</Field>
 					<Field
+						required
 						label={kind === "receipt" ? t("receivedDate") : t("issueDate")}
 						error={errorFor("issueDate")}
 					>
@@ -313,6 +320,7 @@ export function DocumentEditor({
 					</Field>
 					{(kind === "invoice" || kind === "estimate") && (
 						<Field
+							optional
 							label={kind === "invoice" ? t("dueDate") : t("validUntil")}
 							error={errorFor("dueDate")}
 						>
@@ -343,6 +351,7 @@ export function DocumentEditor({
 							)}
 						>
 							<Field
+								required
 								label={t("itemName")}
 								error={lineErrorFor(index, "name")}
 								className="col-span-full"
@@ -353,6 +362,7 @@ export function DocumentEditor({
 								/>
 							</Field>
 							<Field
+								required
 								label={t("quantity")}
 								error={lineErrorFor(index, "quantity")}
 							>
@@ -363,13 +373,18 @@ export function DocumentEditor({
 									onChange={(e) => setLine(index, { quantity: e.target.value })}
 								/>
 							</Field>
-							<Field label={t("unit")} error={lineErrorFor(index, "unit")}>
+							<Field
+								optional
+								label={t("unit")}
+								error={lineErrorFor(index, "unit")}
+							>
 								<Input
 									value={line.unit}
 									onChange={(e) => setLine(index, { unit: e.target.value })}
 								/>
 							</Field>
 							<Field
+								required
 								label={t(withTax ? "unitPrice" : "unitPriceNoTax")}
 								error={lineErrorFor(index, "unitPrice")}
 							>
@@ -433,7 +448,7 @@ export function DocumentEditor({
 					)}
 				</fieldset>
 
-				<Field label={t("notes")} error={errorFor("notes")}>
+				<Field optional label={t("notes")} error={errorFor("notes")}>
 					<Textarea
 						value={form.notes}
 						onChange={(e) => set({ notes: e.target.value })}

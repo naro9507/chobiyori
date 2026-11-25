@@ -170,13 +170,13 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 		<form onSubmit={submit} className="flex flex-col gap-4">
 			<p className="text-muted-foreground text-xs">{t("profileNote")}</p>
 			<div className="grid gap-4 sm:grid-cols-2">
-				<Field label={t("phone")} error={errorFor("phone")}>
+				<Field optional label={t("phone")} error={errorFor("phone")}>
 					<Input
 						value={form.phone}
 						onChange={(e) => set({ phone: e.target.value })}
 					/>
 				</Field>
-				<Field label={t("email")} error={errorFor("email")}>
+				<Field optional label={t("email")} error={errorFor("email")}>
 					<Input
 						type="email"
 						value={form.email}
@@ -184,6 +184,7 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 					/>
 				</Field>
 				<Field
+					optional
 					label={t("bankAccount")}
 					hint={t("bankAccountHint")}
 					error={errorFor("bankAccount")}
@@ -195,6 +196,7 @@ function SettingsForm({ initial }: { initial: DocumentSettings }) {
 					/>
 				</Field>
 				<Field
+					optional
 					label={t("defaultNotes")}
 					error={errorFor("defaultNotes")}
 					className="sm:col-span-2"

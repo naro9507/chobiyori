@@ -198,7 +198,11 @@ function MailForm({
 							<option value="other">{t("other")}</option>
 						</NativeSelect>
 					</Field>
-					<Field label={t("fromAddress")} error={errorFor("fromAddress")}>
+					<Field
+						required
+						label={t("fromAddress")}
+						error={errorFor("fromAddress")}
+					>
 						<Input
 							type="email"
 							value={form.fromAddress}
@@ -206,6 +210,7 @@ function MailForm({
 						/>
 					</Field>
 					<Field
+						optional
 						label={t("fromName")}
 						hint={t("fromNameHint")}
 						error={errorFor("fromName")}
@@ -217,13 +222,13 @@ function MailForm({
 					</Field>
 					{preset === "other" && (
 						<>
-							<Field label={t("host")} error={errorFor("host")}>
+							<Field required label={t("host")} error={errorFor("host")}>
 								<Input
 									value={form.host}
 									onChange={(e) => set({ host: e.target.value })}
 								/>
 							</Field>
-							<Field label={t("port")} error={errorFor("port")}>
+							<Field required label={t("port")} error={errorFor("port")}>
 								<Input
 									inputMode="numeric"
 									className="num"
@@ -245,6 +250,7 @@ function MailForm({
 								</NativeSelect>
 							</Field>
 							<Field
+								optional
 								label={t("username")}
 								hint={t("usernameHint")}
 								error={errorFor("username")}

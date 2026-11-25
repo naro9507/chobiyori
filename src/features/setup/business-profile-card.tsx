@@ -69,6 +69,8 @@ export function BusinessProfileCard() {
 								key={field}
 								label={t(field)}
 								error={message(field)}
+								required={field === "ownerName"}
+								optional={field !== "ownerName"}
 								className={field === "address" ? "sm:col-span-2" : undefined}
 							>
 								<Input

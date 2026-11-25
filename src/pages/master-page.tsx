@@ -111,20 +111,26 @@ function NameFields({
 	const t = useTranslations("master")
 	return (
 		<>
-			<Field label={t("code")} hint={t("codeHint")} error={errorFor("code")}>
+			<Field
+				required
+				label={t("code")}
+				hint={t("codeHint")}
+				error={errorFor("code")}
+			>
 				<Input
 					value={form.code}
 					onChange={(e) => setForm({ code: e.target.value })}
 					className="num"
 				/>
 			</Field>
-			<Field label={t("nameJa")} error={errorFor("nameJa")}>
+			<Field required label={t("nameJa")} error={errorFor("nameJa")}>
 				<Input
 					value={form.nameJa}
 					onChange={(e) => setForm({ nameJa: e.target.value })}
 				/>
 			</Field>
 			<Field
+				optional
 				label={t("nameEn")}
 				hint={t("nameEnHint")}
 				error={errorFor("nameEn")}
@@ -219,7 +225,7 @@ function AccountsSection() {
 			renderFields={(form, setForm, errorFor, editing) => (
 				<>
 					<NameFields form={form} setForm={setForm} errorFor={errorFor} />
-					<Field label={t("kana")} error={errorFor("kana")}>
+					<Field optional label={t("kana")} error={errorFor("kana")}>
 						<Input
 							value={form.kana}
 							onChange={(e) => setForm({ kana: e.target.value })}
@@ -255,6 +261,7 @@ function AccountsSection() {
 						</NativeSelect>
 					</Field>
 					<Field
+						optional
 						label={t("taxCategory")}
 						error={errorFor("defaultTaxCategory")}
 					>
@@ -271,6 +278,7 @@ function AccountsSection() {
 						</NativeSelect>
 					</Field>
 					<Field
+						optional
 						term="allocation"
 						label={t("allocationRule")}
 						hint={t("allocationRuleHint")}
@@ -364,6 +372,7 @@ function SubAccountsSection() {
 			renderFields={(form, setForm, errorFor, editing) => (
 				<>
 					<Field
+						required
 						term="account"
 						label={t("parentAccount")}
 						hint={t("parentAccountHint")}
@@ -385,7 +394,7 @@ function SubAccountsSection() {
 						</NativeSelect>
 					</Field>
 					<NameFields form={form} setForm={setForm} errorFor={errorFor} />
-					<Field label={t("kana")} error={errorFor("kana")}>
+					<Field optional label={t("kana")} error={errorFor("kana")}>
 						<Input
 							value={form.kana}
 							onChange={(e) => setForm({ kana: e.target.value })}
@@ -461,13 +470,14 @@ function PartnersSection() {
 			renderFields={(form, setForm, errorFor) => (
 				<>
 					<NameFields form={form} setForm={setForm} errorFor={errorFor} />
-					<Field label={t("kana")} error={errorFor("kana")}>
+					<Field optional label={t("kana")} error={errorFor("kana")}>
 						<Input
 							value={form.kana}
 							onChange={(e) => setForm({ kana: e.target.value })}
 						/>
 					</Field>
 					<Field
+						optional
 						label={t("invoiceRegistrationNo")}
 						hint={t("invoiceRegistrationNoHint")}
 						error={errorFor("invoiceRegistrationNo")}
@@ -505,6 +515,7 @@ function PartnersSection() {
 						</div>
 					</fieldset>
 					<Field
+						optional
 						label={t("memo")}
 						error={errorFor("memo")}
 						className="sm:col-span-2"
@@ -515,6 +526,7 @@ function PartnersSection() {
 						/>
 					</Field>
 					<Field
+						optional
 						label={t("billingName")}
 						help={t("billingNameHint")}
 						error={errorFor("billingName")}
@@ -524,7 +536,7 @@ function PartnersSection() {
 							onChange={(e) => setForm({ billingName: e.target.value })}
 						/>
 					</Field>
-					<Field label={t("email")} error={errorFor("email")}>
+					<Field optional label={t("email")} error={errorFor("email")}>
 						<Input
 							type="email"
 							value={form.email}
@@ -532,6 +544,7 @@ function PartnersSection() {
 						/>
 					</Field>
 					<Field
+						optional
 						label={t("address")}
 						error={errorFor("address")}
 						className="sm:col-span-2"
@@ -591,6 +604,7 @@ function AllocationRulesSection() {
 				<>
 					<NameFields form={form} setForm={setForm} errorFor={errorFor} />
 					<Field
+						required
 						term="allocation"
 						label={t("businessPercent")}
 						hint={t("businessPercentHint")}

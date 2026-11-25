@@ -459,6 +459,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 						{!form.billId &&
 							(Boolean(activePurposes?.length) || Boolean(form.purposeId)) && (
 								<Field
+									optional
 									label={tMaster("purposes")}
 									hint={tMaster("purposeEntry")}
 								>
@@ -588,6 +589,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							((targets.data?.invoices.length ?? 0) > 0 ||
 								(targets.data?.planMonths.length ?? 0) > 0) && (
 								<Field
+									required
 									label={t("depositTarget")}
 									hint={t("depositTargetHint")}
 									error={errorFor("targetMonth") ?? errorFor("status")}
@@ -624,7 +626,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									</NativeSelect>
 								</Field>
 							)}
-							<Field label={t("date")} error={errorFor("date")}>
+							<Field required label={t("date")} error={errorFor("date")}>
 								<Input
 									type="date"
 									value={form.date}
@@ -635,6 +637,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 								/>
 							</Field>
 							<Field
+								required
 								label={t("amount")}
 								hint={t("amountHint")}
 								error={errorFor("amount")}
@@ -664,6 +667,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							)}
 							{!form.purposeId && form.choice !== "owner" && !linked && (
 								<Field
+									required
 									term="account"
 									label={
 										unpaid ? t("unpaidAccount") : labels[form.choice].account
@@ -681,6 +685,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							)}
 							{!form.purposeId && !unpaid && (
 								<Field
+									required
 									label={labels[form.choice].payment}
 									hint={personal ? t("personalPaymentHint") : undefined}
 									error={errorFor("paymentAccountId")}
@@ -707,8 +712,8 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							)}
 							{!form.purposeId && !linked && (
 								<Field
+									optional
 									label={t("partner")}
-									hint={t("optional")}
 									error={errorFor("partnerId")}
 								>
 									<NativeSelect
@@ -726,6 +731,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 							)}
 							{!form.purposeId && (
 								<Field
+									optional
 									label={t("memo")}
 									hint={t("memoHint")}
 									error={errorFor("memo")}
@@ -764,6 +770,7 @@ function SimpleEntryForm({ fiscalYear }: { fiscalYear: number | null }) {
 									)}
 								{form.allocate && (
 									<Field
+										optional
 										term="allocation"
 										label={t("businessPercent")}
 										hint={t("businessPercentHint")}
