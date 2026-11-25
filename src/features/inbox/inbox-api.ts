@@ -406,7 +406,7 @@ export type ReceiptReading = {
 	/** 画像に写っている、読んでいないほかのレシートの枚数 */
 	otherReceipts: number
 	points: number
-	/** 買った物から AI が推した経費の科目（決算書の行のキー）。推測なので候補として見せるだけ */
+	/** 買った物から AI が推した経費の科目（決算書の行のキー）。ルールも前回の仕訳もないとき、確認の画面の科目に入れておく */
 	category?: string | null
 }
 

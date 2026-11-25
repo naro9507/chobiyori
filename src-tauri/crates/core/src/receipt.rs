@@ -73,7 +73,7 @@ pub struct ReceiptReading {
     #[serde(default)]
     pub points: i64,
     /// 買った物から推した経費の科目（決算書の行のキー。`pl.supplies` など）。
-    /// 印字を読んだ値ではなく推測なので、仕訳には入れず、確認の画面で候補として見せるだけ
+    /// 印字を読んだ値ではなく推測。ルールも前回の仕訳もないとき、確認の画面の科目に入れておく（確定は利用者）
     #[serde(default)]
     pub category: Option<String>,
 }

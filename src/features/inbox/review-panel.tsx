@@ -23,7 +23,11 @@ import { useRecordsTax } from "@/features/journal/journal-api"
 import { MasterCombobox } from "@/features/journal/master-combobox"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { type BookColumn, BookTable } from "@/features/ledger/book-table"
-import { type TaxCategory, taxCategories } from "@/features/master/master-api"
+import {
+	type Account,
+	type TaxCategory,
+	taxCategories,
+} from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -353,6 +357,26 @@ function ConfirmForm({
 	const receipt = useReceipts().data?.find((r) => r.id === item.receiptId)
 	const [fixing, setFixing] = useState(false)
 
+	const pickAccount = (id: number | null) => {
+		setAccountId(id)
+		setSubAccountId(null)
+		if (percent === "") {
+			const rule = masters.allocationPercentOf(id)
+			if (rule !== null && item.spend > 0) setPercent(String(rule))
+		}
+	}
+	// ルールも前回の仕訳もないときは、レシートから推した科目を入れておく（確定前に直せる）。
+	// レシートの一覧は後から届くことがあるので、届いた時に 1 度だけ入れる
+	const guessedId =
+		item.spend > 0 && item.suggestion === null
+			? accountOfLine(masters.accounts, receipt?.reading?.category)
+			: undefined
+	const [guessApplied, setGuessApplied] = useState(false)
+	if (!guessApplied && guessedId !== undefined && accountId === null) {
+		setGuessApplied(true)
+		pickAccount(guessedId)
+	}
+
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
 		const deposit = depositKey ? parseTargetKey(depositKey) : null
@@ -510,12 +534,8 @@ function ConfirmForm({
 							items={masters.accountItems}
 							value={accountId}
 							onChange={(id) => {
-								setAccountId(id)
-								setSubAccountId(null)
-								if (percent === "") {
-									const rule = masters.allocationPercentOf(id)
-									if (rule !== null && item.spend > 0) setPercent(String(rule))
-								}
+								setGuessApplied(true)
+								pickAccount(id)
 							}}
 						/>
 					</Field>
@@ -525,12 +545,8 @@ function ConfirmForm({
 							guessedLine={receipt?.reading?.category ?? null}
 							value={accountId}
 							onPick={(id) => {
-								setAccountId(id)
-								setSubAccountId(null)
-								if (percent === "") {
-									const rule = masters.allocationPercentOf(id)
-									if (rule !== null) setPercent(String(rule))
-								}
+								setGuessApplied(true)
+								pickAccount(id)
 							}}
 						/>
 					)}
@@ -744,11 +760,21 @@ function DepositPicker({
 	)
 }
 
+/** 決算書の行に当たる、有効な科目（最初の 1 つ） */
+function accountOfLine(
+	accounts: Account[],
+	line: string | null | undefined
+): number | undefined {
+	if (!line) return undefined
+	return accounts.find((a) => a.isActive && a.statementLine === line)?.id
+}
+
 type Candidate = { id: number; reason: "suggestion" | "guess" | "common" }
 
 /**
  * 科目の入力の下に並べる候補。ルール・前回の仕訳の科目、レシートから AI が推した科目、
  * よく使う経費の科目の順。押すとその科目を選ぶ（確定はしない）。
+ * ルールも前回の仕訳もなければ、推した科目は最初から入力に入っている。
  */
 function AccountCandidates({
 	suggestedId,
@@ -764,8 +790,7 @@ function AccountCandidates({
 	const t = useTranslations("inbox")
 	const masters = useJournalMasters()
 	const active = masters.accounts.filter((a) => a.isActive)
-	const byLine = (line: string) =>
-		active.find((a) => a.statementLine === line)?.id
+	const byLine = (line: string) => accountOfLine(active, line)
 	const candidates: Candidate[] = []
 	const push = (id: number | null | undefined, reason: Candidate["reason"]) => {
 		if (id == null || candidates.some((c) => c.id === id)) return

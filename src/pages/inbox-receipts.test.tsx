@@ -323,7 +323,7 @@ describe("レシート", () => {
 		})
 	})
 
-	it("科目の入力の下に、レシートから推した科目とよく使う科目を並べる", async () => {
+	it("レシートから推した科目を入れておき、入力の下によく使う科目も並べる", async () => {
 		const user = userEvent.setup()
 		receipts = [
 			receipt({
@@ -354,8 +354,11 @@ describe("レシート", () => {
 			"604 旅費交通費レシートから推測",
 			"610 消耗品費",
 		])
-		await user.click(buttons[0])
+		// ルールも前回の仕訳もないので、推した科目が最初から入っている
 		expect(buttons[0]).toHaveAttribute("aria-pressed", "true")
+		await user.click(buttons[1])
+		expect(buttons[1]).toHaveAttribute("aria-pressed", "true")
+		expect(buttons[0]).toHaveAttribute("aria-pressed", "false")
 	})
 
 	it("ポイントで払った分を含めて経費にし、ポイントの出どころを選べる", async () => {
