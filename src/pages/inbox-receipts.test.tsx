@@ -33,7 +33,8 @@ function account(
 	code: string,
 	nameJa: string,
 	category: Account["category"],
-	isPaymentAccount = false
+	isPaymentAccount = false,
+	statementLine: string | null = null
 ): Account {
 	return {
 		id,
@@ -42,7 +43,7 @@ function account(
 		nameEn: "",
 		kana: "",
 		category,
-		statementLine: null,
+		statementLine,
 		defaultTaxCategory: null,
 		defaultAllocationRuleId: null,
 		isPaymentAccount,
@@ -55,7 +56,8 @@ function account(
 const accounts = [
 	account(1, "101", "現金", "asset", true),
 	account(2, "204", "未払金", "liability", true),
-	account(3, "610", "消耗品費", "expense"),
+	account(3, "610", "消耗品費", "expense", false, "pl.supplies"),
+	account(4, "604", "旅費交通費", "expense", false, "pl.travel"),
 ]
 
 const attachment = {
@@ -319,6 +321,41 @@ describe("レシート", () => {
 			id: 9,
 			transactionId: 77,
 		})
+	})
+
+	it("科目の入力の下に、レシートから推した科目とよく使う科目を並べる", async () => {
+		const user = userEvent.setup()
+		receipts = [
+			receipt({
+				id: 2,
+				status: "read",
+				inboxItemId: 9,
+				inboxStatus: "pending",
+				reading: {
+					date: "2026-10-05",
+					total: 3240,
+					merchant: "テスト交通",
+					phone: "",
+					invoiceNo: null,
+					taxParts: [],
+					payment: "card",
+					otherReceipts: 0,
+					points: 0,
+					category: "pl.travel",
+				},
+			}),
+		]
+		renderPage()
+		const form = await screen.findByRole("form", { name: "候補を確定する" })
+		const list = await within(form).findByRole("list", { name: "科目の候補" })
+		const buttons = within(list).getAllByRole("button")
+		// 推測した科目が先、よく使う科目が後
+		expect(buttons.map((b) => b.textContent)).toEqual([
+			"604 旅費交通費レシートから推測",
+			"610 消耗品費",
+		])
+		await user.click(buttons[0])
+		expect(buttons[0]).toHaveAttribute("aria-pressed", "true")
 	})
 
 	it("ポイントで払った分を含めて経費にし、ポイントの出どころを選べる", async () => {

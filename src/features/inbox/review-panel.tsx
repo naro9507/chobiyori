@@ -44,6 +44,15 @@ import { ReceiptImage } from "./receipt-image"
 
 const statuses: InboxStatus[] = ["pending", "posted", "ignored"]
 
+/** 科目の候補に、いつも並べる経費の科目（決算書の行）。レシートでよく使うもの */
+const commonExpenseLines = [
+	"pl.supplies",
+	"pl.travel",
+	"pl.entertainment",
+	"pl.communication",
+	"pl.misc_expenses",
+]
+
 /** 確認待ちの候補を見て、1 件ずつ、またはまとめて確定する。 */
 export function ReviewPanel({ receiptId }: { receiptId?: number }) {
 	const t = useTranslations("inbox")
@@ -510,6 +519,21 @@ function ConfirmForm({
 							}}
 						/>
 					</Field>
+					{item.spend > 0 && (
+						<AccountCandidates
+							suggestedId={s && !s.ignore ? s.accountId : null}
+							guessedLine={receipt?.reading?.category ?? null}
+							value={accountId}
+							onPick={(id) => {
+								setAccountId(id)
+								setSubAccountId(null)
+								if (percent === "") {
+									const rule = masters.allocationPercentOf(id)
+									if (rule !== null) setPercent(String(rule))
+								}
+							}}
+						/>
+					)}
 					{subAccounts.length > 0 && (
 						<Field label={t("subAccount")}>
 							<NativeSelect
@@ -717,5 +741,64 @@ function DepositPicker({
 				/>
 			</Field>
 		</fieldset>
+	)
+}
+
+type Candidate = { id: number; reason: "suggestion" | "guess" | "common" }
+
+/**
+ * 科目の入力の下に並べる候補。ルール・前回の仕訳の科目、レシートから AI が推した科目、
+ * よく使う経費の科目の順。押すとその科目を選ぶ（確定はしない）。
+ */
+function AccountCandidates({
+	suggestedId,
+	guessedLine,
+	value,
+	onPick,
+}: {
+	suggestedId: number | null
+	guessedLine: string | null
+	value: number | null
+	onPick: (id: number) => void
+}) {
+	const t = useTranslations("inbox")
+	const masters = useJournalMasters()
+	const active = masters.accounts.filter((a) => a.isActive)
+	const byLine = (line: string) =>
+		active.find((a) => a.statementLine === line)?.id
+	const candidates: Candidate[] = []
+	const push = (id: number | null | undefined, reason: Candidate["reason"]) => {
+		if (id == null || candidates.some((c) => c.id === id)) return
+		if (!active.some((a) => a.id === id)) return
+		candidates.push({ id, reason })
+	}
+	push(suggestedId, "suggestion")
+	if (guessedLine) push(byLine(guessedLine), "guess")
+	for (const line of commonExpenseLines) push(byLine(line), "common")
+	if (candidates.length === 0) return null
+	return (
+		<ul
+			aria-label={t("accountCandidates")}
+			className="-mt-1 flex flex-wrap gap-1.5"
+		>
+			{candidates.map((c) => (
+				<li key={c.id}>
+					<Button
+						type="button"
+						size="sm"
+						variant={c.id === value ? "secondary" : "outline"}
+						aria-pressed={c.id === value}
+						onClick={() => onPick(c.id)}
+					>
+						{masters.accountLabel(c.id)}
+						{c.reason !== "common" && (
+							<span className="text-muted-foreground text-xs">
+								{t(`candidate_${c.reason}`)}
+							</span>
+						)}
+					</Button>
+				</li>
+			))}
+		</ul>
 	)
 }
