@@ -5,7 +5,9 @@
 		"fiscalYear": "FY {year}",
 		"loading": "Loading",
 		"chooseFiscalYear": "Fiscal year to view",
-		"listSeparator": ", "
+		"listSeparator": ", ",
+		"required": "Required",
+		"optional": "Optional"
 	},
 	"nav": {
 		"label": "Main menu",
@@ -422,6 +424,10 @@
 		"outOfRange": "Please check the allowed range.",
 		"duplicateCode": "This code is already used. Please choose another.",
 		"notFound": "It could not be found. Please reopen the screen.",
+		"notFoundFiscalYear": "There are no books for the year of this date. Check that the date is right. To record entries for a new year, create that year under \"Carry forward\" on the Closing screen.",
+		"notFoundAccount": "The selected account could not be found. It may have been deleted. Please choose the account again.",
+		"notFoundPartner": "The selected partner could not be found. It may have been deleted. Choose a partner again or leave it empty.",
+		"notFoundSubAccount": "The selected sub-account could not be found. It may have been deleted. Please choose it again.",
 		"inUse": "It is in use, so it cannot be deleted or recategorized. Deactivate it if you no longer need it.",
 		"systemAccount": "Standard accounts cannot be deleted or recategorized. Deactivate it if you no longer need it.",
 		"alreadySetUp": "Setup is already complete.",
@@ -723,6 +729,11 @@
 		"saveRule": "Use this for the same shop next time",
 		"confirm": "Record",
 		"enterHint": "Press Enter to record and go to the next one.",
+		"noYearBefore": "{year} is before {first}, the first year of these books, so it cannot be recorded here.",
+		"noYearAfter": "There are no books for {year} yet, so this cannot be confirmed. Create the {year} year under \"Carry forward\" on the Closing screen, then confirm.",
+		"noYearReceiptHint": "If the date was misread, fix it with \"Fix read values\". If you do not need to record it, choose \"Don't record\".",
+		"noYearStatementHint": "If you do not need to record this line, choose \"Don't record\".",
+		"accountRequiredHint": "Choose an account to confirm.",
 		"statementHint": "Choose a statement file (CSV or Excel) saved from your card company's or bank's website. Nothing goes into your books until you record it.",
 		"chooseStatement": "Choose a statement file",
 		"openedLabel": "Opened statement",

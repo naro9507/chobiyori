@@ -1,11 +1,13 @@
 import { cloneElement, type ReactElement, useId } from "react"
 import { type GlossaryTerm, TermHelp } from "@/features/help/term-help"
+import { useTranslations } from "@/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import { HelpTip } from "./help-tip"
 
 /**
  * ラベル・入力欄・補足・エラーをひとまとめにする。
  * 子の入力欄に id と aria の属性を付ける。
+ * `required` なら「必須」、`optional` なら「任意」をラベルの横に出す。
  */
 export function Field({
 	label,
@@ -13,6 +15,8 @@ export function Field({
 	hint,
 	help,
 	error,
+	required,
+	optional,
 	className,
 	children,
 }: {
@@ -21,9 +25,12 @@ export function Field({
 	hint?: string
 	help?: string
 	error?: string
+	required?: boolean
+	optional?: boolean
 	className?: string
 	children: ReactElement<Record<string, unknown>>
 }) {
+	const t = useTranslations("app")
 	const id = useId()
 	const hintId = `${id}-hint`
 	const errorId = `${id}-error`
@@ -36,6 +43,14 @@ export function Field({
 				<label htmlFor={id} className="font-medium text-sm">
 					{label}
 				</label>
+				{required && (
+					<span className="rounded-sm border border-destructive/40 px-1 text-destructive text-xs">
+						{t("required")}
+					</span>
+				)}
+				{optional && !required && (
+					<span className="text-muted-foreground text-xs">{t("optional")}</span>
+				)}
 				{term && <TermHelp term={term} />}
 				{help && <HelpTip topic={label}>{help}</HelpTip>}
 			</div>
@@ -43,6 +58,7 @@ export function Field({
 				id,
 				"aria-describedby": describedBy,
 				"aria-invalid": error ? true : undefined,
+				"aria-required": required ? true : undefined,
 			})}
 			{hint && (
 				<p id={hintId} className="text-muted-foreground text-xs">

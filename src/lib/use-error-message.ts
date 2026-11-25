@@ -27,9 +27,29 @@ const formatMessageOf: Record<
 	apiKey: "invalidApiKey",
 }
 
+/** 見つからないものを、入力欄に合わせて何が見つからないかの文にする。 */
+const notFoundMessageOf: Record<
+	string,
+	| "notFoundFiscalYear"
+	| "notFoundAccount"
+	| "notFoundPartner"
+	| "notFoundSubAccount"
+> = {
+	fiscalYear: "notFoundFiscalYear",
+	accountId: "notFoundAccount",
+	revenueAccountId: "notFoundAccount",
+	paymentAccountId: "notFoundAccount",
+	partnerId: "notFoundPartner",
+	subAccountId: "notFoundSubAccount",
+	debitSubAccountId: "notFoundSubAccount",
+}
+
 function messageKey(error: AppError) {
 	if (error.code === "invalidFormat" && error.field) {
 		return formatMessageOf[error.field] ?? error.code
+	}
+	if (error.code === "notFound" && error.field) {
+		return notFoundMessageOf[error.field] ?? error.code
 	}
 	return error.code
 }
