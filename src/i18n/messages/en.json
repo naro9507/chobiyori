@@ -445,7 +445,7 @@
 		"secretStore": "The place where the API key is kept (Windows Credential Manager or Mac Keychain) could not be used. Sign in to your computer again and try again.",
 		"noApiKey": "To read receipts, register an API key under \"Receipt reading\" in Settings. Until then, you can type the details while looking at the image.",
 		"badApiKey": "The API key is wrong or no longer works. Check the key in Google AI Studio and register it again.",
-		"serviceBusy": "The reading service (Gemini) is busy. Wait a while, then press Read. If it keeps happening, switch to a lighter model (such as gemini-3.5-flash-lite) under Receipt reading in Settings. The receipts are still waiting.",
+		"serviceBusy": "The reading service (Gemini) is busy. Wait a while, then press Read. This is temporary on Google's side and usually clears within minutes. The receipts are still waiting.",
 		"offline": "Could not reach the reading service. Once you are online, press Read. The receipts are still waiting.",
 		"rateLimited": "The reading limit was reached. Wait a while and try again.",
 		"modelNotFound": "The model in Settings was not found. The name may be wrong, or the model may have been retired. Check the model name under \"Receipt reading\" in Settings. The receipts are still waiting.",
