@@ -123,9 +123,14 @@ impl SecretStore for Keyring {
     }
 }
 
-/// 登録する API キーを確かめる。前後の空白を除き、使える文字だけか見る。
+/// 登録する API キーを確かめる。貼り付けで紛れ込む空白・改行・見えない文字・引用符を除き、
+/// 使える文字だけか見る。
 pub fn validate_key(key: &str) -> AppResult<String> {
-    let key = key.trim();
+    let key: String = key
+        .chars()
+        .filter(|c| !c.is_whitespace() && !c.is_control() && !is_invisible(*c))
+        .collect();
+    let key = key.trim_matches(|c| matches!(c, '"' | '\'' | '“' | '”' | '‘' | '’' | '`'));
     if key.is_empty() {
         return Err(AppError::field(ErrorCode::Required, "apiKey"));
     }
@@ -137,6 +142,11 @@ pub fn validate_key(key: &str) -> AppResult<String> {
         return Err(AppError::field(ErrorCode::InvalidFormat, "apiKey"));
     }
     Ok(key.to_string())
+}
+
+/// ゼロ幅の文字や BOM（コピーで付くことがある）。
+fn is_invisible(c: char) -> bool {
+    matches!(c, '\u{200B}'..='\u{200F}' | '\u{2060}' | '\u{FEFF}' | '\u{00AD}')
 }
 
 #[cfg(test)]
@@ -172,6 +182,11 @@ pub(crate) mod tests {
         assert_eq!(
             validate_key("abc def").unwrap_err(),
             AppError::field(ErrorCode::InvalidFormat, "apiKey")
+        );
+        // 貼り付けで混ざる空白・改行・引用符・見えない文字は取り除く
+        assert_eq!(
+            validate_key("\u{FEFF}\"AIza-abc\n_123\" \u{200B}").unwrap(),
+            "AIza-abc_123"
         );
         let store = MemoryStore::default();
         store.set("k").unwrap();

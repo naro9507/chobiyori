@@ -5,7 +5,11 @@ import { NotInTauriError } from "./tauri"
 /** 形式の誤りを、入力欄に合わせた直し方の文にする。 */
 const formatMessageOf: Record<
 	string,
-	"invalidDate" | "invalidCode" | "invalidRegistrationNo" | "invalidEmail"
+	| "invalidDate"
+	| "invalidCode"
+	| "invalidRegistrationNo"
+	| "invalidEmail"
+	| "invalidApiKey"
 > = {
 	date: "invalidDate",
 	issueDate: "invalidDate",
@@ -20,6 +24,7 @@ const formatMessageOf: Record<
 	email: "invalidEmail",
 	fromAddress: "invalidEmail",
 	to: "invalidEmail",
+	apiKey: "invalidApiKey",
 }
 
 function messageKey(error: AppError) {
