@@ -72,12 +72,26 @@ pub fn error_of(status: u16, retry_after: Option<u64>) -> ReadError {
     match status {
         401 | 403 => ReadError::BadKey,
         404 => ReadError::ModelNotFound,
-        // 503 は「混んでいる」（high demand）。接続できないのではないので、待って読み直す
-        429 | 503 => ReadError::RateLimited { retry_after },
+        429 => ReadError::RateLimited { retry_after },
+        // 503 は「混んでいる」（high demand）。接続できないのでも回数の上限でもないので、待って読み直す
+        503 => ReadError::Busy,
         400 | 413 | 415 => ReadError::Rejected,
         500..=599 => ReadError::Offline,
         _ => ReadError::BadResponse,
     }
+}
+
+/// 返事の中身がキーの間違い・期限切れを言っているか。Gemini は状態を 400・401・403・429 と
+/// 変えて返すことがあるので、状態より先に中身で見分ける（間違ったキーを「回数の上限」と言わないため）。
+pub fn is_bad_key(body: &str) -> bool {
+    const SIGNS: [&str; 5] = [
+        "API_KEY_INVALID",
+        "API_KEY_EXPIRED",
+        "API key not valid",
+        "API key expired",
+        "ACCESS_TOKEN_TYPE_UNSUPPORTED",
+    ];
+    SIGNS.iter().any(|s| body.contains(s))
 }
 
 /// 429 の返事の中身から、待てば読めるのか（1 分あたりの上限）、今日はもう読めないのか
@@ -135,8 +149,8 @@ impl ReceiptReader for Gemini {
             .and_then(|v| v.parse().ok());
         let body = response.text().await.map_err(|_| ReadError::Offline)?;
         if status != 200 {
-            // 400 でもキーの間違いのことがある
-            if status == 400 && body.contains("API_KEY_INVALID") {
+            // 400 や 429 でもキーの間違いのことがある
+            if is_bad_key(&body) {
                 return Err(ReadError::BadKey);
             }
             if status == 429 {
@@ -191,14 +205,22 @@ mod tests {
             }
         );
         assert_eq!(error_of(403, None), ReadError::BadKey);
-        assert_eq!(
-            error_of(503, None),
-            ReadError::RateLimited { retry_after: None }
-        );
+        assert_eq!(error_of(503, None), ReadError::Busy);
         assert_eq!(error_of(500, None), ReadError::Offline);
         assert_eq!(error_of(413, None), ReadError::Rejected);
         // モデルがない（提供の終了など）は 1 枚の失敗にしない
         assert_eq!(error_of(404, None), ReadError::ModelNotFound);
+    }
+
+    #[test]
+    fn bad_keys_are_told_whatever_the_status() {
+        let invalid = r#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID"}]}}"#;
+        assert!(is_bad_key(invalid));
+        assert!(is_bad_key(
+            &invalid.replace("API_KEY_INVALID", "API_KEY_EXPIRED")
+        ));
+        let per_minute = r#"{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"38.5s"}]}}"#;
+        assert!(!is_bad_key(per_minute));
     }
 
     #[test]

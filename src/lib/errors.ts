@@ -34,6 +34,7 @@ export type ErrorCode =
 	| "badApiKey"
 	| "offline"
 	| "rateLimited"
+	| "serviceBusy"
 	| "modelNotFound"
 	| "quotaExhausted"
 	| "readFailed"
