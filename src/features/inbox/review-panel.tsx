@@ -363,7 +363,9 @@ function ConfirmForm({
 			const reason =
 				fiscalYears.length > 0 && year < first
 					? t("noYearBefore", { year, first })
-					: t("noYearAfter", { year })
+					: year > new Date().getFullYear()
+						? t("noYearFuture", { year })
+						: t("noYearAfter", { year })
 			const next = receipt ? t("noYearReceiptHint") : t("noYearStatementHint")
 			return `${reason}${next}`
 		}

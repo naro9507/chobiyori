@@ -6,9 +6,22 @@ use chobiyori_storage::setup::{self, BusinessProfile, FiscalYear, SetupInput, Se
 use chobiyori_storage::Database;
 use tauri::State;
 
+/// 年が明けていたら、今年の年度を用意する（前の年の申告の前でも、1 月から記録できるように）。
+fn start_this_year(db: &Database) -> AppResult<()> {
+    let conn = db.conn();
+    let year: i64 = conn.query_row(
+        "SELECT CAST(strftime('%Y', 'now', 'localtime') AS INTEGER)",
+        [],
+        |r| r.get(0),
+    )?;
+    setup::start_calendar_year(&conn, year)?;
+    Ok(())
+}
+
 /// 初期設定が済んでいるか。済んでいなければ画面は初期設定ウィザードを出す。
 #[tauri::command]
 pub async fn setup_status(db: State<'_, Database>) -> AppResult<SetupStatus> {
+    start_this_year(&db)?;
     setup::status(&db.conn())
 }
 
@@ -33,6 +46,7 @@ pub async fn update_business_profile(
 
 #[tauri::command]
 pub async fn list_fiscal_years(db: State<'_, Database>) -> AppResult<Vec<FiscalYear>> {
+    start_this_year(&db)?;
     setup::fiscal_years(&db.conn())
 }
 

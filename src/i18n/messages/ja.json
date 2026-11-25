@@ -57,7 +57,10 @@
 		"firstAccounts": "使う口座を確認する（マスタの「勘定科目」）",
 		"firstOpening": "開業時の残高を入れる（残高がなければ 0 円のまま確定）",
 		"firstTransaction": "最初の売上や経費を記録する",
-		"setupRecovery": "パスワードを忘れたときの復旧コードを発行する"
+		"setupRecovery": "パスワードを忘れたときの復旧コードを発行する",
+		"notCarriedTitle": "{year} 年の残高をまだ繰り越していません",
+		"notCarriedBody": "{year} 年の取引はもう記録できます。ただ、口座残高は 0 円から数えています。{previous} 年の決算が済んだら、繰り越してください（あとから何度でもやり直せます）。",
+		"notCarriedLink": "{previous} 年度の「年度の繰越」を開く"
 	},
 	"settings": {
 		"language": "表示する言語",
@@ -730,6 +733,7 @@
 		"confirm": "確定する",
 		"enterHint": "Enter で確定して、次の候補に進みます。",
 		"noYearBefore": "{year} 年は、帳簿をつけ始めた {first} 年より前なので、この帳簿には記録できません。",
+		"noYearFuture": "{year} 年はまだ来ていない年なので確定できません。日付が合っているか確かめてください。",
 		"noYearAfter": "{year} 年の帳簿がまだないので確定できません。決算画面の「年度の繰越」で {year} 年度を作ってから確定してください。",
 		"noYearReceiptHint": "日付の読み間違いなら「読み取った値を直す」で直してください。記録しないなら「対象外にする」を選んでください。",
 		"noYearStatementHint": "記録しない明細なら「対象外にする」を選んでください。",

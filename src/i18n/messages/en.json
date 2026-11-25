@@ -57,7 +57,10 @@
 		"firstAccounts": "Check the accounts you use",
 		"firstOpening": "Enter your opening balances, or confirm zero balances",
 		"firstTransaction": "Record your first sale or expense",
-		"setupRecovery": "Create a recovery code in case you forget your password"
+		"setupRecovery": "Create a recovery code in case you forget your password",
+		"notCarriedTitle": "Balances for {year} have not been carried forward yet",
+		"notCarriedBody": "You can already record {year} transactions, but account balances start from 0. Once closing for {previous} is done, carry the balances forward (you can redo it any time).",
+		"notCarriedLink": "Open \"Carry forward\" for {previous}"
 	},
 	"settings": {
 		"language": "Display language",
@@ -730,6 +733,7 @@
 		"confirm": "Record",
 		"enterHint": "Press Enter to record and go to the next one.",
 		"noYearBefore": "{year} is before {first}, the first year of these books, so it cannot be recorded here.",
+		"noYearFuture": "{year} has not started yet, so this cannot be confirmed. Check that the date is right.",
 		"noYearAfter": "There are no books for {year} yet, so this cannot be confirmed. Create the {year} year under \"Carry forward\" on the Closing screen, then confirm.",
 		"noYearReceiptHint": "If the date was misread, fix it with \"Fix read values\". If you do not need to record it, choose \"Don't record\".",
 		"noYearStatementHint": "If you do not need to record this line, choose \"Don't record\".",

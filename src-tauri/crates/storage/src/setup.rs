@@ -160,6 +160,35 @@ fn validate_year(year: i64) -> AppResult<i64> {
     }
 }
 
+/// 暦の年 `year` の年度がなく、その前の年が最も新しい年度なら、`year` の年度を作る
+/// （申告区分と消費税の扱いは前の年と同じ）。前の年の申告が終わる前の 1 月から、新しい年の分を記録できるようにする。
+/// 期首残高は入れない。前の年の決算が済んだら「年度の繰越」で入れる（作っただけの年度には上書きの確認なしで入る）。
+/// 作ったら true。
+pub fn start_calendar_year(conn: &Connection, year: i64) -> AppResult<bool> {
+    let latest: Option<(i64, FilingType, TaxStatus)> = conn
+        .query_row(
+            "SELECT year, filing_type, tax_status FROM fiscal_years ORDER BY year DESC LIMIT 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    let has_profile: bool = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM business_profile)",
+        [],
+        |row| row.get(0),
+    )?;
+    match latest {
+        Some((latest, filing_type, tax_status)) if has_profile && latest + 1 == year => {
+            conn.execute(
+                "INSERT INTO fiscal_years (year, filing_type, tax_status) VALUES (?1, ?2, ?3)",
+                params![year, filing_type, tax_status],
+            )?;
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
 pub fn status(conn: &Connection) -> AppResult<SetupStatus> {
     let has_profile: bool = conn.query_row(
         "SELECT EXISTS (SELECT 1 FROM business_profile)",
@@ -413,6 +442,26 @@ pub fn fiscal_years(conn: &Connection) -> AppResult<Vec<FiscalYear>> {
 pub(crate) mod tests {
     use super::*;
     use crate::test_support::{input, set_up_db};
+
+    #[test]
+    fn the_new_calendar_year_is_started_from_the_latest_year() {
+        let db = set_up_db();
+        let conn = db.conn();
+        let latest = status(&conn).unwrap().fiscal_year.unwrap();
+        // 同じ年・2 年先の年は作らない
+        assert!(!start_calendar_year(&conn, latest).unwrap());
+        assert!(!start_calendar_year(&conn, latest + 2).unwrap());
+        assert!(start_calendar_year(&conn, latest + 1).unwrap());
+        let years = fiscal_years(&conn).unwrap();
+        assert_eq!(years[0].year, latest + 1);
+        assert_eq!(years[0].filing_type, years[1].filing_type);
+        assert_eq!(years[0].tax_status, years[1].tax_status);
+        // 2 回目は何もしない
+        assert!(!start_calendar_year(&conn, latest + 1).unwrap());
+        drop(conn);
+        // 作っただけの年度には、前の年から上書きの確認なしで繰り越せる
+        crate::closing::carry_forward(&db, latest, false).unwrap();
+    }
 
     #[test]
     fn industry_templates_add_accounts_before_misc_and_allocation_rules() {

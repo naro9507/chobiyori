@@ -275,7 +275,7 @@ describe("取込受信箱", () => {
 			if (command === "list_inbox")
 				return [
 					{ ...item(1, "文具店", 1080, 3), date: "2025-12-28" },
-					{ ...item(2, "書店", 500, 3), date: "2027-01-05" },
+					{ ...item(2, "書店", 500, 3), date: "2099-01-05" },
 				]
 			if (command === "confirm_inbox_item")
 				throw { code: "notFound", field: "fiscalYear" }
@@ -294,7 +294,7 @@ describe("取込受信箱", () => {
 		const next = await screen.findByRole("form", { name: "候補を確定する" })
 		await user.click(within(next).getByRole("button", { name: "確定する" }))
 		expect(await within(next).findByRole("alert")).toHaveTextContent(
-			"「年度の繰越」で 2027 年度を作ってから確定してください"
+			"2099 年はまだ来ていない年なので確定できません。"
 		)
 	})
 
