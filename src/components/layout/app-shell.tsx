@@ -5,7 +5,10 @@ import { CommandPalette } from "@/features/commands/command-palette"
 import { FilingCalendarSyncWorker } from "@/features/filing/filing-calendar-sync"
 import { FilingNotificationScheduler } from "@/features/filing/filing-notification-plan"
 import { FilingReminderBanner } from "@/features/filing/filing-reminder-banner"
-import { ReceiptReadingStatus } from "@/features/inbox/receipt-reading-status"
+import {
+	ReceiptReadingStatus,
+	ResumeReceiptReading,
+} from "@/features/inbox/receipt-reading-status"
 import {
 	useFiscalYear,
 	useFiscalYears,
@@ -92,6 +95,7 @@ export function AppShell() {
 				<FilingCalendarSyncWorker />
 				<FilingNotificationScheduler />
 				<FilingReminderBanner />
+				<ResumeReceiptReading />
 				<Outlet />
 			</main>
 		</div>

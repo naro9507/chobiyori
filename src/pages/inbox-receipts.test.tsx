@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
 	afterAll,
@@ -160,7 +160,7 @@ beforeEach(() => {
 		}),
 	]
 	reads = 0
-	useReceiptReading.setState({ progress: { kind: "idle" } })
+	useReceiptReading.setState({ progress: { kind: "idle" }, interrupted: false })
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	mocks.callCommand.mockReset()
 	mocks.callCommand.mockImplementation(
@@ -297,6 +297,35 @@ describe("レシート", () => {
 		)
 		expect(await screen.findByText(/2 枚を読み取りました/)).toBeInTheDocument()
 		expect(reads).toBe(2)
+	})
+
+	it("読んでいる途中でアプリが閉じられていたら、起動したときに続きから読む", async () => {
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		useReceiptReading.setState({ interrupted: true })
+		renderPage("/settings")
+		const nav = await screen.findByRole("navigation", {
+			name: "メインメニュー",
+		})
+		expect(
+			await within(nav).findByRole("link", {
+				name: /レシートを 2 枚読み取りました/,
+			})
+		).toBeInTheDocument()
+		expect(reads).toBe(2)
+		expect(useReceiptReading.getState().interrupted).toBe(false)
+	})
+
+	it("途中で閉じられていても、キーがなければ読まずに印を下ろす", async () => {
+		useReceiptReading.setState({ interrupted: true })
+		renderPage("/settings")
+		await waitFor(() =>
+			expect(useReceiptReading.getState().interrupted).toBe(false)
+		)
+		expect(reads).toBe(0)
 	})
 
 	it("読み取りは画面を離れても続き、サイドメニューに進み具合を出す", async () => {

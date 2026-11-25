@@ -1,6 +1,12 @@
 import { Link } from "@tanstack/react-router"
 import { CircleAlert, Loader2, ScanText } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { useTranslations } from "@/i18n/use-translations"
+import {
+	useInvalidateReceiptsAfterReading,
+	useReceiptSettings,
+	useReceipts,
+} from "./inbox-api"
 import { useReceiptReading } from "./receipt-reading-store"
 
 /**
@@ -44,4 +50,35 @@ export function ReceiptReadingStatus() {
 			</span>
 		</Link>
 	)
+}
+
+/**
+ * 前に読んでいる途中でアプリが閉じられていたら、起動したときに続きから読む。
+ * キーか同意がなくなっていたら読まない（レシートの画面から読み直せる）。
+ */
+export function ResumeReceiptReading() {
+	const interrupted = useReceiptReading((state) => state.interrupted)
+	return interrupted ? <Resume /> : null
+}
+
+function Resume() {
+	const settings = useReceiptSettings()
+	const receipts = useReceipts()
+	const invalidate = useInvalidateReceiptsAfterReading()
+	const readAll = useReceiptReading((state) => state.readAll)
+	const started = useRef(false)
+	useEffect(() => {
+		if (started.current || !settings.data || !receipts.data) return
+		started.current = true
+		const waiting = receipts.data.filter(
+			(r) => r.inboxItemId === null && r.status === "waiting" && r.sendAllowed
+		).length
+		const ready = settings.data.hasKey && settings.data.consentedAt !== null
+		if (!ready || waiting === 0) {
+			useReceiptReading.setState({ interrupted: false })
+			return
+		}
+		void readAll(waiting, invalidate)
+	}, [settings.data, receipts.data, readAll, invalidate])
+	return null
 }
