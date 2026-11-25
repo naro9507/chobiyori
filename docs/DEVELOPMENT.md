@@ -34,6 +34,7 @@ make dev     # アプリを起動
 |---|---|
 | `make dev` | アプリを起動する。画面の変更はすぐ反映され、Rust の変更は再ビルドされる |
 | `make dev-web` | 画面だけをブラウザで開く。Rust のコマンドは呼べない |
+| `make dev-mock` | 画面をモックの帳簿でブラウザに開く。Rust を起動せずに見た目と流れを確かめる（[モックの環境](#モックの環境)） |
 | `make build` | いまの OS 用のインストーラを作る（`src-tauri/target/release/bundle/`）。配布用は GitHub Actions で作る（[リリースと自動アップデート](./RELEASE.md)） |
 | `make test` | 画面（Vitest）と Rust（cargo test）のテスト |
 | `make lint` | Biome と Clippy |
@@ -88,6 +89,15 @@ chobiyori/
 3. 新しいメニュー項目なら `src/app/navigation.ts` に足し、`i18n/messages/ja.json` と `en.json` の `nav` と `descriptions` に文言を足す。
 
 文言は日本語と英語で同じキーを持つ必要がある。そろっていないとテストが失敗する。
+
+## モックの環境
+
+`make dev-mock`（`pnpm dev:mock`）で、Rust 側の代わりに画面の中の偽の帳簿から返すモードで開く（`src/mock/`）。アプリを起動しなくても、画面の見た目や入力の流れをブラウザで確かめられる。本番のビルドには入らない。
+
+- 場面は URL の `?scenario=` で選ぶ（例: `http://localhost:5173/?scenario=newYear#/`）。場面の一覧と中身は `src/mock/data.ts` の `scenarios` と `createBook`。日付は今日の年を基準に作る。
+- 画面から保存・確定すると偽の帳簿が書き変わる。ページを読み直すと元に戻る。
+- コマンドの返し方は `src/mock/handlers.ts`。用意していないコマンドは、一覧（`list_*`）なら空、それ以外は「うまくいきませんでした」になり、コンソールに `[mock] 用意していないコマンド` と出る。画面を見るのに要るものから足していく。
+- 返す形は、画面の型（`features/*/…-api.ts`）を使って書く。Rust 側の型と画面の型がずれていないかは、ここでは確かめられないので、アプリでも確かめる。
 
 ## Rust のコマンドを足すとき
 
