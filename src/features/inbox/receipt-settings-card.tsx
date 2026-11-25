@@ -302,7 +302,7 @@ function ModelField({
 	const t = useTranslations("receiptSettings")
 	const known = MODELS.some((m) => m.id === model)
 	return (
-		<Field label={t("model")} hint={t("modelHint")} className="w-72">
+		<Field label={t("model")} hint={t("modelHint")} className="w-80">
 			<NativeSelect value={model} onChange={(e) => onSave(e.target.value)}>
 				{MODELS.map((m) => (
 					<option key={m.id} value={m.id}>

@@ -989,10 +989,10 @@
 		"paymentAccountUnset": "No account set",
 		"paymentAccountUnavailable": "{account} (currently unavailable)",
 		"model": "Model used for reading",
-		"modelHint": "The recommended model is fine for most people.",
-		"modelLite": "Gemini 3.5 Flash Lite (recommended, fast)",
-		"modelFlash": "Gemini 3.5 Flash (slow, 20 a day on the free tier)",
-		"modelFlashNew": "Gemini 3.8 Flash (slow, 20 a day on the free tier)"
+		"modelHint": "The recommended model is fine for most people. Counts are free-tier estimates.",
+		"modelLite": "Gemini 3.5 Flash Lite (recommended)",
+		"modelFlash": "Gemini 3.5 Flash (slow, 20/day)",
+		"modelFlashNew": "Gemini 3.8 Flash (slow, 20/day)"
 	},
 	"closing": {
 		"deductionHint2027": "The ¥650,000 deduction requires filing via e-Tax by the deadline. The ¥750,000 deduction also requires qualifying electronic records. After confirming eligibility, you can change the transfer amounts in Income Tax.",

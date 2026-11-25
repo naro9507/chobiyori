@@ -989,10 +989,10 @@
 		"paymentAccountUnset": "口座未設定",
 		"paymentAccountUnavailable": "{account}（現在は選択できません）",
 		"model": "読み取りに使うモデル",
-		"modelHint": "ふつうは「おすすめ」のままで大丈夫です。",
-		"modelLite": "Gemini 3.5 Flash Lite（おすすめ・速い）",
-		"modelFlash": "Gemini 3.5 Flash（遅い・無料枠は 1 日 20 回）",
-		"modelFlashNew": "Gemini 3.8 Flash（遅い・無料枠は 1 日 20 回）"
+		"modelHint": "ふつうは「おすすめ」のままで大丈夫です。回数は無料枠のめやすです。",
+		"modelLite": "Gemini 3.5 Flash Lite（おすすめ）",
+		"modelFlash": "Gemini 3.5 Flash（遅い・1 日 20 回）",
+		"modelFlashNew": "Gemini 3.8 Flash（遅い・1 日 20 回）"
 	},
 	"closing": {
 		"deductionHint2027": "65 万円は期限内の e-Tax、75 万円はさらに優良な電子帳簿などの保存要件が必要です。75 万円の条件を確認したら「確定申告」で転記額を切り替えられます。",
