@@ -1,5 +1,5 @@
-import { Check, Copy, KeyRound } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import { Check, Copy, Eye, EyeOff, KeyRound } from "lucide-react"
+import { type ComponentProps, type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -105,16 +105,14 @@ export function ReceiptSettingsCard() {
 							</p>
 							<form
 								onSubmit={submitKey}
-								className="flex flex-wrap items-end gap-2"
+								className="flex flex-wrap items-start gap-2"
 							>
 								<Field
 									label={data.hasKey ? t("replaceKey") : t("apiKey")}
 									hint={t("apiKeyHint")}
 									className="w-96"
 								>
-									<Input
-										type="password"
-										autoComplete="off"
+									<SecretInput
 										value={key}
 										onChange={(e) => setKeyText(e.target.value)}
 									/>
@@ -122,7 +120,7 @@ export function ReceiptSettingsCard() {
 								<Button
 									type="submit"
 									size="sm"
-									className="mb-6"
+									className="mt-[2.125rem]"
 									disabled={key.trim() === "" || setKey.isPending}
 								>
 									{data.hasKey ? t("replaceKeyButton") : t("saveKey")}
@@ -132,7 +130,7 @@ export function ReceiptSettingsCard() {
 										type="button"
 										size="sm"
 										variant="ghost"
-										className="mb-6"
+										className="mt-[2.125rem]"
 										disabled={deleteKey.isPending}
 										onClick={() => deleteKey.mutate()}
 									>
@@ -249,6 +247,38 @@ function KeyGuide() {
 				<li>{t("noteData")}</li>
 			</ul>
 		</section>
+	)
+}
+
+/** 目のマークで表示と非表示を切り替えられる入力欄（API キー用）。 */
+function SecretInput(props: ComponentProps<"input">) {
+	const t = useTranslations("receiptSettings")
+	const [visible, setVisible] = useState(false)
+	return (
+		<div className="relative">
+			<Input
+				{...props}
+				type={visible ? "text" : "password"}
+				autoComplete="off"
+				autoCapitalize="off"
+				autoCorrect="off"
+				spellCheck={false}
+				className="pr-10"
+			/>
+			<button
+				type="button"
+				aria-label={visible ? t("hideKey") : t("showKey")}
+				aria-pressed={visible}
+				onClick={() => setVisible((v) => !v)}
+				className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			>
+				{visible ? (
+					<EyeOff aria-hidden="true" className="size-4" />
+				) : (
+					<Eye aria-hidden="true" className="size-4" />
+				)}
+			</button>
+		</div>
 	)
 }
 
