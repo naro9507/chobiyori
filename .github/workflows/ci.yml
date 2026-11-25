@@ -46,6 +46,9 @@ jobs:
       - name: 監査 Issue の通知処理を確かめる
         run: node --test scripts/report-security-audit.test.mjs
 
+      - name: 変更履歴のまとめ方を確かめる
+        run: node --test scripts/changeset-changelog.test.mjs
+
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           toolchain: stable
