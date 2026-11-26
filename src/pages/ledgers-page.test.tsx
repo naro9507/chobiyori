@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -18,13 +19,12 @@ import type { Account } from "@/features/master/master-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -177,8 +177,8 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	// 取り込んだ 2014 年度を見ている
 	useYearStore.setState({ selected: 2014 })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -274,7 +274,7 @@ describe("帳簿", () => {
 		).toEqual(["", "", "", "", "206 預り金", "5,000", "", "", ""])
 		expect(rows[4]).toHaveTextContent("108,000")
 		// サイドメニューで選んだ年度で読む
-		expect(mocks.callCommand).toHaveBeenCalledWith("journal_book", {
+		expect(ipc).toHaveBeenCalledWith("journal_book", {
 			fiscalYear: 2014,
 			fromMonth: 1,
 			toMonth: 12,
@@ -293,22 +293,22 @@ describe("帳簿", () => {
 			amountFrom: 8000,
 			partner: "試験商店",
 		})
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"journal_book",
 			expect.objectContaining({ search })
 		)
 		await user.click(screen.getByRole("button", { name: "CSV で保存" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+		expect(ipc).toHaveBeenCalledWith("export_report", {
 			receipt: expect.any(String),
 			request: expect.objectContaining({ search }),
 		})
-		const exported = mocks.callCommand.mock.calls.find(
+		const exported = ipc.mock.calls.find(
 			([command]) => command === "export_report"
 		)
 		await user.click(
 			await screen.findByRole("button", { name: "保存したファイルを表示" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("reveal_export", {
+		expect(ipc).toHaveBeenCalledWith("reveal_export", {
 			receipt: exported?.[1].receipt,
 		})
 		await user.click(
@@ -319,7 +319,7 @@ describe("帳簿", () => {
 		expect(
 			await screen.findByRole("tab", { name: "総勘定元帳", selected: true })
 		).toBeVisible()
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"ledger",
 			expect.objectContaining({ accountId: 2, search: { transactionId: 1 } })
 		)
@@ -339,7 +339,7 @@ describe("帳簿", () => {
 				/この形式（HEIC・PDF など）は画面に出せません/
 			)
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("list_attachments", {
+		expect(ipc).toHaveBeenCalledWith("list_attachments", {
 			transactionId: 1,
 		})
 	})
@@ -371,7 +371,7 @@ describe("帳簿", () => {
 		).toEqual(["3/12", "610 消耗品費", "文具", "", "1,080", "28,920"])
 
 		await user.selectOptions(select, "104 普通預金")
-		expect(mocks.callCommand).toHaveBeenCalledWith("ledger", {
+		expect(ipc).toHaveBeenCalledWith("ledger", {
 			fiscalYear: 2014,
 			fromMonth: 1,
 			toMonth: 12,
@@ -396,7 +396,7 @@ describe("帳簿", () => {
 		await screen.findByRole("table", { name: "仕訳帳" })
 		await user.click(screen.getByRole("button", { name: "PDF で保存" }))
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+		expect(ipc).toHaveBeenCalledWith("export_report", {
 			receipt: expect.any(String),
 			request: {
 				target: { kind: "journal" },
@@ -415,14 +415,15 @@ describe("帳簿", () => {
 
 	it("PDF のフォントがないときは、直し方を出す", async () => {
 		const user = userEvent.setup()
-		mocks.callCommand.mockImplementation(async (command: string) => {
+		ipc.mockImplementation(async (command: string) => {
 			if (command === "export_report") throw { code: "fontNotFound" }
 			if (command === "setup_status")
 				return { completed: true, fiscalYear: 2026 }
 			if (command === "list_accounts") return accounts
 			if (command === "journal_book")
 				return { transactions: [], totalDebit: 0, totalCredit: 0 }
-			return []
+			// アプリの更新の確認など、プラグインのコマンドは「なし」
+			return command.startsWith("plugin:") ? null : []
 		})
 		renderPage()
 		expect(

@@ -1,10 +1,9 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
 	afterAll,
-	afterEach,
 	beforeAll,
 	beforeEach,
 	describe,
@@ -22,12 +21,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	resetBook("default")
-	;(globalThis as { isTauri?: boolean }).isTauri = true
 	mockIPC(handleCommand)
-})
-afterEach(() => {
-	clearMocks()
-	delete (globalThis as { isTauri?: boolean }).isTauri
 })
 
 // 一覧は仮想スクロールなので、表示する高さを決めておく

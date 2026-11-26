@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -23,13 +24,12 @@ import type {
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -183,8 +183,8 @@ beforeEach(() => {
 		ignored: [],
 	}
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -251,7 +251,7 @@ describe("取込受信箱", () => {
 			within(form).getByLabelText("次回から同じ店はこの内容にする")
 		)
 		await user.click(within(form).getByRole("button", { name: "確定する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("confirm_inbox_item", {
+		expect(ipc).toHaveBeenCalledWith("confirm_inbox_item", {
 			id: 1,
 			input: {
 				accountId: 3,
@@ -275,7 +275,7 @@ describe("取込受信箱", () => {
 		await user.click(
 			screen.getByRole("button", { name: "選んだ候補を候補どおりに確定" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("confirm_inbox_items", {
+		expect(ipc).toHaveBeenCalledWith("confirm_inbox_items", {
 			ids: [1],
 			input: null,
 		})
@@ -317,7 +317,7 @@ describe("取込受信箱", () => {
 			"204 未払金"
 		)
 		await user.click(save)
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_import_format", {
+		expect(ipc).toHaveBeenCalledWith("save_import_format", {
 			id: null,
 			input: expect.objectContaining({
 				name: "card",
@@ -329,7 +329,7 @@ describe("取込受信箱", () => {
 				},
 			}),
 		})
-		expect(mocks.callCommand).toHaveBeenCalledWith("import_statement", {
+		expect(ipc).toHaveBeenCalledWith("import_statement", {
 			formatId: 5,
 		})
 		expect(
@@ -371,9 +371,9 @@ describe("取込受信箱", () => {
 	})
 
 	it("明細を開かずにテンプレートを保存・編集し、次の取り込みで選べる", async () => {
-		const base = mocks.callCommand.getMockImplementation()
+		const base = ipc.getMockImplementation()
 		let saved: ImportFormat | null = null
-		mocks.callCommand.mockImplementation(async (command: string, args) => {
+		ipc.mockImplementation(async (command: string, args) => {
 			switch (command) {
 				case "list_import_formats":
 					return saved ? [saved] : []
@@ -425,7 +425,7 @@ describe("取込受信箱", () => {
 		expect(
 			await screen.findByText("「テスト銀行」を保存しました。")
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_import_format", {
+		expect(ipc).toHaveBeenCalledWith("save_import_format", {
 			id: null,
 			input: expect.objectContaining({
 				name: "テスト銀行",
@@ -447,17 +447,14 @@ describe("取込受信箱", () => {
 		expect(
 			await screen.findByText("「テスト銀行」を保存しました。")
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_import_format", {
+		expect(ipc).toHaveBeenCalledWith("save_import_format", {
 			id: 5,
 			input: expect.objectContaining({
 				definition: expect.objectContaining({ delimiter: "tab", skipRows: 1 }),
 			}),
 		})
-		expect(mocks.callCommand).not.toHaveBeenCalledWith("open_statement")
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"import_statement",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("open_statement", {})
+		expect(ipc).not.toHaveBeenCalledWith("import_statement", expect.anything())
 
 		await user.click(screen.getByRole("link", { name: "確認待ちに戻る" }))
 		await user.click(
@@ -472,7 +469,7 @@ describe("取込受信箱", () => {
 		)
 		expect(await screen.findByText("入金テスト")).toBeInTheDocument()
 		await user.click(screen.getByRole("button", { name: "受信箱に入れる" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("import_statement", {
+		expect(ipc).toHaveBeenCalledWith("import_statement", {
 			formatId: 5,
 		})
 		expect(
@@ -481,8 +478,8 @@ describe("取込受信箱", () => {
 	})
 
 	it("口座の入金は合う請求書や定期売上を候補に出し、選んで確定する", async () => {
-		const base = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(async (command: string, args) => {
+		const base = ipc.getMockImplementation()
+		ipc.mockImplementation(async (command: string, args) => {
 			switch (command) {
 				case "list_inbox":
 					return [item(1, "ﾌﾘｺﾐ ﾔﾏﾀﾞ ﾀﾛｳ", -8000, null)]
@@ -529,7 +526,7 @@ describe("取込受信箱", () => {
 			within(form).queryByLabelText("何に使ったか（科目）")
 		).not.toBeInTheDocument()
 		await user.click(within(form).getByRole("button", { name: "確定する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("confirm_inbox_item", {
+		expect(ipc).toHaveBeenCalledWith("confirm_inbox_item", {
 			id: 1,
 			input: expect.objectContaining({
 				deposit: { kind: "plan", planId: 4, month: "2026-10" },

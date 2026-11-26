@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -6,13 +7,12 @@ import { AppProviders } from "@/app/providers"
 import { createAppRouter } from "@/app/router"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function renderApp() {
 	const router = createAppRouter(createMemoryHistory({ initialEntries: ["/"] }))
@@ -28,8 +28,8 @@ let completed = false
 beforeEach(() => {
 	completed = false
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string, args) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string, args) => {
 		switch (command) {
 			case "setup_status":
 				return completed
@@ -82,7 +82,7 @@ describe("初期設定ウィザード", () => {
 		await user.click(
 			screen.getByRole("button", { name: "国税庁の公表サイトで番号を確認" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_invoice_site")
+		expect(ipc).toHaveBeenCalledWith("open_invoice_site", {})
 		expect(screen.getByLabelText("インボイスの登録番号")).toHaveValue("")
 		await user.click(screen.getByRole("button", { name: "次へ" }))
 
@@ -117,7 +117,7 @@ describe("初期設定ウィザード", () => {
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("complete_setup", {
+		expect(ipc).toHaveBeenCalledWith("complete_setup", {
 			input: {
 				profile: {
 					ownerName: "山田 花子",
@@ -177,10 +177,7 @@ describe("初期設定ウィザード", () => {
 			screen.getByText("登録番号は T と 13 桁の数字で入れてください。")
 		).toBeInTheDocument()
 		expect(screen.getByText("手順 1 / 4")).toBeInTheDocument()
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"complete_setup",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("complete_setup", expect.anything())
 	})
 
 	it("免税事業者で登録番号があるときは案内を出し、課税を選ぶと消す", async () => {

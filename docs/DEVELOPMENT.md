@@ -110,31 +110,48 @@ chobiyori/
 
 ### テストで使う
 
-`mockIPC` に `handleCommand` を渡すと、場面の帳簿から返る（例: `src/pages/inbox-mock.test.tsx`）。`callCommand` は `isTauri` を見るので、テストの間だけ立てる。
+画面のテストは、Rust 側のコマンドを `mockIPC` で返す。`src/test/setup.ts` がテストごとに `isTauri` を立て（`callCommand` がこれを見る）、終わったら `clearMocks()` を呼ぶので、各テストは `mockIPC` で返し方を決めるだけでよい。
+
+コマンドごとに返す値を書くとき（多くのテスト）:
 
 ```ts
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks"
+const ipc = vi.fn()
+beforeEach(() => {
+	mockIPC(ipc)
+	ipc.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+		switch (command) {
+			case "list_accounts":
+				return accounts
+			default:
+				// アプリの更新の確認など、プラグインのコマンドは「なし」
+				return command.startsWith("plugin:") ? null : []
+		}
+	})
+})
+
+expect(ipc).toHaveBeenCalledWith("confirm_inbox_item", { id: 1, input: … })
+expect(ipc).toHaveBeenCalledWith("open_with_login", {}) // 引数のないコマンドは {} で届く
+```
+
+その他のコマンドに `[]` を返すと、アプリの更新の確認（`plugin:updater|check`）が「更新あり」になり、更新のダイアログが画面を覆う。プラグインのコマンドには `null` を返す。
+
+モックの帳簿をそのまま使うとき（例: `src/pages/inbox-mock.test.tsx`）:
+
+```ts
 import { currentBook, resetBook } from "@/mock/book"
 import { handleCommand } from "@/mock/handlers"
 
 beforeEach(() => {
 	resetBook("default")
-	globalThis.isTauri = true
 	mockIPC(handleCommand)
 })
-afterEach(() => {
-	clearMocks()
-	delete globalThis.isTauri
-})
 
-it("締めた年度は確定できない", async () => {
-	// 一部のコマンドだけ変える
-	mockIPC((cmd, args) =>
-		cmd === "confirm_inbox_item" ? Promise.reject({ code: "yearClosed" }) : handleCommand(cmd, args)
-	)
-	// 呼び出しを確かめるときは vi.fn で包む: const handler = vi.fn(handleCommand); mockIPC(handler)
-	// 帳簿を確かめる・変えるときは currentBook()
-})
+// 一部のコマンドだけ変える
+mockIPC((cmd, args) =>
+	cmd === "confirm_inbox_item" ? Promise.reject({ code: "yearClosed" }) : handleCommand(cmd, args)
+)
+// 呼び出しを確かめるときは vi.fn で包む: const handler = vi.fn(handleCommand); mockIPC(handler)
+// 帳簿を確かめる・変えるときは currentBook()
 ```
 
 ### コマンドを足すとき

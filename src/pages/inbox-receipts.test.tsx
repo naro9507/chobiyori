@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -20,13 +21,12 @@ import type {
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -158,8 +158,8 @@ beforeEach(() => {
 	]
 	reads = 0
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(
+	ipc.mockReset()
+	ipc.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "setup_status":
@@ -200,7 +200,8 @@ beforeEach(() => {
 				case "attachment_content":
 					return { attachment, data: "AA==" }
 				default:
-					return []
+					// アプリの更新の確認など、プラグインのコマンドは「なし」
+					return command.startsWith("plugin:") ? null : []
 			}
 		}
 	)
@@ -251,7 +252,7 @@ describe("レシート", () => {
 				"上の説明を読み、レシートの画像を送ることに同意します"
 			)
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_receipt_settings", {
+		expect(ipc).toHaveBeenCalledWith("save_receipt_settings", {
 			input: {
 				model: "gemini-2.5-flash",
 				cashAccountId: 1,
@@ -263,7 +264,7 @@ describe("レシート", () => {
 		expect(keyInput).toHaveAttribute("type", "password")
 		await user.type(keyInput, "AIza-test")
 		await user.click(screen.getByRole("button", { name: "キーを登録する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("set_gemini_key", {
+		expect(ipc).toHaveBeenCalledWith("set_gemini_key", {
 			key: "AIza-test",
 		})
 		// 登録したかどうかだけを出し、替える・消すができる
@@ -315,7 +316,7 @@ describe("レシート", () => {
 				name: "この取引に紐付ける（新しく作らない）",
 			})
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("link_inbox_item", {
+		expect(ipc).toHaveBeenCalledWith("link_inbox_item", {
 			id: 9,
 			transactionId: 77,
 		})
@@ -364,7 +365,7 @@ describe("レシート", () => {
 		await user.click(
 			within(fields).getByRole("button", { name: "確認待ちに入れる" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"save_receipt_fields",
 			expect.objectContaining({
 				id: 2,
@@ -384,9 +385,9 @@ it("レシートの削除を取り消すと画像は残る", async () => {
 		expect(confirm).toHaveBeenCalledWith(
 			expect.stringContaining(receipts[0].attachment.fileName)
 		)
-		expect(
-			mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
-		).toBe(false)
+		expect(ipc.mock.calls.some(([name]) => name === "delete_receipt")).toBe(
+			false
+		)
 	} finally {
 		confirm.mockRestore()
 	}

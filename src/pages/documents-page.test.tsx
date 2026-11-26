@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -12,13 +13,12 @@ import type {
 } from "@/features/documents/documents-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 const issued: DocumentRecord = {
 	id: 1,
@@ -88,7 +88,7 @@ const mailDraft = {
 
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
+	ipc.mockReset()
 	const settings: DocumentSettings = {
 		phone: "",
 		email: "",
@@ -100,7 +100,7 @@ beforeEach(() => {
 		mailSubject: "",
 		mailBody: "",
 	}
-	mocks.callCommand.mockImplementation(
+	ipc.mockImplementation(
 		async (
 			command: string,
 			args?: {
@@ -190,8 +190,8 @@ describe("書類の画面", () => {
 			paid: boolean
 		}
 		let bills: Bill[] = []
-		const standardCommand = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(async (command, args) => {
+		const standardCommand = ipc.getMockImplementation()
+		ipc.mockImplementation(async (command, args) => {
 			if (command === "list_received_bills") return bills
 			if (command === "save_received_bill") {
 				bills = [{ ...args.input, id: 1, paid: false }]
@@ -294,7 +294,7 @@ describe("書類の画面", () => {
 		const form = within(body.closest("form") as HTMLFormElement)
 		await user.click(form.getByRole("button", { name: "保存する" }))
 		await waitFor(() =>
-			expect(mocks.callCommand).toHaveBeenCalledWith("save_document_settings", {
+			expect(ipc).toHaveBeenCalledWith("save_document_settings", {
 				input: expect.objectContaining({
 					mailSubject: "【{書類}】",
 					mailBody: "{書類別の一文}",
@@ -325,10 +325,11 @@ describe("書類の画面", () => {
 		await user.selectOptions(target, "gmail")
 		await user.click(screen.getByRole("button", { name: "下書きを開く" }))
 		await waitFor(() =>
-			expect(mocks.callCommand).toHaveBeenCalledWith(
-				"open_document_in_mail_app",
-				{ id: 1, draft: mailDraft, target: "gmail" }
-			)
+			expect(ipc).toHaveBeenCalledWith("open_document_in_mail_app", {
+				id: 1,
+				draft: mailDraft,
+				target: "gmail",
+			})
 		)
 		expect(
 			await screen.findByRole("button", { name: "送信済みにする" })
@@ -365,7 +366,7 @@ describe("書類の画面", () => {
 		await user.type(screen.getByLabelText(/^単価/), "20000")
 		await user.click(screen.getByRole("button", { name: "下書きを保存" }))
 
-		const call = mocks.callCommand.mock.calls.find(
+		const call = ipc.mock.calls.find(
 			([command]) => command === "create_document"
 		)
 		expect(call?.[1].input).toMatchObject({
@@ -381,9 +382,9 @@ describe("書類の画面", () => {
 })
 
 it("初回入金では入金した口座を明示的に選ぶ", async () => {
-	const original = mocks.callCommand.getMockImplementation()
+	const original = ipc.getMockImplementation()
 	const doc = { ...issued, transactionId: 7 }
-	mocks.callCommand.mockImplementation(async (cmd, args) => {
+	ipc.mockImplementation(async (cmd, args) => {
 		if (cmd === "get_document") return doc
 		if (cmd === "list_documents") return [doc]
 		if (cmd === "list_accounts")
@@ -415,11 +416,9 @@ it("初回入金では入金した口座を明示的に選ぶ", async () => {
 	await user.selectOptions(account, "W001 架空銀行")
 	expect(save).toBeEnabled()
 	await user.click(save)
-	expect(
-		mocks.callCommand.mock.calls.some(
-			([, args]) => args?.input?.accountId === 2
-		)
-	).toBe(true)
+	expect(ipc.mock.calls.some(([, args]) => args?.input?.accountId === 2)).toBe(
+		true
+	)
 })
 it("単価の空欄を示し、一覧に戻るときは破棄を選べる", async () => {
 	const user = userEvent.setup()
@@ -428,9 +427,7 @@ it("単価の空欄を示し、一覧に戻るときは破棄を選べる", asyn
 	await user.type(await screen.findByLabelText(/^品名/), "制作")
 	await user.click(screen.getByRole("button", { name: "下書きを保存" }))
 	expect(screen.getByLabelText(/^単価/)).toHaveAttribute("aria-invalid", "true")
-	expect(
-		mocks.callCommand.mock.calls.some(([cmd]) => cmd === "create_document")
-	).toBe(false)
+	expect(ipc.mock.calls.some(([cmd]) => cmd === "create_document")).toBe(false)
 	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
 	try {
 		await user.click(screen.getByRole("button", { name: "一覧に戻る" }))

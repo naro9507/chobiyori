@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -8,13 +9,12 @@ import type { Account } from "@/features/master/master-api"
 import type { TrialBalance } from "@/features/reports/reports-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -136,8 +136,8 @@ function renderPage() {
 beforeEach(() => {
 	balanced = true
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -185,7 +185,7 @@ describe("集計", () => {
 		await user.selectOptions(screen.getByLabelText("はじめの月"), "1月")
 		await user.selectOptions(screen.getByLabelText("おわりの月"), "3月")
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("trial_balance", {
+		expect(ipc).toHaveBeenCalledWith("trial_balance", {
 			fiscalYear: 2026,
 			fromMonth: 1,
 			toMonth: 3,
