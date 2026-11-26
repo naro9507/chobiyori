@@ -110,7 +110,7 @@ chobiyori/
 
 ### テストで使う
 
-画面のテストは、Rust 側のコマンドを `mockIPC` で返す。`callCommand` は通信の口（`mockIPC` が用意する）があるかで「アプリの中か」を見るので、`mockIPC` を呼ぶだけで動く。`src/test/setup.ts` がテストごとに `clearMocks()` を呼ぶ。
+画面のテストは、Rust 側のコマンドを `mockIPC` で返す。`callCommand` は `@tauri-apps/api` の `isTauri()` でアプリの中かを見るが、`mockIPC` はその印（`globalThis.isTauri`）を立てない。そこで `src/test/setup.ts` がテストごとに印を立て、終わったら `clearMocks()` を呼ぶので、各テストは `mockIPC` で返し方を決めるだけでよい。
 
 コマンドごとに返す値を書くとき（多くのテスト）:
 
