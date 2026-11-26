@@ -13,11 +13,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/ui/confirm-dialog"
 import { useTranslations } from "@/i18n/use-translations"
-import { isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
 	type Receipt,
-	readNextReceipt,
 	useAddReceipts,
 	useDeleteReceipt,
 	useInvalidateReceiptsAfterReading,
@@ -28,22 +26,16 @@ import {
 } from "./inbox-api"
 import { ReceiptFieldsForm } from "./receipt-fields-form"
 import { ReceiptImage } from "./receipt-image"
+import { isReading, useReceiptReading } from "./receipt-reading-store"
 
 /** 設定画面（API キーの登録と案内がある） */
 const settingsPath: string =
 	navItems.find((item) => item.id === "settings")?.path ?? "/"
 
-/** 回数の上限に達したとき、読み直すまで待つ時間 */
-const RATE_LIMIT_WAIT_MS = 30_000
-
-type Progress =
-	| { kind: "idle" }
-	| { kind: "reading"; done: number; remaining: number }
-	| { kind: "waiting"; done: number }
-	| { kind: "finished"; done: number }
-	| { kind: "stopped"; done: number; error: unknown }
-
-/** レシートを取り込み、まとめて読み取る。読み取った結果は受信箱の候補になる（確定するまで記帳しない）。 */
+/**
+ * レシートを取り込み、まとめて読み取る。読み取った結果は受信箱の候補になる（確定するまで記帳しない）。
+ * 読み取りの繰り返しは `useReceiptReading` が持つので、この画面を離れても続く。
+ */
 export function ReceiptsPanel() {
 	const inbox = useTranslations("inbox")
 	const t = useTranslations("receipts")
@@ -53,42 +45,18 @@ export function ReceiptsPanel() {
 	const add = useAddReceipts()
 	const invalidate = useInvalidateReceiptsAfterReading()
 	const [manualAdded, setManualAdded] = useState<number | null>(null)
-	const [progress, setProgress] = useState<Progress>({ kind: "idle" })
+	const progress = useReceiptReading((state) => state.progress)
+	const startReading = useReceiptReading((state) => state.readAll)
+	const dismissReading = useReceiptReading((state) => state.dismiss)
 	const [selectedId, setSelectedId] = useState<number | null>(null)
 	const list = (receipts.data ?? []).filter((r) => r.inboxItemId === null)
 	const waiting = list.filter((r) => r.status === "waiting" && r.sendAllowed)
 	const selected = list.find((r) => r.id === selectedId)
 	const ready = settings.data?.hasKey && settings.data.consentedAt !== null
 
-	/** 読み取り待ちのレシートを、1 枚ずつ最後まで読む。 */
-	const readAll = async () => {
-		let done = 0
-		setProgress({ kind: "reading", done, remaining: waiting.length })
-		for (;;) {
-			try {
-				const outcome = await readNextReceipt()
-				if (!outcome.receipt) break
-				done += 1
-				setProgress({ kind: "reading", done, remaining: outcome.remaining })
-				await invalidate()
-				if (outcome.remaining === 0) break
-			} catch (error) {
-				if (isAppError(error) && error.code === "rateLimited") {
-					setProgress({ kind: "waiting", done })
-					await new Promise((resolve) =>
-						setTimeout(resolve, RATE_LIMIT_WAIT_MS)
-					)
-					continue
-				}
-				setProgress({ kind: "stopped", done, error })
-				await invalidate()
-				return
-			}
-		}
-		setProgress({ kind: "finished", done })
-		await invalidate()
-	}
-	const busy = progress.kind === "reading" || progress.kind === "waiting"
+	/** 読み取り待ちのレシートを最後まで読む。ほかの画面に移っても続ける。 */
+	const readAll = () => startReading(waiting.length, invalidate)
+	const busy = isReading(progress)
 
 	return (
 		<div className="flex flex-col gap-5">
@@ -144,7 +112,10 @@ export function ReceiptsPanel() {
 				{manualAdded && t("manualAdded")}
 				{add.data && t("added", add.data)}
 				{progress.kind === "reading" && t("reading", progress)}
-				{progress.kind === "waiting" && t("rateLimitWait", progress)}
+				{progress.kind === "waiting" &&
+					t(progress.busy ? "busyWait" : "rateLimitWait", {
+						done: progress.done,
+					})}
 				{progress.kind === "finished" && t("readFinished", progress)}
 			</p>
 			{(manualAdded || progress.kind === "finished") && (
@@ -160,7 +131,10 @@ export function ReceiptsPanel() {
 			{progress.kind === "stopped" && (
 				<p role="alert" className="text-destructive text-sm">
 					{t("readStopped", { done: progress.done })}{" "}
-					{errorMessage(progress.error)}
+					{errorMessage(progress.error)}{" "}
+					<Button size="sm" variant="ghost" onClick={dismissReading}>
+						{t("dismissStopped")}
+					</Button>
 				</p>
 			)}
 			{(add.error || receipts.error) && (

@@ -72,6 +72,36 @@ pub struct ReceiptReading {
     /// ポイント・商品券などで払った額（合計からは引かれている）
     #[serde(default)]
     pub points: i64,
+    /// 買った物から推した経費の科目（決算書の行のキー。`pl.supplies` など）。
+    /// 印字を読んだ値ではなく推測。ルールも前回の仕訳もないとき、確認の画面の科目に入れておく（確定は利用者）
+    #[serde(default)]
+    pub category: Option<String>,
+}
+
+/// AI に選ばせる経費の科目。（返事の値, 決算書の行）。返事の値は英語の短い語にする
+/// （利用者の科目名は送らないため、標準の科目に対応する決算書の行で受け取る）。
+pub const CATEGORIES: &[(&str, &str)] = &[
+    ("supplies", "pl.supplies"),
+    ("travel", "pl.travel"),
+    ("communication", "pl.communication"),
+    ("entertainment", "pl.entertainment"),
+    ("utilities", "pl.utilities"),
+    ("freight", "pl.freight"),
+    ("advertising", "pl.advertising"),
+    ("repairs", "pl.repairs"),
+    ("welfare", "pl.welfare"),
+    ("taxesDues", "pl.taxes_dues"),
+    ("rent", "pl.rent"),
+    ("purchases", "pl.purchases"),
+    ("misc", "pl.misc_expenses"),
+];
+
+/// AI の返事の科目を、決算書の行のキーにする。知らない値・`unknown` は None。
+fn category_of(text: &str) -> Option<String> {
+    CATEGORIES
+        .iter()
+        .find(|(key, _)| *key == text)
+        .map(|(_, line)| (*line).to_string())
 }
 
 string_enum! {
@@ -130,10 +160,23 @@ pub fn response_schema() -> Value {
             },
             "payment": { "type": "string", "enum": ["cash", "card", "eMoney", "unknown"] },
             "points": { "type": "string", "description": "ポイント・商品券・ギフト券など、お金の代わりに使って合計から引かれた額（なければ空）" },
-            "otherReceipts": { "type": "integer", "description": "読んだ 1 枚のほかに、画像に写っているレシート・領収書の枚数（なければ 0）" }
+            "otherReceipts": { "type": "integer", "description": "読んだ 1 枚のほかに、画像に写っているレシート・領収書の枚数（なければ 0）" },
+            "category": {
+                "type": "string",
+                "enum": category_enum(),
+                "description": "買った物・サービスから考えた、個人事業の経費の科目（推測）"
+            }
         },
         "required": ["date", "total", "merchant", "payment"]
     })
+}
+
+fn category_enum() -> Vec<&'static str> {
+    CATEGORIES
+        .iter()
+        .map(|(key, _)| *key)
+        .chain(["unknown"])
+        .collect()
 }
 
 /// AI に送る指示。帳簿や取引先の情報は送らない（画像とこの文だけ）。
@@ -142,7 +185,12 @@ pub const PROMPT: &str = "これは日本のレシートまたは領収書の画
 taxParts には「10%対象」「8%対象（軽減税率）」などの税率ごとの対象額（税込）と消費税額を入れてください。\
 payment は現金なら cash、クレジットカードなら card、電子マネーや QR コード決済なら eMoney、分からなければ unknown にしてください。\
 「ポイント利用」「商品券」など、お金の代わりに使って合計から引かれた額は points に入れてください（合計は引いた後の、実際に払った額）。\
-画像にレシートが 2 枚以上写っているときは、いちばん大きく写っている 1 枚だけを読み、ほかの枚数を otherReceipts に入れてください。";
+画像にレシートが 2 枚以上写っているときは、いちばん大きく写っている 1 枚だけを読み、ほかの枚数を otherReceipts に入れてください。\
+category だけは推測でかまいません。品目と店の種類から、個人事業の経費ならどれに当たりそうかを選んでください\
+（supplies: 消耗品・事務用品・10 万円未満の機器、travel: 電車・バス・タクシー・駐車場・宿泊・ガソリン、communication: 切手・電話・インターネット、\
+entertainment: 取引先との飲食・贈答、utilities: 電気・ガス・水道、freight: 宅配便・梱包材、advertising: 広告・チラシ・印刷、repairs: 修理、\
+welfare: 従業員のための飲食・慰労、taxesDues: 収入印紙・証明書の手数料、rent: 家賃・レンタルスペース、purchases: 売るための商品・材料、misc: そのほか）。\
+決められなければ unknown にしてください。";
 
 fn text_of(value: Option<&Value>) -> String {
     match value {
@@ -244,6 +292,7 @@ pub fn parse_reading(text: &str) -> Option<(ReceiptReading, bool)> {
             .unwrap_or(0)
             .clamp(0, 99),
         points: amount_of(object.get("points")).unwrap_or(0),
+        category: category_of(&text_of(object.get("category"))),
     };
     // 登録番号らしいものが書いてあるのに形が違う
     let bad_invoice = !invoice_text.is_empty() && reading.invoice_no.is_none();
@@ -347,6 +396,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn categories_are_expense_lines_of_the_standard_accounts() {
+        for (_, line) in CATEGORIES {
+            assert!(
+                crate::standard_accounts::GENERAL
+                    .iter()
+                    .any(|a| a.statement_line == Some(*line)),
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
     fn model_names_are_safe_for_the_url() {
         assert!(valid_model("gemini-2.5-flash"));
         assert!(!valid_model("../x"));
@@ -418,6 +479,21 @@ mod tests {
         .unwrap();
         assert_eq!(checks(&r, false, "2026-11-16"), [Check::MultipleReceipts]);
         assert!(parse_reading("こんにちは").is_none());
+        // 科目の推測は、知っている値だけを決算書の行にする
+        let (r, _) = parse_reading(&GOOD.replace(
+            r#""payment": "card""#,
+            r#""payment": "card", "category": "travel""#,
+        ))
+        .unwrap();
+        assert_eq!(r.category.as_deref(), Some("pl.travel"));
+        for unknown in ["unknown", "food", ""] {
+            let (r, _) = parse_reading(&GOOD.replace(
+                r#""payment": "card""#,
+                &format!(r#""payment": "card", "category": "{unknown}""#),
+            ))
+            .unwrap();
+            assert_eq!(r.category, None);
+        }
         assert!(parse_reading("[1, 2]").is_none());
     }
 

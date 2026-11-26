@@ -7,6 +7,7 @@ import { I18nProvider } from "@/i18n/i18n-context"
 import { useSettingsStore } from "@/stores/settings-store"
 import packageJson from "../../../package.json"
 import { findRelease, parseChangelog, parseNotes, releases } from "./changelog"
+import { ReleaseNotes } from "./release-notes"
 
 const mocks = vi.hoisted(() => ({ version: "0.2.0" }))
 
@@ -77,6 +78,12 @@ describe("同梱の CHANGELOG.md", () => {
 		expect(releases[0]?.items.length).toBeGreaterThan(0)
 		expect(releases[0]?.items.join("")).not.toContain("変更点を書く")
 	})
+
+	it("箇条書きが 1 行につながった項目がない", () => {
+		for (const release of releases) {
+			for (const item of release.items) expect(item).not.toMatch(/^[-*]\s/)
+		}
+	})
 })
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -113,9 +120,9 @@ describe("WhatsNewBanner", () => {
 		expect(
 			screen.getByText(`バージョン ${mocks.version} に更新しました`)
 		).toBeInTheDocument()
-		for (const item of releases[0].items) {
-			expect(screen.getByText(item)).toBeInTheDocument()
-		}
+		expect(
+			screen.getAllByRole("listitem").map((item) => item.textContent)
+		).toEqual(releases[0].items.map((item) => item.replaceAll("`", "")))
 
 		await user.click(screen.getByRole("button", { name: "閉じる" }))
 
@@ -132,5 +139,17 @@ describe("WhatsNewBanner", () => {
 		expect(
 			screen.getByText("このバージョンの変更点の記載はありません。")
 		).toBeInTheDocument()
+	})
+})
+
+describe("ReleaseNotes", () => {
+	it("「`」で囲んだ部分をコードとして表示する", () => {
+		const { container } = render(
+			<ReleaseNotes items={["キー（`.` を含むもの）を登録できます。"]} />
+		)
+		expect(container.querySelector("code")).toHaveTextContent(".")
+		expect(screen.getByRole("listitem")).toHaveTextContent(
+			"キー（. を含むもの）を登録できます。"
+		)
 	})
 })
