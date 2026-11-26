@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks"
 import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
@@ -44,7 +45,8 @@ function fakeUpdate(version = "0.2.0") {
 beforeEach(() => {
 	mocks.check.mockReset()
 	mocks.relaunch.mockReset()
-	globalThis.isTauri = true
+	// アプリの中として動かす（更新の確認そのものは plugin-updater の check を差し替えている）
+	mockIPC(() => null)
 })
 
 describe("toPercent", () => {
@@ -68,7 +70,7 @@ describe("UpdateDialog", () => {
 	})
 
 	it("ブラウザで開いているときは確かめない", async () => {
-		globalThis.isTauri = false
+		clearMocks()
 		const { container } = render(<UpdateDialog />, { wrapper })
 		await new Promise((resolve) => setTimeout(resolve, 0))
 		expect(mocks.check).not.toHaveBeenCalled()

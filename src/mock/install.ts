@@ -14,8 +14,6 @@ export function installMock() {
 		requested && requested in scenarios ? (requested as Scenario) : "default"
 	resetBook(scenario)
 	console.info(`[mock] 場面: ${scenario}（${scenarios[scenario]}）`)
-	// `callCommand` は Tauri の中かどうかを `isTauri` で見る
-	;(globalThis as { isTauri?: boolean }).isTauri = true
 	mockIPC(
 		async (command, args) => {
 			// 本物の呼び出しと同じように、少し待ってから返す（読み込み中の表示を見るため）
