@@ -1,6 +1,6 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
 import { mockIPC } from "@tauri-apps/api/mocks"
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppProviders } from "@/app/providers"
@@ -545,6 +545,21 @@ describe("仕訳グリッド", () => {
 		const totals = screen.getByRole("region", { name: "当月の合計" })
 		expect(within(totals).getByText("貸借が一致しています")).toBeInTheDocument()
 		expect(within(totals).getByText("-1,200")).toBeInTheDocument()
+	})
+
+	it("日本語入力の変換を決める Enter では、次の欄へ進まない", async () => {
+		const user = userEvent.setup()
+		renderPage()
+		await user.click(await screen.findByRole("tab", { name: "仕訳グリッド" }))
+		await user.click(screen.getByRole("tab", { name: "3月" }))
+
+		const day = await screen.findByLabelText("新しい行の日")
+		await user.click(day)
+		await user.keyboard("5")
+		fireEvent.keyDown(day, { key: "Enter", isComposing: true, keyCode: 229 })
+		expect(day).toHaveFocus()
+		await user.keyboard("{Enter}")
+		expect(screen.getByLabelText("新しい行の借方")).toHaveFocus()
 	})
 
 	it("番号を打って Enter で進み、行の最後で保存する", async () => {

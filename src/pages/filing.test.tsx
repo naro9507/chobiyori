@@ -524,9 +524,9 @@ describe("インボイスの登録と期限", () => {
 			name: "申告期限のリマインダー",
 		})
 		expect(reminder).toHaveTextContent("2026年分の確定申告")
-		expect(reminder).toHaveTextContent("申告期限まであと5日（2027-03-15）")
+		expect(reminder).toHaveTextContent("申告期限まであと 5 日（2027-03-15）")
 		const sevenDays = screen.getByRole("checkbox", {
-			name: "期限の7日前",
+			name: "期限の 7 日前",
 		})
 		await user.click(sevenDays)
 		expect(
@@ -558,7 +558,7 @@ describe("インボイスの登録と期限", () => {
 		renderAt("/settings?view=business")
 		await screen.findByRole("region", { name: "申告期限のリマインダー" })
 		const checkbox = screen.getByRole("checkbox", { name: "デスクトップ通知" })
-		expect(checkbox).toHaveAccessibleDescription(/午前9時に通知を予約/)
+		expect(checkbox).toHaveAccessibleDescription(/午前 9 時に通知を予約/)
 		const help = screen.getByRole("button", { name: "デスクトップ通知の説明" })
 		expect(screen.queryByText(/閉じていても届きます/)).not.toBeInTheDocument()
 		await user.hover(help)
@@ -576,7 +576,7 @@ describe("インボイスの登録と期限", () => {
 		expect(calls()[0][1]).toEqual({
 			options: {
 				title: "2026年分の確定申告",
-				body: "申告期限まであと20日（2027-03-15）",
+				body: "申告期限まであと 20 日（2027-03-15）",
 			},
 		})
 		const saved = JSON.parse(localStorage.getItem("dcs-settings") ?? "{}")
@@ -630,7 +630,7 @@ describe("インボイスの登録と期限", () => {
 			today: today(),
 			includeFuture: true,
 		})
-		await user.click(screen.getByRole("checkbox", { name: "期限の7日前" }))
+		await user.click(screen.getByRole("checkbox", { name: "期限の 7 日前" }))
 		await waitFor(() => expect(schedules().at(-1)).toHaveLength(2))
 		await user.click(desktop)
 		await waitFor(() => expect(schedules().at(-1)).toEqual([]))
@@ -667,11 +667,11 @@ describe("インボイスの登録と期限", () => {
 		)
 		expect(await google.findByText("未連携")).toBeInTheDocument()
 		await user.click(google.getByRole("button", { name: "連携する" }))
-		expect(await google.findByText("認証中…")).toBeInTheDocument()
+		expect(await google.findByText("認証しています")).toBeInTheDocument()
 		expect(google.queryByText("連携済み")).not.toBeInTheDocument()
 		await act(async () => finishAuthorization())
 		expect(await google.findByText("連携済み")).toBeInTheDocument()
-		expect(await google.findByText("同期中…")).toBeInTheDocument()
+		expect(await google.findByText("同期しています")).toBeInTheDocument()
 		expect(outlook.getByText("未連携")).toBeInTheDocument()
 		expect(
 			outlook.getByRole("button", { name: "連携する" })

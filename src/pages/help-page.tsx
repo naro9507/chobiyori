@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Page } from "@/components/layout/page"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { helpSections, matchesHelp } from "@/features/help/help-content"
 import { useHelpArticles } from "@/features/help/use-help-articles"
@@ -42,23 +43,30 @@ export function HelpPage() {
 				account.isPaymentAccount
 		)
 	const year = useFiscalYear()
-	const canReplace = () => {
+	const confirm = useConfirm()
+	const tApp = useTranslations("app")
+	/** 入力中の取引があるか。 */
+	const hasDraft = () => {
 		const d = useSimpleEntryDrafts.getState().forms[String(year)]
-		return (
-			!d ||
-			!(
-				d.amount ||
-				d.memo ||
-				d.accountId ||
-				d.paymentAccountId ||
-				d.purposeId ||
-				d.partnerId ||
-				d.depositKey ||
-				d.unpaid
-			) ||
-			window.confirm(t("replaceEntry"))
+		return Boolean(
+			d &&
+				(d.amount ||
+					d.memo ||
+					d.accountId ||
+					d.paymentAccountId ||
+					d.purposeId ||
+					d.partnerId ||
+					d.depositKey ||
+					d.unpaid)
 		)
 	}
+	/** 入力中の取引を置き換えてよいか。入力中のものがなければ確認しない。 */
+	const canReplace = async () =>
+		!hasDraft() ||
+		(await confirm({
+			message: t("replaceEntry"),
+			confirmLabel: tApp("replace"),
+		}))
 	const articles = visibleArticles.filter((a) =>
 		selectedArticle
 			? a.id === selectedArticle
@@ -141,19 +149,31 @@ export function HelpPage() {
 											to={a.path}
 											search={{ article: a.id, view: a.view }}
 											onClick={(e) => {
-												if (a.id === "sales" && !canReplace()) {
+												const start = () => {
+													if (a.id === "sales")
+														useEntryIntent.getState().transaction({
+															kind: "income",
+															accountCode: "",
+															paymentCode: "",
+															memo: "",
+														})
+													if (a.path === "/transactions")
+														useTransactionsTab.getState().setTab("simple")
+												}
+												if (a.id === "sales" && hasDraft()) {
+													// 入力中の取引があるときは、確認してから移る
 													e.preventDefault()
+													void canReplace().then((ok) => {
+														if (!ok || !a.path) return
+														start()
+														void navigate({
+															to: a.path,
+															search: { article: a.id, view: a.view },
+														})
+													})
 													return
 												}
-												if (a.id === "sales")
-													useEntryIntent.getState().transaction({
-														kind: "income",
-														accountCode: "",
-														paymentCode: "",
-														memo: "",
-													})
-												if (a.path === "/transactions")
-													useTransactionsTab.getState().setTab("simple")
+												start()
 											}}
 											className="inline-flex items-center gap-1 text-primary text-sm underline underline-offset-4"
 										>
@@ -168,11 +188,11 @@ export function HelpPage() {
 											<Button
 												disabled={!canUseExample(a.example)}
 												variant="outline"
-												onClick={() => {
+												onClick={async () => {
 													if (
 														!a.example ||
 														!canUseExample(a.example) ||
-														!canReplace()
+														!(await canReplace())
 													)
 														return
 													useEntryIntent.getState().transaction({

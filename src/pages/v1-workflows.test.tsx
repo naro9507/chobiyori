@@ -539,17 +539,13 @@ it("記入例の適用を取り消すと編集中の金額とメモが残る", a
 	)
 	await user.click(menu.getByRole("link", { name: "ヘルプ" }))
 	await user.type(await screen.findByRole("searchbox"), "ボールペン")
-	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
-	try {
-		await user.click(screen.getByRole("button", { name: "この形で入力" }))
-		expect(confirm).toHaveBeenCalledOnce()
-		await user.click(menu.getByRole("link", { name: "取引入力" }))
-		const restored = within(
-			await screen.findByRole("form", { name: "かんたん入力" })
-		)
-		expect(restored.getByLabelText("金額")).toHaveValue("4500")
-		expect(restored.getByLabelText("メモ")).toHaveValue("携帯料金")
-	} finally {
-		confirm.mockRestore()
-	}
+	await user.click(screen.getByRole("button", { name: "この形で入力" }))
+	const dialog = await screen.findByRole("dialog", { name: "確認してください" })
+	await user.click(within(dialog).getByRole("button", { name: "やめる" }))
+	await user.click(menu.getByRole("link", { name: "取引入力" }))
+	const restored = within(
+		await screen.findByRole("form", { name: "かんたん入力" })
+	)
+	expect(restored.getByLabelText("金額")).toHaveValue("4500")
+	expect(restored.getByLabelText("メモ")).toHaveValue("携帯料金")
 })

@@ -9,7 +9,8 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Checkbox, Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
@@ -180,6 +181,7 @@ function BackupRow({
 	disabled: boolean
 }) {
 	const t = useTranslations("backup")
+	const tApp = useTranslations("app")
 	return (
 		<li
 			className={`flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0 ${selected ? "bg-accent" : ""}`}
@@ -187,7 +189,8 @@ function BackupRow({
 			<span className="flex flex-col">
 				<span className="num">{file.createdAt}</span>
 				<span className="text-muted-foreground text-xs">
-					{t(`kind_${file.kind}`)}・
+					{t(`kind_${file.kind}`)}
+					{tApp("middleDot")}
 					<span className="num">{formatSize(file.size)}</span>
 				</span>
 			</span>
@@ -253,8 +256,7 @@ function RestorePanel({
 					hint={t("backupPasswordHint")}
 					className="max-w-sm"
 				>
-					<Input
-						type="password"
+					<PasswordInput
 						autoComplete="off"
 						value={password}
 						disabled={busy}

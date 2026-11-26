@@ -9,12 +9,12 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import { useLoginStatus } from "./account-login"
-import { PASSWORD_MIN } from "./lock-screen"
+import { PASSWORD_MIN, useNewPasswordCheck } from "./new-password-check"
 import { useChangePassword } from "./security-api"
 
 /** 設定: 起動時のパスワードを変える。いまのパスワードが要る。 */
@@ -26,15 +26,13 @@ export function PasswordCard() {
 	const [current, setCurrent] = useState("")
 	const [next, setNext] = useState("")
 	const [confirm, setConfirm] = useState("")
-	const [mismatch, setMismatch] = useState(false)
+	const check = useNewPasswordCheck(next, confirm)
+	const tErrors = useTranslations("errors")
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
-		if (next !== confirm) {
-			setMismatch(true)
-			return
-		}
-		setMismatch(false)
+		check.attempt()
+		if (!check.valid) return
 		change.mutate(
 			{ current, new: next },
 			{
@@ -42,6 +40,7 @@ export function PasswordCard() {
 					setCurrent("")
 					setNext("")
 					setConfirm("")
+					check.reset()
 				},
 			}
 		)
@@ -64,8 +63,7 @@ export function PasswordCard() {
 						label={t("currentPassword")}
 						error={error("currentPassword")}
 					>
-						<Input
-							type="password"
+						<PasswordInput
 							autoComplete="current-password"
 							value={current}
 							onChange={(e) => setCurrent(e.target.value)}
@@ -75,25 +73,29 @@ export function PasswordCard() {
 						required
 						label={t("newPassword")}
 						hint={t("passwordHint", { min: PASSWORD_MIN })}
-						error={error("newPassword")}
+						error={
+							check.showTooShort
+								? tErrors("weakPassword")
+								: error("newPassword")
+						}
 					>
-						<Input
-							type="password"
+						<PasswordInput
 							autoComplete="new-password"
 							value={next}
 							onChange={(e) => setNext(e.target.value)}
+							onBlur={check.onPasswordBlur}
 						/>
 					</Field>
 					<Field
 						required
 						label={t("confirmPassword")}
-						error={mismatch ? t("mismatch") : undefined}
+						error={check.showMismatch ? t("mismatch") : undefined}
 					>
-						<Input
-							type="password"
+						<PasswordInput
 							autoComplete="new-password"
 							value={confirm}
 							onChange={(e) => setConfirm(e.target.value)}
+							onBlur={check.onConfirmBlur}
 						/>
 					</Field>
 					<p className="text-muted-foreground text-xs">

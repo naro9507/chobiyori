@@ -8,6 +8,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Field } from "@/components/ui/field"
 import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
 import { useJournalErrorMessage } from "@/features/journal/journal-errors"
@@ -288,6 +289,8 @@ function TemplateList({
 	onEdit: (template: Template) => void
 }) {
 	const t = useTranslations("recurring")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const errorMessage = useJournalErrorMessage(fiscalYear)
 	const templates = useTemplates()
 	const remove = useDeleteTemplate()
@@ -357,8 +360,14 @@ function TemplateList({
 										size="sm"
 										variant="ghost"
 										aria-label={t("deleteNamed", { name: template.name })}
-										onClick={() => {
-											if (window.confirm(t("deleteConfirm"))) {
+										onClick={async () => {
+											if (
+												await confirm({
+													message: t("deleteConfirm"),
+													confirmLabel: tApp("delete"),
+													destructive: true,
+												})
+											) {
 												remove.mutate(template.id)
 											}
 										}}

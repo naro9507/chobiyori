@@ -30,9 +30,15 @@ export function amountForCommand(text: string) {
 	return amount === null || Number.isNaN(amount) ? -1 : amount
 }
 
-/** 期首残高用。貸越などのマイナスの残高も、そのまま読める。 */
+/**
+ * 期首残高や値引きの単価用。貸越などのマイナスも読める。
+ * 先頭の「-」は全角の「－」、数学のマイナス「−」、長音「ー」、「▲」「△」でもよい。
+ */
 export function parseSignedAmount(text: string): number | null {
-	const normalized = text.normalize("NFKC").replace(/[,、¥￥円\s]/g, "")
+	const normalized = text
+		.normalize("NFKC")
+		.replace(/[,、¥円\s]/g, "")
+		.replace(/^[▲△ー−]/, "-")
 	if (normalized === "") return null
 	if (!/^-?\d+$/.test(normalized)) return Number.NaN
 	const amount = Number(normalized)

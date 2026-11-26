@@ -1,10 +1,12 @@
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Field } from "@/components/ui/field"
 import { Input, NativeSelect, Textarea } from "@/components/ui/input"
 import { partnerKind, useMasterList } from "@/features/master/master-api"
 import { useTranslations } from "@/i18n/use-translations"
+import { parseSignedAmount } from "@/lib/amount"
 import { fieldError, isAppError, lineFieldError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import { cn } from "@/lib/utils"
@@ -45,12 +47,7 @@ const emptyLine: LineForm = {
 
 /** 単価を読む。値引きは「-1000」「▲1000」。読めなければ NaN（Rust 側で範囲外になる）。 */
 function parsePrice(text: string) {
-	const normalized = text
-		.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-		.replace(/[,，¥￥円\s]/g, "")
-		.replace(/^[▲△ー−]/, "-")
-	if (normalized === "") return Number.NaN
-	return /^-?\d+$/.test(normalized) ? Number(normalized) : Number.NaN
+	return parseSignedAmount(text) ?? Number.NaN
 }
 
 function toInput(form: Form): DocumentInput {
@@ -121,6 +118,8 @@ export function DocumentEditor({
 	onDeleted: () => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const errorMessage = useErrorMessage()
 	const partners = useMasterList(partnerKind)
 	const save = useSaveDocument()
@@ -214,11 +213,17 @@ export function DocumentEditor({
 			}
 		)
 	}
-	const issue = () => {
+	const issue = async () => {
 		setAttempted(true)
 		setIssuing(true)
 		if (form.lines.some(priceInvalid) || !form.recipientName.trim()) return
-		if (!window.confirm(t("issueConfirm"))) return
+		if (
+			!(await confirm({
+				message: t("issueConfirm"),
+				confirmLabel: t("issue"),
+			}))
+		)
+			return
 		save.mutate(
 			{ id: savedId, input },
 			{
@@ -236,8 +241,16 @@ export function DocumentEditor({
 		)
 	}
 
-	const remove = () => {
-		if (!document || !window.confirm(t("deleteConfirm"))) return
+	const remove = async () => {
+		if (
+			!document ||
+			!(await confirm({
+				message: t("deleteConfirm"),
+				confirmLabel: tApp("delete"),
+				destructive: true,
+			}))
+		)
+			return
 		action.mutate({ type: "delete", id: document.id }, { onSuccess: onDeleted })
 	}
 

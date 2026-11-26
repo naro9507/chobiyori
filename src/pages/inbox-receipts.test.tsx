@@ -1,6 +1,6 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
 import { mockIPC } from "@tauri-apps/api/mocks"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
 	afterAll,
@@ -18,6 +18,7 @@ import type {
 	Receipt,
 	ReceiptSettings,
 } from "@/features/inbox/inbox-api"
+import { useReceiptReading } from "@/features/inbox/receipt-reading-store"
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
@@ -33,7 +34,8 @@ function account(
 	code: string,
 	nameJa: string,
 	category: Account["category"],
-	isPaymentAccount = false
+	isPaymentAccount = false,
+	statementLine: string | null = null
 ): Account {
 	return {
 		id,
@@ -42,7 +44,7 @@ function account(
 		nameEn: "",
 		kana: "",
 		category,
-		statementLine: null,
+		statementLine,
 		defaultTaxCategory: null,
 		defaultAllocationRuleId: null,
 		isPaymentAccount,
@@ -55,7 +57,8 @@ function account(
 const accounts = [
 	account(1, "101", "現金", "asset", true),
 	account(2, "204", "未払金", "liability", true),
-	account(3, "610", "消耗品費", "expense"),
+	account(3, "610", "消耗品費", "expense", false, "pl.supplies"),
+	account(4, "604", "旅費交通費", "expense", false, "pl.travel"),
 ]
 
 const attachment = {
@@ -157,6 +160,7 @@ beforeEach(() => {
 		}),
 	]
 	reads = 0
+	useReceiptReading.setState({ progress: { kind: "idle" }, interrupted: false })
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	ipc.mockReset()
 	ipc.mockImplementation(
@@ -296,6 +300,112 @@ describe("レシート", () => {
 		expect(reads).toBe(2)
 	})
 
+	it("回数の上限に達したら、サービスが返した秒数だけ待って続ける", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		const base = ipc.getMockImplementation()
+		let limited = false
+		ipc.mockImplementation(
+			async (command: string, args?: Record<string, unknown>) => {
+				if (command === "read_next_receipt" && !limited) {
+					limited = true
+					throw { code: "rateLimited", retryAfter: 1 }
+				}
+				return base?.(command, args)
+			}
+		)
+		renderPage("/inbox?view=receipts")
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
+		const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+		expect(
+			await within(nav).findByText(/1 秒待ってからレシートの読み取りを続けます/)
+		).toBeInTheDocument()
+		expect(
+			await within(nav).findByRole(
+				"link",
+				{ name: /レシートを 2 枚読み取りました/ },
+				{ timeout: 3000 }
+			)
+		).toBeInTheDocument()
+		expect(reads).toBe(2)
+	})
+
+	it("読んでいる途中でアプリが閉じられていたら、起動したときに続きから読む", async () => {
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		useReceiptReading.setState({ interrupted: true })
+		renderPage("/settings")
+		const nav = await screen.findByRole("navigation", {
+			name: "メインメニュー",
+		})
+		expect(
+			await within(nav).findByRole("link", {
+				name: /レシートを 2 枚読み取りました/,
+			})
+		).toBeInTheDocument()
+		expect(reads).toBe(2)
+		expect(useReceiptReading.getState().interrupted).toBe(false)
+	})
+
+	it("途中で閉じられていても、キーがなければ読まずに印を下ろす", async () => {
+		useReceiptReading.setState({ interrupted: true })
+		renderPage("/settings")
+		await waitFor(() =>
+			expect(useReceiptReading.getState().interrupted).toBe(false)
+		)
+		expect(reads).toBe(0)
+	})
+
+	it("読み取りは画面を離れても続き、サイドメニューに進み具合を出す", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		// 1 枚目の読み取りを、画面を移るまで待たせる
+		let release = () => {}
+		const held = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const base = ipc.getMockImplementation()
+		ipc.mockImplementation(
+			async (command: string, args?: Record<string, unknown>) => {
+				if (command === "read_next_receipt" && reads === 0) await held
+				return base?.(command, args)
+			}
+		)
+		renderPage("/inbox?view=receipts")
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
+		const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+		expect(
+			await within(nav).findByText("レシートを読み取っています（0 / 2 枚）")
+		).toBeInTheDocument()
+		// ほかの画面に移っても読み続ける
+		await user.click(within(nav).getByRole("link", { name: "設定" }))
+		release()
+		const done = await within(nav).findByRole("link", {
+			name: /レシートを 2 枚読み取りました/,
+		})
+		expect(reads).toBe(2)
+		// 押すと確認待ちを開き、知らせは消える
+		await user.click(done)
+		expect(
+			within(nav).queryByText(/レシートを 2 枚読み取りました/)
+		).not.toBeInTheDocument()
+	})
+
 	it("同じ買い物の取引があれば、新しく作らずに紐付けられる", async () => {
 		const user = userEvent.setup()
 		receipts = [
@@ -320,6 +430,44 @@ describe("レシート", () => {
 			id: 9,
 			transactionId: 77,
 		})
+	})
+
+	it("レシートから推した科目を入れておき、入力の下によく使う科目も並べる", async () => {
+		const user = userEvent.setup()
+		receipts = [
+			receipt({
+				id: 2,
+				status: "read",
+				inboxItemId: 9,
+				inboxStatus: "pending",
+				reading: {
+					date: "2026-10-05",
+					total: 3240,
+					merchant: "テスト交通",
+					phone: "",
+					invoiceNo: null,
+					taxParts: [],
+					payment: "card",
+					otherReceipts: 0,
+					points: 0,
+					category: "pl.travel",
+				},
+			}),
+		]
+		renderPage()
+		const form = await screen.findByRole("form", { name: "候補を確定する" })
+		const list = await within(form).findByRole("list", { name: "科目の候補" })
+		const buttons = within(list).getAllByRole("button")
+		// 推測した科目が先、よく使う科目が後
+		expect(buttons.map((b) => b.textContent)).toEqual([
+			"604 旅費交通費レシートから推測",
+			"610 消耗品費",
+		])
+		// ルールも前回の仕訳もないので、推した科目が最初から入っている
+		expect(buttons[0]).toHaveAttribute("aria-pressed", "true")
+		await user.click(buttons[1])
+		expect(buttons[1]).toHaveAttribute("aria-pressed", "true")
+		expect(buttons[0]).toHaveAttribute("aria-pressed", "false")
 	})
 
 	it("ポイントで払った分を含めて経費にし、ポイントの出どころを選べる", async () => {
@@ -379,16 +527,23 @@ it("レシートの削除を取り消すと画像は残る", async () => {
 	const user = userEvent.setup()
 	renderPage("/inbox?view=receipts")
 	const buttons = await screen.findAllByRole("button", { name: "消す" })
-	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
-	try {
-		await user.click(buttons[0])
-		expect(confirm).toHaveBeenCalledWith(
-			expect.stringContaining(receipts[0].attachment.fileName)
-		)
+	await user.click(buttons[0])
+	const dialog = await screen.findByRole("dialog", { name: "確認してください" })
+	expect(dialog).toHaveTextContent(receipts[0].attachment.fileName)
+	// 開いたときの選択は「やめる」
+	expect(within(dialog).getByRole("button", { name: "やめる" })).toHaveFocus()
+	await user.click(within(dialog).getByRole("button", { name: "やめる" }))
+	expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+	expect(ipc.mock.calls.some(([name]) => name === "delete_receipt")).toBe(false)
+	await user.click(buttons[0])
+	await user.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "削除する",
+		})
+	)
+	await waitFor(() =>
 		expect(ipc.mock.calls.some(([name]) => name === "delete_receipt")).toBe(
-			false
+			true
 		)
-	} finally {
-		confirm.mockRestore()
-	}
+	)
 })

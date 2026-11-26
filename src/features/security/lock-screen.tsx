@@ -10,15 +10,13 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import { DeviceUnlock, useLoginStatus } from "./account-login"
+import { PASSWORD_MIN, useNewPasswordCheck } from "./new-password-check"
 import { type BookStatus, useOpenBooks } from "./security-api"
-
-/** パスワードの最短の長さ。Rust 側 `db::vault::PASSWORD_MIN` と同じ。 */
-export const PASSWORD_MIN = 8
 
 /** `seconds` 秒から 1 秒ずつ減らした残りの秒数。 */
 function useCountdown(seconds: number) {
@@ -44,10 +42,11 @@ export function LockScreen({ status }: { status: BookStatus }) {
 	const open = useOpenBooks()
 	const [password, setPassword] = useState("")
 	const [confirm, setConfirm] = useState("")
-	const [mismatch, setMismatch] = useState(false)
 	const [recovering, setRecovering] = useState(false)
 	const [recoveryCode, setRecoveryCode] = useState("")
 	const choosing = status.state !== "encrypted" || recovering
+	const check = useNewPasswordCheck(password, confirm)
+	const tErrors = useTranslations("errors")
 	const login = useLoginStatus(!choosing).data
 	// 端末の本人確認は、画面を出したときに 1 回だけ自動で始める
 	const deviceStarted = useRef(false)
@@ -70,11 +69,10 @@ export function LockScreen({ status }: { status: BookStatus }) {
 
 	const submit = (e: FormEvent) => {
 		e.preventDefault()
-		if (choosing && password !== confirm) {
-			setMismatch(true)
-			return
+		if (choosing) {
+			check.attempt()
+			if (!check.valid) return
 		}
-		setMismatch(false)
 		if (recovering) {
 			open.mutate({
 				command: "reset_books_password",
@@ -99,7 +97,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 		setPassword("")
 		setConfirm("")
 		setRecoveryCode("")
-		setMismatch(false)
+		check.reset()
 		setRecovering(!recovering)
 	}
 
@@ -156,9 +154,8 @@ export function LockScreen({ status }: { status: BookStatus }) {
 								label={t("recoveryCode")}
 								error={recoveryError ? errorMessage(recoveryError) : undefined}
 							>
-								<Input
+								<PasswordInput
 									autoFocus
-									type="password"
 									autoComplete="off"
 									value={recoveryCode}
 									onChange={(e) => setRecoveryCode(e.target.value)}
@@ -171,27 +168,33 @@ export function LockScreen({ status }: { status: BookStatus }) {
 							hint={
 								choosing ? t("passwordHint", { min: PASSWORD_MIN }) : undefined
 							}
-							error={passwordError ? errorMessage(passwordError) : undefined}
+							error={
+								choosing && check.showTooShort
+									? tErrors("weakPassword")
+									: passwordError
+										? errorMessage(passwordError)
+										: undefined
+							}
 						>
-							<Input
-								type="password"
+							<PasswordInput
 								autoComplete={choosing ? "new-password" : "current-password"}
 								autoFocus={!recovering}
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
+								onBlur={choosing ? check.onPasswordBlur : undefined}
 							/>
 						</Field>
 						{choosing && (
 							<Field
 								required
 								label={t("confirmPassword")}
-								error={mismatch ? t("mismatch") : undefined}
+								error={check.showMismatch ? t("mismatch") : undefined}
 							>
-								<Input
-									type="password"
+								<PasswordInput
 									autoComplete="new-password"
 									value={confirm}
 									onChange={(e) => setConfirm(e.target.value)}
+									onBlur={check.onConfirmBlur}
 								/>
 							</Field>
 						)}

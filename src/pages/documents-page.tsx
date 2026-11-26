@@ -10,6 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { NativeSelect } from "@/components/ui/input"
 import { DocumentDetail } from "@/features/documents/document-detail"
 import { DocumentEditor } from "@/features/documents/document-editor"
@@ -161,10 +162,20 @@ function NewDocument({
 	onOpen: (d: DocumentRecord) => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const errorMessage = useErrorMessage()
 	const dirty = useRef(false)
-	const leave = () => {
-		if (!dirty.current || window.confirm(t("discardEdits"))) onBack()
+	const leave = async () => {
+		if (
+			!dirty.current ||
+			(await confirm({
+				message: t("discardEdits"),
+				confirmLabel: tApp("discard"),
+				destructive: true,
+			}))
+		)
+			onBack()
 	}
 	const defaults = useNewDocumentDefaults(kind)
 	return (
@@ -208,9 +219,19 @@ function OpenDocument({
 	onOpen: (d: DocumentRecord) => void
 }) {
 	const t = useTranslations("documents")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const dirty = useRef(false)
-	const leave = () => {
-		if (!dirty.current || window.confirm(t("discardEdits"))) onBack()
+	const leave = async () => {
+		if (
+			!dirty.current ||
+			(await confirm({
+				message: t("discardEdits"),
+				confirmLabel: tApp("discard"),
+				destructive: true,
+			}))
+		)
+			onBack()
 	}
 	const title = d.number
 		? `${t(`kind_${d.kind}`)} ${d.number}`

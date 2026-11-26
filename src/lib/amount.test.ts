@@ -36,7 +36,9 @@ describe("金額", () => {
 
 describe("期首残高の金額", () => {
 	it("マイナスの残高を読み、不正な入力は有効な -1 円と区別する", () => {
-		expect(parseSignedAmount("−100")).toBeNaN()
+		expect(parseSignedAmount("−100")).toBe(-100)
+		expect(parseSignedAmount("▲1,000")).toBe(-1000)
+		expect(parseSignedAmount("1-0")).toBeNaN()
 		expect(parseSignedAmount("－１，２００円")).toBe(-1200)
 		expect(signedAmountForCommand("-1")).toBe(-1)
 		expect(signedAmountForCommand("abc")).toBeGreaterThan(999_999_999_999)

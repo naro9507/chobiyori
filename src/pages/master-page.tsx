@@ -158,6 +158,7 @@ type AccountForm = {
 
 function AccountsSection() {
 	const t = useTranslations("master")
+	const tApp = useTranslations("app")
 	const paymentId = useId()
 	const locale = useSettingsStore((state) => state.locale)
 	const rules = useMasterList(allocationRuleKind)
@@ -293,7 +294,8 @@ function AccountsSection() {
 							<option value="">{t("none")}</option>
 							{(rules.data ?? []).map((r) => (
 								<option key={r.id} value={r.id}>
-									{displayName(r, locale)}（{r.businessPercent}%）
+									{displayName(r, locale)}
+									{tApp("parenthesized", { text: `${r.businessPercent}%` })}
 								</option>
 							))}
 						</NativeSelect>
@@ -408,6 +410,7 @@ function SubAccountsSection() {
 
 function PartnersSection() {
 	const t = useTranslations("master")
+	const tApp = useTranslations("app")
 	const customerId = useId()
 	const vendorId = useId()
 	const locale = useSettingsStore((state) => state.locale)
@@ -429,7 +432,7 @@ function PartnersSection() {
 					cell: (p) =>
 						[p.isCustomer && t("customer"), p.isVendor && t("vendor")]
 							.filter(Boolean)
-							.join("・") || "—",
+							.join(tApp("middleDot")) || "—",
 				},
 				{
 					header: t("invoiceRegistrationNo"),
