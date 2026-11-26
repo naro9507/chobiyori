@@ -92,17 +92,14 @@ chobiyori/
 
 ## モックの環境
 
-`src/mock/` に、Rust 側のコマンドの偽物を置いている。画面の `callCommand` を Tauri の `mockIPC` で横取りし、場面ごとの偽の帳簿から返す。同じものを、ブラウザで画面を見るとき（`make dev-mock`）とテストの両方で使う。本番のビルドには入らない。
-
-MSW は HTTP の通信を横取りする仕組みで、Tauri のコマンドは HTTP を通らないので使っていない。代わりに MSW と同じ使い方ができるようにしてある。
+`src/mock/` に、Rust 側のコマンドの偽物を置いている。Tauri の `mockIPC`（`@tauri-apps/api/mocks`）に渡すハンドラーと、場面ごとの偽の帳簿で、ブラウザで画面を見るとき（`make dev-mock`）とテストの両方で使う。本番のビルドには入らない。
 
 | ファイル | 中身 |
 |---|---|
 | `data.ts` | 場面（`scenarios`）と偽の帳簿（`createBook`）。日付は今日の年を基準に作る |
-| `handlers.ts` | コマンドごとのふだんの返し方（`baseHandlers`）。帳簿を読み書きする |
-| `mock.ts` | `mock.reset()`・`mock.use()`・`mock.book()`・`mock.callsOf()` |
+| `book.ts` | いまの場面の帳簿（`currentBook`）と作り直し（`resetBook`） |
+| `handlers.ts` | `mockIPC` に渡すハンドラー（`handleCommand`）。コマンドごとに帳簿を読み書きして返す |
 | `install.ts` | `pnpm dev:mock` で読み込む入口 |
-| `vitest.ts` | テスト用の `setupMockCommands()` |
 
 ### ブラウザで見る
 
@@ -110,23 +107,33 @@ MSW は HTTP の通信を横取りする仕組みで、Tauri のコマンドは 
 
 - 場面は URL の `?scenario=` で選ぶ（例: `http://localhost:5173/?scenario=newYear#/`）。
 - 画面から保存・確定すると、偽の帳簿が書き変わる。ページを読み直すと元に戻る。
-- ブラウザのコンソールの `__mock` で、その場で返し方や帳簿を変えられる。
-  - 例: `__mock.use({ confirm_inbox_item: () => { throw { code: "yearClosed" } } })`
-  - 例: `__mock.book().inbox.length`
 
 ### テストで使う
 
-`vi.mock("@/lib/tauri")` でコマンドごとに返す値を書く代わりに、場面の帳簿をそのまま使える（例: `src/pages/inbox-mock.test.tsx`）。
+`mockIPC` に `handleCommand` を渡すと、場面の帳簿から返る（例: `src/pages/inbox-mock.test.tsx`）。`callCommand` は `isTauri` を見るので、テストの間だけ立てる。
 
 ```ts
-import { fail, mock, setupMockCommands } from "@/mock/vitest"
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks"
+import { currentBook, resetBook } from "@/mock/book"
+import { handleCommand } from "@/mock/handlers"
 
-setupMockCommands() // テストごとに場面を作り直す。引数で場面を選べる
+beforeEach(() => {
+	resetBook("default")
+	globalThis.isTauri = true
+	mockIPC(handleCommand)
+})
+afterEach(() => {
+	clearMocks()
+	delete globalThis.isTauri
+})
 
 it("締めた年度は確定できない", async () => {
-	mock.use({ confirm_inbox_item: () => fail({ code: "yearClosed" }) }) // このテストだけの返し方
-	// 画面を操作する
-	expect(mock.callsOf("confirm_inbox_item")).toEqual([expect.objectContaining({ id: 1 })])
+	// 一部のコマンドだけ変える
+	mockIPC((cmd, args) =>
+		cmd === "confirm_inbox_item" ? Promise.reject({ code: "yearClosed" }) : handleCommand(cmd, args)
+	)
+	// 呼び出しを確かめるときは vi.fn で包む: const handler = vi.fn(handleCommand); mockIPC(handler)
+	// 帳簿を確かめる・変えるときは currentBook()
 })
 ```
 

@@ -10,14 +10,13 @@ import type {
 import type { TrialBalance } from "@/features/reports/reports-api"
 import type { AppError } from "@/lib/errors"
 import { currentBook } from "./book"
-import { drawReceipt, images, type MockBook } from "./data"
+import { drawReceipt, images } from "./data"
 
-export type Args = Record<string, unknown>
-/** コマンドの返し方。`book` は場面の偽の帳簿で、書き換えると次の呼び出しから反映される。 */
-export type CommandHandler = (args: Args, book: MockBook) => unknown
+type Args = Record<string, unknown>
+type CommandHandler = (args: Args) => unknown
 
-/** Rust 側のエラー（`AppError`）を返す。ハンドラーの中で使う。 */
-export function fail(error: AppError): never {
+/** Rust 側のエラー（`AppError`）を返す。 */
+function fail(error: AppError): never {
 	throw error
 }
 
@@ -83,8 +82,7 @@ function trialBalance(fiscalYear: number): TrialBalance {
 	}
 }
 
-/** 場面の帳簿から返す、ふだんの返し方。 */
-export const baseHandlers: Record<string, CommandHandler> = {
+const handlers: Record<string, CommandHandler> = {
 	app_info: () => ({ name: "帳日和", version: "0.0.0-mock" }),
 	book_status: () => ({
 		state: "encrypted",
@@ -212,9 +210,29 @@ export const baseHandlers: Record<string, CommandHandler> = {
 }
 
 /** 用意していないコマンド。一覧なら空、それ以外は「うまくいきませんでした」にする。 */
-export function fallback(command: string): unknown {
+function fallback(command: string): unknown {
 	console.warn(`[mock] 用意していないコマンド: ${command}`)
 	if (command.startsWith("plugin:")) return null
 	if (command.startsWith("list_")) return []
 	throw new Error(`[mock] ${command}`)
+}
+
+/**
+ * `mockIPC` に渡すハンドラー。場面の帳簿（`resetBook` で作り直す）から、Rust 側の代わりに返す。
+ *
+ * ```ts
+ * mockIPC(handleCommand)
+ * // 一部のコマンドだけ変えるとき
+ * mockIPC((cmd, args) =>
+ *   cmd === "confirm_inbox_item" ? Promise.reject({ code: "yearClosed" }) : handleCommand(cmd, args)
+ * )
+ * ```
+ */
+export async function handleCommand(command: string, args?: unknown) {
+	const handler = handlers[command]
+	const result = await (handler
+		? handler((args ?? {}) as Args)
+		: fallback(command))
+	// 画面が書き換えても帳簿が変わらないよう、写しを返す
+	return result === undefined ? null : structuredClone(result)
 }

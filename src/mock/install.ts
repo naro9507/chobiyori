@@ -1,12 +1,7 @@
+import { mockIPC } from "@tauri-apps/api/mocks"
+import { resetBook } from "./book"
 import { type Scenario, scenarios } from "./data"
-import { mock, startMockIpc } from "./mock"
-
-declare global {
-	interface Window {
-		/** モックの環境で、コンソールから返し方や帳簿を変える（`mock.ts` を参照） */
-		__mock?: typeof mock
-	}
-}
+import { handleCommand } from "./handlers"
 
 /**
  * モックの環境（`pnpm dev:mock`）。Rust 側の代わりに、画面の中の偽の帳簿から返す。
@@ -17,10 +12,16 @@ export function installMock() {
 	const requested = new URLSearchParams(location.search).get("scenario")
 	const scenario: Scenario =
 		requested && requested in scenarios ? (requested as Scenario) : "default"
-	mock.reset(scenario)
-	startMockIpc()
-	window.__mock = mock
-	console.info(
-		`[mock] 場面: ${scenario}（${scenarios[scenario]}）。コンソールの __mock で返し方を変えられます`
+	resetBook(scenario)
+	console.info(`[mock] 場面: ${scenario}（${scenarios[scenario]}）`)
+	// `callCommand` は Tauri の中かどうかを `isTauri` で見る
+	;(globalThis as { isTauri?: boolean }).isTauri = true
+	mockIPC(
+		async (command, args) => {
+			// 本物の呼び出しと同じように、少し待ってから返す（読み込み中の表示を見るため）
+			await new Promise((resolve) => setTimeout(resolve, 80))
+			return handleCommand(command, args)
+		},
+		{ shouldMockEvents: true }
 	)
 }
