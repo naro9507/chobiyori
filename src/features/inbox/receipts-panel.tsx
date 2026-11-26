@@ -114,6 +114,7 @@ export function ReceiptsPanel() {
 				{progress.kind === "waiting" &&
 					t(progress.busy ? "busyWait" : "rateLimitWait", {
 						done: progress.done,
+						seconds: progress.seconds,
 					})}
 				{progress.kind === "finished" && t("readFinished", progress)}
 			</p>

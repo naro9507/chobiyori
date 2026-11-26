@@ -4,6 +4,8 @@ export type AppError = {
 	field?: string
 	/** 仕訳の明細行のエラーのとき、その行（0 から数える） */
 	line?: number
+	/** 回数の上限のとき、読み直すまで待つ秒数（サービスが教えてくれたときだけ） */
+	retryAfter?: number
 }
 
 export type ErrorCode =

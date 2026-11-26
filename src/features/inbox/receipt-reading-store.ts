@@ -3,16 +3,26 @@ import { createJSONStorage, persist } from "zustand/middleware"
 import { isAppError } from "@/lib/errors"
 import { readNextReceipt } from "./inbox-api"
 
-/** 回数の上限・混雑のとき、読み直すまで待つ時間 */
-const RATE_LIMIT_WAIT_MS = 30_000
-/** 続けて上限・混雑と言われたら、ここで止めて理由を出す（待ち続けないため） */
-const RATE_LIMIT_MAX_WAITS = 4
+/** 回数の上限・混雑のとき、待つ秒数をサービスが教えてくれなければこれだけ待つ */
+const DEFAULT_WAIT_SECONDS = 30
+/** 教えてくれた秒数が長すぎても、1 回でこれより長くは待たない（止まって見えないように） */
+const MAX_WAIT_SECONDS = 120
+/** 続けて上限・混雑と言われ、待った秒数の合計がこれに達したら、止めて理由を出す（待ち続けないため） */
+const MAX_TOTAL_WAIT_SECONDS = 120
+
+/** 読み直すまで待つ秒数。サービスが返した秒数（`retryAfter`）を使い、なければ決まった時間にする。 */
+export function waitSeconds(retryAfter: number | undefined): number {
+	if (retryAfter === undefined || !Number.isFinite(retryAfter)) {
+		return DEFAULT_WAIT_SECONDS
+	}
+	return Math.min(Math.max(Math.ceil(retryAfter), 1), MAX_WAIT_SECONDS)
+}
 
 export type ReadingProgress =
 	| { kind: "idle" }
 	| { kind: "reading"; done: number; remaining: number }
 	/** `busy` はサービスの混雑（503）、そうでなければ回数の上限 */
-	| { kind: "waiting"; done: number; busy: boolean }
+	| { kind: "waiting"; done: number; busy: boolean; seconds: number }
 	| { kind: "finished"; done: number }
 	| { kind: "stopped"; done: number; error: unknown }
 
@@ -54,7 +64,8 @@ export const useReceiptReading = create<ReadingState>()(
 			readAll: async (remaining, afterEach) => {
 				if (isReading(get().progress)) return
 				let done = 0
-				let waits = 0
+				// 続けて待った秒数の合計（1 枚読めたら数え直す）
+				let waited = 0
 				set({
 					progress: { kind: "reading", done, remaining },
 					interrupted: true,
@@ -63,7 +74,7 @@ export const useReceiptReading = create<ReadingState>()(
 					try {
 						const outcome = await readNextReceipt()
 						if (!outcome.receipt) break
-						waits = 0
+						waited = 0
 						done += 1
 						set({
 							progress: {
@@ -78,18 +89,20 @@ export const useReceiptReading = create<ReadingState>()(
 						if (
 							isAppError(error) &&
 							(error.code === "rateLimited" || error.code === "serviceBusy") &&
-							waits < RATE_LIMIT_MAX_WAITS
+							waited < MAX_TOTAL_WAIT_SECONDS
 						) {
-							waits += 1
+							const seconds = waitSeconds(error.retryAfter)
+							waited += seconds
 							set({
 								progress: {
 									kind: "waiting",
 									done,
 									busy: error.code === "serviceBusy",
+									seconds,
 								},
 							})
 							await new Promise((resolve) =>
-								setTimeout(resolve, RATE_LIMIT_WAIT_MS)
+								setTimeout(resolve, seconds * 1000)
 							)
 							continue
 						}
