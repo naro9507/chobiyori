@@ -282,6 +282,16 @@ function SecretInput(props: ComponentProps<"input">) {
 	)
 }
 
+/**
+ * 選べるモデル。先頭が設定のないときのモデル（Rust 側 `receipt::DEFAULT_MODEL`）。
+ * 2026-11-20 の比べ方は `crates/core/src/receipt.rs` の DEFAULT_MODEL の説明を参照。
+ */
+export const MODELS = [
+	{ id: "gemini-3.5-flash-lite", label: "modelLite" },
+	{ id: "gemini-3.5-flash", label: "modelFlash" },
+	{ id: "gemini-3.8-flash", label: "modelFlashNew" },
+] as const
+
 function ModelField({
 	model,
 	onSave,
@@ -290,14 +300,18 @@ function ModelField({
 	onSave: (model: string) => void
 }) {
 	const t = useTranslations("receiptSettings")
-	const [value, setValue] = useState(model)
+	const known = MODELS.some((m) => m.id === model)
 	return (
-		<Field label={t("model")} hint={t("modelHint")} className="w-64">
-			<Input
-				value={value}
-				onChange={(e) => setValue(e.target.value)}
-				onBlur={() => value.trim() !== model && onSave(value.trim())}
-			/>
+		<Field label={t("model")} hint={t("modelHint")} className="w-80">
+			<NativeSelect value={model} onChange={(e) => onSave(e.target.value)}>
+				{MODELS.map((m) => (
+					<option key={m.id} value={m.id}>
+						{t(m.label)}
+					</option>
+				))}
+				{/* 前に名前を入れて設定したモデルは、選び直すまでそのまま残す */}
+				{!known && <option value={model}>{model}</option>}
+			</NativeSelect>
 		</Field>
 	)
 }

@@ -162,6 +162,7 @@ pub async fn read_next(
         Err(ReadError::ModelNotFound) => Err(AppError::new(ErrorCode::ModelNotFound)),
         Err(ReadError::QuotaExhausted) => Err(AppError::new(ErrorCode::QuotaExhausted)),
         Err(ReadError::RateLimited { retry_after }) => Err(AppError::rate_limited(retry_after)),
+        Err(ReadError::Busy) => Err(AppError::new(ErrorCode::ServiceBusy)),
     })?;
     Ok(ReadOutcome {
         receipt,

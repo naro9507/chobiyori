@@ -6,6 +6,10 @@ import { FilingCalendarSyncWorker } from "@/features/filing/filing-calendar-sync
 import { FilingNotificationScheduler } from "@/features/filing/filing-notification-plan"
 import { FilingReminderBanner } from "@/features/filing/filing-reminder-banner"
 import {
+	ReceiptReadingStatus,
+	ResumeReceiptReading,
+} from "@/features/inbox/receipt-reading-status"
+import {
 	useFiscalYear,
 	useFiscalYears,
 	useYearStore,
@@ -62,6 +66,7 @@ export function AppShell() {
 					</div>
 				)}
 				<CommandPalette />
+				<ReceiptReadingStatus />
 				{navGroups.map((group) => (
 					<ul
 						key={group[0].id}
@@ -90,6 +95,7 @@ export function AppShell() {
 				<FilingCalendarSyncWorker />
 				<FilingNotificationScheduler />
 				<FilingReminderBanner />
+				<ResumeReceiptReading />
 				<Outlet />
 			</main>
 		</div>
