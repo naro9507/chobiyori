@@ -28,8 +28,10 @@ import {
 	type TaxCategory,
 	taxCategories,
 } from "@/features/master/master-api"
+import { useFiscalYears } from "@/features/setup/fiscal-years"
 import { useTranslations } from "@/i18n/use-translations"
 import { formatAmount } from "@/lib/amount"
+import { fieldError, isAppError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
 	type ConfirmInput,
@@ -356,6 +358,32 @@ function ConfirmForm({
 	const link = useLinkInboxItem()
 	const receipt = useReceipts().data?.find((r) => r.id === item.receiptId)
 	const [fixing, setFixing] = useState(false)
+	const fiscalYears = useFiscalYears().data ?? []
+	// 入力欄の下に出すエラー（明細行のエラーは、どの行か画面から分からないので下にまとめて出す）
+	const inputError = (field: string) => {
+		const e = fieldError(confirm.error, field)
+		return e && errorMessage(e)
+	}
+	const shownOnInput =
+		inputError("allocationPercent") !== undefined ||
+		inputError("memo") !== undefined
+	const formError = (() => {
+		const e = confirm.error ?? ignore.error
+		if (!e || (e === confirm.error && shownOnInput)) return undefined
+		// 日付の年の帳簿がない。前の年は記録できず、次の年は繰越で年度を作れる
+		if (isAppError(e) && e.code === "notFound" && e.field === "fiscalYear") {
+			const first = Math.min(...fiscalYears.map((y) => y.year))
+			const reason =
+				fiscalYears.length > 0 && year < first
+					? t("noYearBefore", { year, first })
+					: year > new Date().getFullYear()
+						? t("noYearFuture", { year })
+						: t("noYearAfter", { year })
+			const next = receipt ? t("noYearReceiptHint") : t("noYearStatementHint")
+			return `${reason}${next}`
+		}
+		return errorMessage(e)
+	})()
 
 	const pickAccount = (id: number | null) => {
 		setAccountId(id)
@@ -529,7 +557,10 @@ function ConfirmForm({
 			)}
 			{depositKey === "" && (
 				<>
-					<Field label={item.spend > 0 ? t("accountSpend") : t("accountBack")}>
+					<Field
+						label={item.spend > 0 ? t("accountSpend") : t("accountBack")}
+						required
+					>
 						<MasterCombobox
 							items={masters.accountItems}
 							value={accountId}
@@ -551,7 +582,7 @@ function ConfirmForm({
 						/>
 					)}
 					{subAccounts.length > 0 && (
-						<Field label={t("subAccount")}>
+						<Field label={t("subAccount")} optional>
 							<NativeSelect
 								value={subAccountId ?? ""}
 								onChange={(e) =>
@@ -569,7 +600,7 @@ function ConfirmForm({
 							</NativeSelect>
 						</Field>
 					)}
-					<Field label={t("partner")}>
+					<Field label={t("partner")} optional>
 						<MasterCombobox
 							items={masters.partnerItems}
 							value={partnerId}
@@ -577,7 +608,11 @@ function ConfirmForm({
 						/>
 					</Field>
 					{recordsTax && (
-						<Field label={t("taxCategory")} hint={t("taxCategoryHint")}>
+						<Field
+							label={t("taxCategory")}
+							hint={t("taxCategoryHint")}
+							optional
+						>
 							<NativeSelect
 								value={taxCategory ?? ""}
 								onChange={(e) =>
@@ -598,7 +633,12 @@ function ConfirmForm({
 						</Field>
 					)}
 					{item.spend > 0 && (
-						<Field label={t("allocation")} hint={t("allocationHint")}>
+						<Field
+							label={t("allocation")}
+							hint={t("allocationHint")}
+							error={inputError("allocationPercent")}
+							optional
+						>
 							<Input
 								inputMode="numeric"
 								value={percent}
@@ -608,7 +648,7 @@ function ConfirmForm({
 							/>
 						</Field>
 					)}
-					<Field label={t("memo")}>
+					<Field label={t("memo")} error={inputError("memo")} optional>
 						<Input value={memo} onChange={(e) => setMemo(e.target.value)} />
 					</Field>
 					<LabeledCheckbox
@@ -618,9 +658,14 @@ function ConfirmForm({
 					/>
 				</>
 			)}
-			{(confirm.error || ignore.error) && (
+			{formError && (
 				<p role="alert" className="text-destructive text-sm">
-					{errorMessage(confirm.error ?? ignore.error)}
+					{formError}
+				</p>
+			)}
+			{accountId === null && depositKey === "" && (
+				<p className="text-muted-foreground text-sm">
+					{t("accountRequiredHint")}
 				</p>
 			)}
 			<div className="flex flex-wrap gap-2">

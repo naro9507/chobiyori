@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { act, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -10,13 +11,12 @@ import type { BookStatus, LockStatus } from "@/features/security/security-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 const free = { retryAfter: 0, attemptsLeft: 5 }
 let book: BookStatus
@@ -50,8 +50,8 @@ beforeEach(() => {
 	loginAuthorization = undefined
 	deviceOk = false
 	locks = { fiscalYear: 2026, lockedMonths: [], yearClosed: false }
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(
+	ipc.mockReset()
+	ipc.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "login_status":
@@ -112,7 +112,8 @@ beforeEach(() => {
 					return locks
 				}
 				default:
-					return []
+					// アプリの更新の確認など、プラグインのコマンドは「なし」
+					return command.startsWith("plugin:") ? null : []
 			}
 		}
 	)
@@ -126,7 +127,7 @@ describe("起動時のパスワード", () => {
 			await screen.findByRole("heading", { name: "パスワードを入れてください" })
 		).toBeInTheDocument()
 		// 帳簿はまだ読まない
-		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
+		expect(ipc).not.toHaveBeenCalledWith("setup_status", {})
 
 		const input = screen.getByLabelText("パスワード")
 		await user.type(input, "wrong one")
@@ -148,7 +149,7 @@ describe("起動時のパスワード", () => {
 		expect(await screen.findByRole("alert")).toHaveTextContent(
 			"Windows Hello / Touch ID で認証できませんでした"
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
+		expect(ipc).toHaveBeenCalledWith("open_with_login", {})
 		expect(
 			screen.queryByRole("button", { name: /Google|Microsoft/ })
 		).toBeNull()
@@ -162,11 +163,11 @@ describe("起動時のパスワード", () => {
 		await screen.findByRole("button", {
 			name: "Windows Hello / Touch ID で開く",
 		})
-		const automatic = mocks.callCommand.mock.calls.filter(
+		const automatic = ipc.mock.calls.filter(
 			([command]) => command === "open_with_login"
 		)
 		expect(automatic).toHaveLength(1)
-		expect(mocks.callCommand).not.toHaveBeenCalledWith("setup_status")
+		expect(ipc).not.toHaveBeenCalledWith("setup_status", {})
 		expect(screen.getByLabelText("パスワード")).toBeInTheDocument()
 	})
 
@@ -177,11 +178,8 @@ describe("起動時のパスワード", () => {
 		expect(
 			await screen.findByRole("heading", { level: 1, name: "ホーム" })
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("open_with_login")
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"unlock_books",
-			expect.anything()
-		)
+		expect(ipc).toHaveBeenCalledWith("open_with_login", {})
+		expect(ipc).not.toHaveBeenCalledWith("unlock_books", expect.anything())
 	})
 
 	it("続けて間違えると、待ち時間のあいだ入力を止める", async () => {
@@ -226,10 +224,7 @@ describe("起動時のパスワード", () => {
 		expect(
 			screen.getByText(/1 回目と 2 回目のパスワードが違います/)
 		).toBeInTheDocument()
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"create_books",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("create_books", expect.anything())
 
 		await user.clear(screen.getByLabelText("もう一度入れてください"))
 		await user.type(
@@ -239,7 +234,7 @@ describe("起動時のパスワード", () => {
 		await user.click(
 			screen.getByRole("button", { name: "パスワードを決めて始める" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_books", {
+		expect(ipc).toHaveBeenCalledWith("create_books", {
 			password: "first password",
 		})
 	})
@@ -255,10 +250,7 @@ describe("起動時のパスワード", () => {
 		await user.click(
 			screen.getByRole("button", { name: "パスワードを決めて始める" })
 		)
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"create_books",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("create_books", expect.anything())
 
 		await user.type(password, "er password")
 		expect(screen.queryByText(/8 文字以上にしてください。/)).toBeNull()
@@ -298,7 +290,7 @@ describe("起動時のパスワード", () => {
 		})
 		await user.click(reset)
 		expect(screen.getByText(/パスワードが違います/)).toBeInTheDocument()
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+		expect(ipc).not.toHaveBeenCalledWith(
 			"reset_books_password",
 			expect.anything()
 		)
@@ -314,7 +306,7 @@ describe("起動時のパスワード", () => {
 		await user.clear(code)
 		await user.type(code, "saved code")
 		await user.click(reset)
-		expect(mocks.callCommand).toHaveBeenCalledWith("reset_books_password", {
+		expect(ipc).toHaveBeenCalledWith("reset_books_password", {
 			recoveryCode: "saved code",
 			new: "new password",
 		})
@@ -366,7 +358,7 @@ describe("端末ログインの設定", () => {
 		expect(enable).toBeDisabled()
 		await user.type(password, "correct horse")
 		await user.click(enable)
-		expect(mocks.callCommand).toHaveBeenCalledWith("link_login", {
+		expect(ipc).toHaveBeenCalledWith("link_login", {
 			password: "correct horse",
 		})
 		expect(await screen.findByText("本人確認しています")).toBeInTheDocument()
@@ -387,7 +379,7 @@ describe("端末ログインの設定", () => {
 		await user.click(
 			screen.getByRole("button", { name: "端末ログインを無効にする" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("unlink_login", {
+		expect(ipc).toHaveBeenCalledWith("unlink_login", {
 			password: "correct horse",
 		})
 		expect(
@@ -409,7 +401,7 @@ describe("月締め", () => {
 		const march = within(months).getByText("3月").closest("li")
 		if (!march) throw new Error("3 月の行がない")
 		await user.click(within(march).getByRole("button", { name: "締める" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("set_month_lock", {
+		expect(ipc).toHaveBeenCalledWith("set_month_lock", {
 			fiscalYear: 2026,
 			month: 3,
 			locked: true,

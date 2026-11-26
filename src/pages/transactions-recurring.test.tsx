@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -9,13 +10,12 @@ import { useYearStore } from "@/features/setup/fiscal-years"
 import type { Template } from "@/features/templates/templates-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -93,8 +93,8 @@ beforeEach(() => {
 	]
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -159,16 +159,13 @@ describe("毎月の取引", () => {
 		if (!row) throw new Error("候補の行がない")
 		expect(within(row).getByText(/事業 40% で按分/)).toBeInTheDocument()
 		expect(screen.getByText("2月分 家賃")).toBeInTheDocument()
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"post_template",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("post_template", expect.anything())
 
 		const amount = within(row).getByLabelText("金額")
 		await user.clear(amount)
 		await user.type(amount, "82,000")
 		await user.click(within(row).getByRole("button", { name: "記録する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("post_template", {
+		expect(ipc).toHaveBeenCalledWith("post_template", {
 			id: 7,
 			fiscalYear: 2026,
 			input: {
@@ -184,7 +181,7 @@ describe("毎月の取引", () => {
 		await user.click(
 			within(second).getByRole("button", { name: "この月は記録しない" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("skip_template_month", {
+		expect(ipc).toHaveBeenCalledWith("skip_template_month", {
 			id: 7,
 			fiscalYear: 2026,
 			month: 2,
@@ -214,7 +211,7 @@ describe("毎月の取引", () => {
 		)
 		await user.click(within(form).getByRole("button", { name: "保存" }))
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_template", {
+		expect(ipc).toHaveBeenCalledWith("create_template", {
 			input: expect.objectContaining({
 				name: "電気代",
 				amount: 9000,
@@ -261,13 +258,10 @@ describe("家事按分と税区分", () => {
 			"104 普通預金"
 		)
 		await user.click(within(form).getByRole("button", { name: "記録する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"create_simple_transaction",
-			{
-				fiscalYear: 2026,
-				input: expect.objectContaining({ accountId: 3, allocationPercent: 70 }),
-			}
-		)
+		expect(ipc).toHaveBeenCalledWith("create_simple_transaction", {
+			fiscalYear: 2026,
+			input: expect.objectContaining({ accountId: 3, allocationPercent: 70 }),
+		})
 	})
 
 	it("免税の年度は税区分の欄を出さず、課税の年度は出す", async () => {
@@ -294,7 +288,7 @@ describe("家事按分と税区分", () => {
 		await user.keyboard("{Enter}")
 		await user.type(within(form).getByLabelText("2 行目の金額"), "540")
 		await user.click(within(form).getByRole("button", { name: "保存" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_transaction", {
+		expect(ipc).toHaveBeenCalledWith("create_transaction", {
 			fiscalYear: 2026,
 			input: expect.objectContaining({
 				lines: [

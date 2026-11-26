@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -13,13 +14,12 @@ import type { Account } from "@/features/master/master-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -175,8 +175,8 @@ beforeEach(() => {
 		totals: { assets: 0, liabilitiesAndCapital: 0, balanced: true },
 		confirmed: false,
 	}
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(
+	ipc.mockReset()
+	ipc.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "setup_status":
@@ -260,7 +260,7 @@ describe("決算", () => {
 		await user.click(
 			screen.getByRole("checkbox", { name: "現金と預金の残高を確かめる" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("set_closing_check", {
+		expect(ipc).toHaveBeenCalledWith("set_closing_check", {
 			fiscalYear: 2026,
 			item: "cashCount",
 			done: true,
@@ -286,7 +286,7 @@ describe("決算", () => {
 		// 保存する前は確定できない
 		expect(screen.getByRole("button", { name: "確定する" })).toBeDisabled()
 		await user.click(screen.getByRole("button", { name: "保存する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_opening_balances", {
+		expect(ipc).toHaveBeenCalledWith("save_opening_balances", {
 			fiscalYear: 2026,
 			rows: [
 				{ accountId: 1, amount: 50000 },
@@ -320,7 +320,7 @@ describe("決算", () => {
 		await user.click(
 			screen.getByRole("button", { name: "選んだ 1 件を記録する" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("record_depreciation", {
+		expect(ipc).toHaveBeenCalledWith("record_depreciation", {
 			fiscalYear: 2026,
 			assetIds: [7],
 		})
@@ -354,7 +354,7 @@ describe("決算", () => {
 		await user.click(
 			await screen.findByRole("button", { name: "2027 年へ繰り越す" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("carry_forward", {
+		expect(ipc).toHaveBeenCalledWith("carry_forward", {
 			fiscalYear: 2026,
 			overwrite: false,
 		})
@@ -383,7 +383,7 @@ it("年度を切り替えると前の年度の未保存の棚卸高を引き継�
 	const input = await screen.findByRole("textbox", { name: "年末の棚卸高" })
 	expect(input).toHaveValue("9000")
 	await user.click(screen.getByRole("button", { name: "棚卸を記録する" }))
-	expect(mocks.callCommand).toHaveBeenCalledWith("record_inventory", {
+	expect(ipc).toHaveBeenCalledWith("record_inventory", {
 		fiscalYear: 2027,
 		closingAmount: 9000,
 	})

@@ -10,12 +10,19 @@ if (!root) {
 	throw new Error("Root element not found")
 }
 
-const router = createAppRouter()
+// モックの環境（`pnpm dev:mock`）では、Rust 側の代わりに偽の帳簿を返す。本番のビルドには入らない
+const ready =
+	import.meta.env.MODE === "mock"
+		? import("./mock/install").then((mock) => mock.installMock())
+		: Promise.resolve()
 
-createRoot(root).render(
-	<StrictMode>
-		<AppProviders>
-			<RouterProvider router={router} />
-		</AppProviders>
-	</StrictMode>
-)
+ready.then(() => {
+	const router = createAppRouter()
+	createRoot(root).render(
+		<StrictMode>
+			<AppProviders>
+				<RouterProvider router={router} />
+			</AppProviders>
+		</StrictMode>
+	)
+})

@@ -181,6 +181,7 @@ export function FormatEditor({
 			<p className="font-bold text-sm">{t("editorTitle")}</p>
 			<div className="grid gap-4 sm:grid-cols-2">
 				<Field
+					required
 					label={t("formatName")}
 					error={nameError ? t("nameRequired") : undefined}
 				>
@@ -206,7 +207,7 @@ export function FormatEditor({
 						))}
 					</NativeSelect>
 				</Field>
-				<Field label={t("target")} hint={t("targetHint")}>
+				<Field required label={t("target")} hint={t("targetHint")}>
 					<NativeSelect
 						value={draft.paymentAccountId ?? ""}
 						aria-invalid={draft.paymentAccountId === null ? true : undefined}
@@ -229,7 +230,7 @@ export function FormatEditor({
 					</NativeSelect>
 				</Field>
 				{subAccounts.length > 0 && (
-					<Field label={t("subAccount")}>
+					<Field optional label={t("subAccount")}>
 						<NativeSelect
 							value={draft.paymentSubAccountId ?? ""}
 							onChange={(e) =>

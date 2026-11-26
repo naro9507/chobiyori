@@ -1,7 +1,7 @@
 # 帳日和 - よく使うコマンド
 # 中身は package.json の scripts と cargo を呼んでいるだけ
 
-.PHONY: help setup install dev dev-web build build-web test test-web test-rust lint format check typecheck clean
+.PHONY: help setup install dev dev-web dev-mock build build-web test test-web test-rust lint format check typecheck clean
 
 .DEFAULT_GOAL := help
 
@@ -19,6 +19,9 @@ dev: ## アプリを起動（Rust をビルドしてウィンドウを開く）
 
 dev-web: ## 画面だけをブラウザで開く（Rust の機能は使えない）
 	pnpm dev:web
+
+dev-mock: ## 画面をモックの帳簿で開く（Rust の代わりに偽のデータを返す）
+	pnpm dev:mock
 
 build: ## 配布用のインストーラを作る
 	pnpm build

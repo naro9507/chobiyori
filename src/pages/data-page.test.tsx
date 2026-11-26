@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -13,7 +14,8 @@ import type {
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 let historyEntries: (HistoryEntry & { after: HistoryTransaction })[]
 
 function historyEntry(id: number, memo: string, at: string) {
@@ -29,11 +31,9 @@ function historyEntry(id: number, memo: string, at: string) {
 	}
 }
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(id: number, code: string, nameJa: string): Account {
 	return {
@@ -125,8 +125,8 @@ beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
 	historyEntries = []
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(
+	ipc.mockReset()
+	ipc.mockImplementation(
 		async (
 			command: string,
 			args?: {
@@ -230,10 +230,7 @@ describe("データ", () => {
 			})
 		)
 		expect(confirm()).not.toBeInTheDocument()
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"restore_backup",
-			expect.anything()
-		)
+		expect(ipc).not.toHaveBeenCalledWith("restore_backup", expect.anything())
 	})
 
 	it("Excel の帳簿は、科目を当てはめてから取り込み、取り込んだ年度を開く", async () => {
@@ -272,7 +269,7 @@ describe("データ", () => {
 		).toBeInTheDocument()
 		await user.click(screen.getByRole("button", { name: "3 件を取り込む" }))
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("run_import", {
+		expect(ipc).toHaveBeenCalledWith("run_import", {
 			fiscalYear: 2014,
 			mapping: [
 				{ number: 1, accountId: 1 },
@@ -302,7 +299,7 @@ describe("データ", () => {
 			within(item).queryByRole("button", { name: "PDF で保存" })
 		).not.toBeInTheDocument()
 		await user.click(within(item).getByRole("button", { name: "CSV で保存" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("export_report", {
+		expect(ipc).toHaveBeenCalledWith("export_report", {
 			receipt: expect.any(String),
 			request: expect.objectContaining({
 				target: { kind: "accounts" },
@@ -345,7 +342,7 @@ describe("データ", () => {
 		expect(
 			await screen.findByText("全 1 件 · 1 / 1 ページ")
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("list_history", {
+		expect(ipc).toHaveBeenCalledWith("list_history", {
 			fiscalYear: 2026,
 			page: 1,
 			query: "古い仕入れ",
@@ -399,7 +396,7 @@ describe("データ", () => {
 		).toBeInTheDocument()
 		expect(screen.getByText(/範囲内の備品/)).toBeInTheDocument()
 		expect(screen.queryByText(/範囲外の備品|交通費/)).toBeNull()
-		expect(mocks.callCommand).toHaveBeenCalledWith("list_history", {
+		expect(ipc).toHaveBeenCalledWith("list_history", {
 			fiscalYear: 2026,
 			page: 1,
 			query: "備品",

@@ -8,12 +8,10 @@ import { I18nProvider } from "@/i18n/i18n-context"
 const mocks = vi.hoisted(() => ({
 	check: vi.fn(),
 	relaunch: vi.fn(),
-	isTauri: vi.fn(() => true),
 }))
 
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }))
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }))
-vi.mock("@/lib/tauri", () => ({ isTauri: mocks.isTauri }))
 
 const { UpdateDialog } = await import("./update-dialog")
 const { toPercent } = await import("./updater")
@@ -46,7 +44,7 @@ function fakeUpdate(version = "0.2.0") {
 beforeEach(() => {
 	mocks.check.mockReset()
 	mocks.relaunch.mockReset()
-	mocks.isTauri.mockReturnValue(true)
+	globalThis.isTauri = true
 })
 
 describe("toPercent", () => {
@@ -70,7 +68,7 @@ describe("UpdateDialog", () => {
 	})
 
 	it("ブラウザで開いているときは確かめない", async () => {
-		mocks.isTauri.mockReturnValue(false)
+		globalThis.isTauri = false
 		const { container } = render(<UpdateDialog />, { wrapper })
 		await new Promise((resolve) => setTimeout(resolve, 0))
 		expect(mocks.check).not.toHaveBeenCalled()

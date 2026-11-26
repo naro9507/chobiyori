@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -12,13 +13,12 @@ import type {
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -141,8 +141,8 @@ function renderPage(path = "/receivables") {
 beforeEach(() => {
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
 	useYearStore.setState({ selected: null })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -193,21 +193,18 @@ describe("売上管理", () => {
 		expect(screen.getByText("2,500")).toBeInTheDocument()
 
 		await user.click(screen.getByRole("button", { name: "1 件をまとめて記録" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"record_recurring_payments",
-			{
-				fiscalYear: 2026,
-				inputs: [
-					expect.objectContaining({
-						planId: 2,
-						targetMonth: "2026-04",
-						amount: 4000,
-						paymentAccountId: 1,
-						refund: false,
-					}),
-				],
-			}
-		)
+		expect(ipc).toHaveBeenCalledWith("record_recurring_payments", {
+			fiscalYear: 2026,
+			inputs: [
+				expect.objectContaining({
+					planId: 2,
+					targetMonth: "2026-04",
+					amount: 4000,
+					paymentAccountId: 1,
+					refund: false,
+				}),
+			],
+		})
 		expect(await screen.findByText("1 件を記録しました。")).toBeInTheDocument()
 	})
 
@@ -230,7 +227,7 @@ describe("売上管理", () => {
 		await user.click(
 			within(form).getByRole("button", { name: "返金を記録する" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("record_recurring_payment", {
+		expect(ipc).toHaveBeenCalledWith("record_recurring_payment", {
 			input: expect.objectContaining({
 				planId: 1,
 				amount: 3000,
@@ -251,8 +248,8 @@ describe("売上管理", () => {
 	})
 
 	it("定期売上から請求書の下書きを作り、未割当の入金をプランの月に割り当てる", async () => {
-		const base = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(async (command: string, args) => {
+		const base = ipc.getMockImplementation()
+		ipc.mockImplementation(async (command: string, args) => {
 			switch (command) {
 				case "list_recurring_plans":
 					return [
@@ -283,7 +280,7 @@ describe("売上管理", () => {
 		await user.click(
 			await screen.findByRole("button", { name: "4月分の下書きを作る" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("draft_recurring_invoices", {
+		expect(ipc).toHaveBeenCalledWith("draft_recurring_invoices", {
 			fiscalYear: 2026,
 			month: 4,
 		})
@@ -296,7 +293,7 @@ describe("売上管理", () => {
 		await user.click(
 			await screen.findByRole("button", { name: "この月の入金にする" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("assign_recurring_payment", {
+		expect(ipc).toHaveBeenCalledWith("assign_recurring_payment", {
 			transactionId: 9,
 			planId: 2,
 			month: "2026-04",

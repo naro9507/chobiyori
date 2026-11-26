@@ -95,7 +95,13 @@ export function PurposesSection() {
 			renderFields={(form, set, error) => (
 				<>
 					{(["code", "nameJa", "nameEn", "kana"] as const).map((key) => (
-						<Field key={key} label={t(key)} error={error(key)}>
+						<Field
+							key={key}
+							label={t(key)}
+							error={error(key)}
+							required={key === "code" || key === "nameJa"}
+							optional={key === "nameEn" || key === "kana"}
+						>
 							<Input
 								value={form[key]}
 								onChange={(e) => set({ [key]: e.target.value })}
@@ -123,6 +129,7 @@ export function PurposesSection() {
 							}
 							label={t(key)}
 							error={error(key)}
+							optional
 						>
 							<NativeSelect
 								value={form[key]}
@@ -144,7 +151,11 @@ export function PurposesSection() {
 							</NativeSelect>
 						</Field>
 					))}
-					<Field label={t("taxCategory")} error={error("defaultTaxCategory")}>
+					<Field
+						optional
+						label={t("taxCategory")}
+						error={error("defaultTaxCategory")}
+					>
 						<NativeSelect
 							value={form.defaultTaxCategory}
 							onChange={(e) => set({ defaultTaxCategory: e.target.value })}

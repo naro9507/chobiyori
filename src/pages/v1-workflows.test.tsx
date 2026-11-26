@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -10,12 +11,11 @@ import { defaultFeatures } from "@/features/setup/setup"
 import { useEntryIntent } from "@/stores/entry-intent-store"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
-vi.mock("@/lib/tauri", async (original) => ({
-	...(await original<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
+beforeEach(() => {
+	mockIPC(ipc)
+})
 function account(
 	id: number,
 	code: string,
@@ -64,8 +64,8 @@ beforeEach(() => {
 		invoice: 0,
 		invoicePending: false,
 	})
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command, args) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command, args) => {
 		switch (command) {
 			case "book_status":
 				return { unlocked: true }
@@ -237,7 +237,7 @@ describe("v1 の操作導線", () => {
 		expect(
 			screen.queryByRole("link", { name: "売上管理" })
 		).not.toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_feature_settings", {
+		expect(ipc).toHaveBeenCalledWith("save_feature_settings", {
 			input: { ...defaultFeatures, receivables: false, recurring: false },
 		})
 		await user.keyboard("{Control>}k{/Control}")
@@ -252,7 +252,7 @@ describe("v1 の操作導線", () => {
 		await waitFor(() => expect(cash).toHaveAttribute("aria-selected", "true"))
 		await user.click(screen.getByRole("tab", { name: "売上帳" }))
 		await waitFor(() =>
-			expect(mocks.callCommand).toHaveBeenCalledWith("sales_book", {
+			expect(ipc).toHaveBeenCalledWith("sales_book", {
 				fiscalYear: 2026,
 				fromMonth: 1,
 				toMonth: 11,
@@ -300,8 +300,8 @@ it("摘要が未登録なら、登録リンクでマスタの摘要タブを直�
 })
 
 it("登録した摘要で科目を確認し、日付・金額を入力して記録できる", async () => {
-	const previous = mocks.callCommand.getMockImplementation()
-	mocks.callCommand.mockImplementation(async (command, args) => {
+	const previous = ipc.getMockImplementation()
+	ipc.mockImplementation(async (command, args) => {
 		if (command === "list_purposes")
 			return [
 				{
@@ -335,7 +335,7 @@ it("登録した摘要で科目を確認し、日付・金額を入力して記�
 	await user.type(within(form).getByLabelText("金額"), "1200")
 	await user.click(within(form).getByRole("button", { name: "記録する" }))
 	await waitFor(() =>
-		expect(mocks.callCommand).toHaveBeenCalledWith("post_purpose", {
+		expect(ipc).toHaveBeenCalledWith("post_purpose", {
 			id: 10,
 			fiscalYear: 2026,
 			date: "2026-01-01",
@@ -366,8 +366,8 @@ it("画面の説明は見出し横のヘルプから必要なときに読める"
 })
 
 it("学校の入力例は学校の科目を引き継ぎ、使わない定期売上の例は表示しない", async () => {
-	const previous = mocks.callCommand.getMockImplementation()
-	mocks.callCommand.mockImplementation(async (command, args) => {
+	const previous = ipc.getMockImplementation()
+	ipc.mockImplementation(async (command, args) => {
 		if (command === "get_industry_template") return "school"
 		if (command === "get_feature_settings")
 			return { ...defaultFeatures, recurring: false }
@@ -391,8 +391,8 @@ it("学校の入力例は学校の科目を引き継ぎ、使わない定期売�
 })
 
 it("無効な科目を使う入力例は読めるが、入力には渡さない", async () => {
-	const previous = mocks.callCommand.getMockImplementation()
-	mocks.callCommand.mockImplementation(async (command, args) => {
+	const previous = ipc.getMockImplementation()
+	ipc.mockImplementation(async (command, args) => {
 		if (command === "list_accounts")
 			return accounts.map((a) =>
 				a.code === "610" ? { ...a, isActive: false } : a

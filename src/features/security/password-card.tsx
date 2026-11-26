@@ -58,7 +58,11 @@ export function PasswordCard() {
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={submit} className="flex max-w-sm flex-col gap-4">
-					<Field label={t("currentPassword")} error={error("currentPassword")}>
+					<Field
+						required
+						label={t("currentPassword")}
+						error={error("currentPassword")}
+					>
 						<PasswordInput
 							autoComplete="current-password"
 							value={current}
@@ -66,6 +70,7 @@ export function PasswordCard() {
 						/>
 					</Field>
 					<Field
+						required
 						label={t("newPassword")}
 						hint={t("passwordHint", { min: PASSWORD_MIN })}
 						error={
@@ -82,6 +87,7 @@ export function PasswordCard() {
 						/>
 					</Field>
 					<Field
+						required
 						label={t("confirmPassword")}
 						error={check.showMismatch ? t("mismatch") : undefined}
 					>

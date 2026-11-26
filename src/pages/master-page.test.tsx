@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -7,13 +8,12 @@ import { createAppRouter } from "@/app/router"
 import type { Account, Partner } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 const cash: Account = {
 	id: 1,
@@ -61,8 +61,8 @@ function renderMaster() {
 beforeEach(() => {
 	partners = []
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string, args) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string, args) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -124,11 +124,11 @@ describe("マスタ", () => {
 		await user.click(
 			await screen.findByRole("button", { name: "コード 620 を削除" })
 		)
-		expect(mocks.callCommand).not.toHaveBeenCalledWith("delete_account", {
+		expect(ipc).not.toHaveBeenCalledWith("delete_account", {
 			id: 2,
 		})
 		await user.click(screen.getByRole("button", { name: "削除する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("delete_account", { id: 2 })
+		expect(ipc).toHaveBeenCalledWith("delete_account", { id: 2 })
 	})
 
 	it("取引先を追加でき、コードの重複は入力欄に示す", async () => {
@@ -149,7 +149,7 @@ describe("マスタ", () => {
 		await user.click(within(form).getByRole("button", { name: "保存" }))
 
 		expect(await screen.findByText("文具店")).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_partner", {
+		expect(ipc).toHaveBeenCalledWith("create_partner", {
 			input: expect.objectContaining({
 				code: "501",
 				nameJa: "文具店",

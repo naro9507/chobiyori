@@ -191,7 +191,7 @@ function CandidateRow({
 							` · ${t("allocationNote", { percent: template.allocationPercent })}`}
 					</p>
 				</div>
-				<Field label={t("date")} className="w-40">
+				<Field required label={t("date")} className="w-40">
 					<Input
 						type="date"
 						value={date}
@@ -204,7 +204,7 @@ function CandidateRow({
 						className="num h-9"
 					/>
 				</Field>
-				<Field label={t("amount")} className="w-32">
+				<Field required label={t("amount")} className="w-32">
 					<Input
 						inputMode="numeric"
 						value={amount}
@@ -486,7 +486,7 @@ function TemplateForm({
 		const options = masters.subAccountsOf(accountId)
 		if (options.length === 0) return null
 		return (
-			<Field label={t(field)} hint={t("optional")} error={errorFor(field)}>
+			<Field optional label={t(field)} error={errorFor(field)}>
 				<NativeSelect
 					value={value}
 					onChange={(e) => setForm({ [field]: e.target.value })}
@@ -562,6 +562,7 @@ function TemplateForm({
 				>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field
+							required
 							label={t("name")}
 							hint={t("nameHint")}
 							error={errorFor("name")}
@@ -572,6 +573,7 @@ function TemplateForm({
 							/>
 						</Field>
 						<Field
+							required
 							label={t("amount")}
 							hint={t("amountHint")}
 							error={errorFor("amount")}
@@ -584,6 +586,7 @@ function TemplateForm({
 							/>
 						</Field>
 						<Field
+							required
 							label={t("debitAccountId")}
 							hint={t("debitHint")}
 							error={errorFor("debitAccountId")}
@@ -595,6 +598,7 @@ function TemplateForm({
 							/>
 						</Field>
 						<Field
+							required
 							label={t("creditAccountId")}
 							hint={t("creditHint")}
 							error={errorFor("creditAccountId")}
@@ -617,11 +621,7 @@ function TemplateForm({
 							form.creditSubAccountId,
 							"creditSubAccountId"
 						)}
-						<Field
-							label={t("partner")}
-							hint={t("optional")}
-							error={errorFor("partnerId")}
-						>
+						<Field optional label={t("partner")} error={errorFor("partnerId")}>
 							<MasterCombobox
 								items={masters.partnerItems}
 								value={form.partnerId}
@@ -629,6 +629,7 @@ function TemplateForm({
 							/>
 						</Field>
 						<Field
+							optional
 							label={t("memo")}
 							hint={t("memoHint")}
 							error={errorFor("memo")}
@@ -652,6 +653,7 @@ function TemplateForm({
 						/>
 						{form.allocate && (
 							<Field
+								optional
 								label={t("businessPercent")}
 								hint={t("businessPercentHint")}
 								error={errorFor("allocationPercent")}
@@ -684,6 +686,7 @@ function TemplateForm({
 						{form.recurrence === "monthly" && (
 							<>
 								<Field
+									required
 									label={t("dayOfMonth")}
 									hint={t("dayOfMonthHint")}
 									error={errorFor("dayOfMonth")}
@@ -696,6 +699,7 @@ function TemplateForm({
 									/>
 								</Field>
 								<Field
+									required
 									label={t("startMonth")}
 									hint={t("startMonthHint")}
 									error={errorFor("startMonth")}

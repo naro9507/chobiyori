@@ -16,7 +16,7 @@ import { useFiscalYear } from "@/features/journal/journal-api"
 import { AccountBalances } from "@/features/reports/account-balances"
 import { currentMonth } from "@/features/reports/reports-api"
 import { useBookStatus } from "@/features/security/security-api"
-import { useFiscalYears } from "@/features/setup/fiscal-years"
+import { useFiscalYears, useYearStore } from "@/features/setup/fiscal-years"
 import { useFeatures } from "@/features/setup/setup"
 import { useCandidates } from "@/features/templates/templates-api"
 import { useTranslations } from "@/i18n/use-translations"
@@ -36,6 +36,17 @@ export function HomePage() {
 	// 開業時の残高を確定したら、最初の案内は役目を終えるので出さない。
 	const firstSteps =
 		firstYear && opening.data?.confirmed === false && !firstStepsDismissed
+	// 年が明けて自動で作った年度は、前の年を繰り越すまで残高が 0 から始まる
+	const previous =
+		fiscalYear !== null && years?.some((y) => y.year === fiscalYear - 1)
+			? fiscalYear - 1
+			: null
+	const newYearOpening = useOpeningBalances(
+		previous === null ? null : fiscalYear
+	)
+	const notCarried =
+		previous !== null && newYearOpening.data?.confirmed === false
+	const selectYear = useYearStore((state) => state.select)
 
 	return (
 		<Page screen="home">
@@ -89,6 +100,29 @@ export function HomePage() {
 						{t("setupRecovery")}
 					</Link>
 				</p>
+			)}
+			{notCarried && previous !== null && (
+				<Card>
+					<CardHeader>
+						<CardTitle>{t("notCarriedTitle", { year: previous })}</CardTitle>
+						<CardDescription>
+							{t("notCarriedBody", {
+								year: previous + 1,
+								previous,
+							})}
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<Link
+							to="/closing"
+							search={{ tab: "carry" }}
+							className="text-primary text-sm underline underline-offset-4"
+							onClick={() => selectYear(previous)}
+						>
+							{t("notCarriedLink", { previous })}
+						</Link>
+					</CardContent>
+				</Card>
 			)}
 			<DeadlineNotices />
 			{features.recurring && (

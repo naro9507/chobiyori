@@ -150,6 +150,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 						)}
 						{recovering && (
 							<Field
+								required
 								label={t("recoveryCode")}
 								error={recoveryError ? errorMessage(recoveryError) : undefined}
 							>
@@ -162,6 +163,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 							</Field>
 						)}
 						<Field
+							required
 							label={t(recovering ? "newPassword" : "password")}
 							hint={
 								choosing ? t("passwordHint", { min: PASSWORD_MIN }) : undefined
@@ -184,6 +186,7 @@ export function LockScreen({ status }: { status: BookStatus }) {
 						</Field>
 						{choosing && (
 							<Field
+								required
 								label={t("confirmPassword")}
 								error={check.showMismatch ? t("mismatch") : undefined}
 							>

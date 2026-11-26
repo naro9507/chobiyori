@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "tauri dev",
     "dev:web": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "tauri build",
     "build:web": "vite build",
     "tauri": "tauri",

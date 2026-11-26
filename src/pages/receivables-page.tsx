@@ -379,7 +379,7 @@ function MonthlyTable({ data, month }: { data: MonthlyList; month: string }) {
 					</p>
 					<p className="text-muted-foreground text-xs">{t("bulkHint")}</p>
 					<div className="flex flex-wrap items-end gap-3">
-						<Field label={t("date")} className="w-44">
+						<Field required label={t("date")} className="w-44">
 							<Input
 								type="date"
 								value={bulkDate}
@@ -509,14 +509,24 @@ function PaymentForm({
 	return (
 		<form onSubmit={submit} className="flex flex-col gap-3">
 			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("date")} error={error("date")} className="w-44">
+				<Field
+					required
+					label={t("date")}
+					error={error("date")}
+					className="w-44"
+				>
 					<Input
 						type="date"
 						value={date}
 						onChange={(e) => setDate(e.target.value)}
 					/>
 				</Field>
-				<Field label={t("amount")} error={error("amount")} className="w-36">
+				<Field
+					required
+					label={t("amount")}
+					error={error("amount")}
+					className="w-36"
+				>
 					<Input
 						inputMode="numeric"
 						value={amountText}
@@ -524,6 +534,7 @@ function PaymentForm({
 					/>
 				</Field>
 				<Field
+					required
 					label={t("paymentAccount")}
 					error={error("paymentAccountId")}
 					className="w-52"
@@ -540,7 +551,7 @@ function PaymentForm({
 					</NativeSelect>
 				</Field>
 				{planId === null && (
-					<Field label={t("partnerOptional")} className="w-52">
+					<Field optional label={t("partnerOptional")} className="w-52">
 						<NativeSelect
 							value={partner ?? ""}
 							onChange={(e) =>
@@ -558,7 +569,7 @@ function PaymentForm({
 						</NativeSelect>
 					</Field>
 				)}
-				<Field label={t("memo")} className="w-52">
+				<Field optional label={t("memo")} className="w-52">
 					<Input value={memo} onChange={(e) => setMemo(e.target.value)} />
 				</Field>
 			</div>
@@ -874,7 +885,12 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 			aria-label={plan ? t("editPlan") : t("addPlan")}
 		>
 			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("partner")} error={error("partnerId")} className="w-52">
+				<Field
+					required
+					label={t("partner")}
+					error={error("partnerId")}
+					className="w-52"
+				>
 					<NativeSelect
 						value={partnerId ?? ""}
 						onChange={(e) => setPartnerId(Number(e.target.value))}
@@ -886,10 +902,20 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 						))}
 					</NativeSelect>
 				</Field>
-				<Field label={t("planName")} error={error("name")} className="w-44">
+				<Field
+					required
+					label={t("planName")}
+					error={error("name")}
+					className="w-44"
+				>
 					<Input value={name} onChange={(e) => setName(e.target.value)} />
 				</Field>
-				<Field label={t("amount")} error={error("amount")} className="w-32">
+				<Field
+					required
+					label={t("amount")}
+					error={error("amount")}
+					className="w-32"
+				>
 					<Input
 						inputMode="numeric"
 						value={amountText}
@@ -897,6 +923,7 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 					/>
 				</Field>
 				<Field
+					required
 					label={t("revenueAccount")}
 					error={error("revenueAccountId")}
 					className="w-52"
@@ -913,6 +940,7 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 					</NativeSelect>
 				</Field>
 				<Field
+					required
 					label={t("startMonth")}
 					error={error("startMonth")}
 					className="w-40"
@@ -924,6 +952,7 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone: () => void }) {
 					/>
 				</Field>
 				<Field
+					optional
 					label={t("endMonth")}
 					hint={t("endMonthHint")}
 					error={error("endMonth")}
@@ -1006,7 +1035,7 @@ function AssignForm({
 					))}
 				</NativeSelect>
 			</Field>
-			<Field label={t("assignMonth")} className="w-40">
+			<Field required label={t("assignMonth")} className="w-40">
 				<Input
 					type="month"
 					value={target}

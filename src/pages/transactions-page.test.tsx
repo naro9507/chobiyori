@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -10,13 +11,12 @@ import { useOnboarding } from "@/stores/onboarding-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useSimpleEntryDrafts } from "@/stores/simple-entry-draft-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -158,8 +158,8 @@ beforeEach(() => {
 	transactions = []
 	failNext = null
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string, args) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string, args) => {
 		if (failNext && command.startsWith("create")) {
 			const error = failNext
 			failNext = null
@@ -294,23 +294,20 @@ describe("かんたん入力", () => {
 		await user.type(within(form).getByLabelText("メモ"), "ペン")
 		await user.click(within(form).getByRole("button", { name: "記録する" }))
 
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"create_simple_transaction",
-			{
-				fiscalYear: 2026,
-				input: {
-					kind: "expense",
-					date: "2026-03-15",
-					amount: 1200,
-					accountId: 5,
-					paymentAccountId: 1,
-					// 経費の科目に按分ルールがないので、按分しない
-					allocationPercent: null,
-					partnerId: null,
-					memo: "ペン",
-				},
-			}
-		)
+		expect(ipc).toHaveBeenCalledWith("create_simple_transaction", {
+			fiscalYear: 2026,
+			input: {
+				kind: "expense",
+				date: "2026-03-15",
+				amount: 1200,
+				accountId: 5,
+				paymentAccountId: 1,
+				// 経費の科目に按分ルールがないので、按分しない
+				allocationPercent: null,
+				partnerId: null,
+				memo: "ペン",
+			},
+		})
 		expect(
 			await within(form).findByText(
 				"記録しました（仕訳: 610 消耗品費 / 101 現金 1,200 円）"
@@ -359,7 +356,7 @@ describe("かんたん入力", () => {
 		expect(
 			within(form).getByLabelText("どこから払ったか")
 		).toHaveAccessibleDescription(/口座を選んでください/)
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+		expect(ipc).not.toHaveBeenCalledWith(
 			"create_simple_transaction",
 			expect.anything()
 		)
@@ -434,7 +431,7 @@ describe("かんたん入力", () => {
 		)
 		await user.click(within(form).getByRole("button", { name: "記録する" }))
 
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"create_simple_transaction",
 			expect.objectContaining({
 				input: expect.objectContaining({
@@ -448,8 +445,8 @@ describe("かんたん入力", () => {
 	})
 
 	it("収入は請求書や定期売上を選ぶと、残りの額を入れて入金として記録する", async () => {
-		const base = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(async (command: string, args) => {
+		const base = ipc.getMockImplementation()
+		ipc.mockImplementation(async (command: string, args) => {
 			switch (command) {
 				case "open_deposit_targets":
 					return {
@@ -496,7 +493,7 @@ describe("かんたん入力", () => {
 			"104 普通預金"
 		)
 		await user.click(within(form).getByRole("button", { name: "記録する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("record_deposit", {
+		expect(ipc).toHaveBeenCalledWith("record_deposit", {
 			input: {
 				target: { kind: "invoice", documentId: 7 },
 				date: "2026-04-10",
@@ -540,7 +537,7 @@ describe("仕訳グリッド", () => {
 		expect(await within(table).findByText("文具")).toBeInTheDocument()
 		expect(within(table).getByText("複合仕訳（3 行）")).toBeInTheDocument()
 		expect(within(table).getByText("179,580")).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("list_transactions", {
+		expect(ipc).toHaveBeenCalledWith("list_transactions", {
 			fiscalYear: 2026,
 			month: 3,
 		})
@@ -581,7 +578,7 @@ describe("仕訳グリッド", () => {
 		await user.keyboard("現{Enter}")
 		await user.keyboard("1200{Enter}ペン{Enter}{Enter}")
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_transaction", {
+		expect(ipc).toHaveBeenCalledWith("create_transaction", {
 			fiscalYear: 2026,
 			input: {
 				date: "2026-03-05",
@@ -628,7 +625,7 @@ describe("仕訳グリッド", () => {
 			"true"
 		)
 		expect(screen.getByRole("alert")).toHaveTextContent("入力してください。")
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
+		expect(ipc).not.toHaveBeenCalledWith(
 			"create_transaction",
 			expect.anything()
 		)
@@ -650,7 +647,7 @@ describe("仕訳グリッド", () => {
 			"206 預り金"
 		)
 		await user.click(within(form).getByRole("button", { name: "保存" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"update_transaction",
 			expect.objectContaining({ id: 10 })
 		)
@@ -687,7 +684,7 @@ describe("複合仕訳", () => {
 		expect(save).toBeEnabled()
 		await user.click(save)
 
-		expect(mocks.callCommand).toHaveBeenCalledWith("create_transaction", {
+		expect(ipc).toHaveBeenCalledWith("create_transaction", {
 			fiscalYear: 2026,
 			input: {
 				date: "2026-03-25",

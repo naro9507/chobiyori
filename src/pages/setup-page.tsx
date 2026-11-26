@@ -229,6 +229,7 @@ export function SetupPage() {
 						</CardHeader>
 						<CardContent className="grid gap-4 sm:grid-cols-2">
 							<Field
+								required
 								label={t("ownerName")}
 								error={
 									message("ownerName") ??
@@ -245,8 +246,8 @@ export function SetupPage() {
 								/>
 							</Field>
 							<Field
+								optional
 								label={t("tradeName")}
-								hint={t("optional")}
 								error={message("tradeName")}
 							>
 								<Input
@@ -256,6 +257,7 @@ export function SetupPage() {
 								/>
 							</Field>
 							<Field
+								optional
 								label={t("industry")}
 								hint={t("industryHint")}
 								error={message("industry")}
@@ -267,6 +269,7 @@ export function SetupPage() {
 							</Field>
 							<div className="flex flex-col gap-1.5">
 								<Field
+									optional
 									label={t("invoiceRegistrationNo")}
 									hint={t("invoiceRegistrationNoHint")}
 									error={
@@ -303,8 +306,8 @@ export function SetupPage() {
 								)}
 							</div>
 							<Field
+								optional
 								label={t("address")}
-								hint={t("optional")}
 								error={message("address")}
 								className="sm:col-span-2"
 							>
@@ -414,6 +417,7 @@ export function SetupPage() {
 						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							<Field
+								required
 								label={t("fiscalYear")}
 								hint={t("fiscalYearHint")}
 								error={message("fiscalYear")}
@@ -502,6 +506,7 @@ export function SetupPage() {
 										</NativeSelect>
 									</Field>
 									<Field
+										required
 										label={more("accountName")}
 										error={lineMessage(accountIndex, "accountName")}
 									>

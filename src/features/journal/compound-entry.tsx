@@ -176,7 +176,7 @@ export function CompoundEntry({
 					className="flex flex-col gap-5"
 				>
 					<div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
-						<Field label={t("date")} error={errorFor("date")}>
+						<Field required label={t("date")} error={errorFor("date")}>
 							<Input
 								type="date"
 								value={date}
@@ -189,7 +189,7 @@ export function CompoundEntry({
 								className="num"
 							/>
 						</Field>
-						<Field label={t("summary")} error={errorFor("memo")}>
+						<Field optional label={t("summary")} error={errorFor("memo")}>
 							<Input
 								value={memo}
 								onChange={(e) => {

@@ -100,6 +100,7 @@ export function ReceiptFieldsForm({
 				label={t("date")}
 				hint={hint("missingDate") ?? hint("unlikelyDate") ?? t("dateHint")}
 				error={error("date")}
+				required
 			>
 				<Input
 					placeholder="YYYY-MM-DD"
@@ -116,6 +117,7 @@ export function ReceiptFieldsForm({
 				label={t("total")}
 				hint={hint("missingTotal") ?? hint("totalMismatch")}
 				error={error("total")}
+				required
 			>
 				<Input
 					inputMode="numeric"
@@ -128,7 +130,12 @@ export function ReceiptFieldsForm({
 					}
 				/>
 			</Field>
-			<Field label={t("points")} hint={t("pointsHint")} error={error("points")}>
+			<Field
+				label={t("points")}
+				hint={t("pointsHint")}
+				error={error("points")}
+				optional
+			>
 				<Input
 					inputMode="numeric"
 					value={points}
@@ -150,6 +157,7 @@ export function ReceiptFieldsForm({
 				label={t("merchant")}
 				hint={hint("multipleReceipts") ?? hint("missingMerchant")}
 				error={error("merchant")}
+				optional
 			>
 				<Input value={merchant} onChange={(e) => setMerchant(e.target.value)} />
 			</Field>
@@ -157,6 +165,7 @@ export function ReceiptFieldsForm({
 				label={t("paidFrom")}
 				hint={t("paidFromHint")}
 				error={error("paymentAccountId")}
+				required
 			>
 				<NativeSelect
 					value={accountId ?? ""}
@@ -173,6 +182,7 @@ export function ReceiptFieldsForm({
 				label={t("reducedAmount")}
 				hint={hint("taxMismatch") ?? t("reducedAmountHint")}
 				error={error("reducedAmount")}
+				optional
 			>
 				<Input
 					inputMode="numeric"
@@ -184,6 +194,7 @@ export function ReceiptFieldsForm({
 				label={t("invoiceNo")}
 				hint={hint("invalidInvoiceNo") ?? t("invoiceNoHint")}
 				error={error("invoiceNo")}
+				optional
 			>
 				<Input
 					value={invoiceNo}

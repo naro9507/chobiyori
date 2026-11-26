@@ -299,14 +299,14 @@ function BillEditor({
 			<fieldset disabled={change.isPending} className="space-y-3">
 				<legend className="mb-2 font-medium">{t(bill ? "edit" : "add")}</legend>
 				<div className="grid gap-3 sm:grid-cols-3">
-					<Field label={t("payee")} error={errorFor("payee")}>
+					<Field required label={t("payee")} error={errorFor("payee")}>
 						<Input
 							required
 							value={payee}
 							onChange={(e) => setPayee(e.target.value)}
 						/>
 					</Field>
-					<Field label={t("dueDate")} error={errorFor("dueDate")}>
+					<Field required label={t("dueDate")} error={errorFor("dueDate")}>
 						<Input
 							required
 							type="date"
@@ -314,7 +314,7 @@ function BillEditor({
 							onChange={(e) => setDueDate(e.target.value)}
 						/>
 					</Field>
-					<Field label={t("amount")} error={errorFor("amount")}>
+					<Field required label={t("amount")} error={errorFor("amount")}>
 						<Input
 							inputMode="numeric"
 							value={amount}

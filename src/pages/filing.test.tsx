@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import {
 	act,
 	render,
@@ -22,13 +23,12 @@ import { today, useFilingDay } from "@/features/filing/filing-api"
 import { useYearStore } from "@/features/setup/fiscal-years"
 import { filingReminderDays, useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 const guide: IncomeGuide = {
 	fiscalYear: 2026,
@@ -240,8 +240,8 @@ beforeEach(() => {
 		filingDesktopNotifications: false,
 	})
 	useYearStore.setState({ selected: null })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(async (command: string, args) => {
+	ipc.mockReset()
+	ipc.mockImplementation(async (command: string, args) => {
 		switch (command) {
 			case "setup_status":
 				return { completed: true, fiscalYear: 2026 }
@@ -401,7 +401,7 @@ describe("確定申告の補助", () => {
 		).toBeGreaterThan(0)
 
 		await user.click(screen.getByRole("checkbox", { name: "申告書を出した" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("set_filing_check", {
+		expect(ipc).toHaveBeenCalledWith("set_filing_check", {
 			fiscalYear: 2026,
 			item: "submitted",
 			done: true,
@@ -467,18 +467,15 @@ describe("インボイスの登録と期限", () => {
 		await user.click(
 			within(card as HTMLElement).getByRole("button", { name: "保存する" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"save_invoice_registration",
-			{
-				input: {
-					registrationNo: "T7000012050002",
-					registeredOn: "2026-10-01",
-					fiscalYear: 2026,
-					taxStatus: "standard",
-					simplifiedCategory: 5,
-				},
-			}
-		)
+		expect(ipc).toHaveBeenCalledWith("save_invoice_registration", {
+			input: {
+				registrationNo: "T7000012050002",
+				registeredOn: "2026-10-01",
+				fiscalYear: 2026,
+				taxStatus: "standard",
+				simplifiedCategory: 5,
+			},
+		})
 		await within(card as HTMLElement).findByText("設定を保存しました。")
 		expect(newMethod).toHaveValue("standard")
 		unmount()
@@ -490,7 +487,7 @@ describe("インボイスの登録と期限", () => {
 		await user.click(savedCard.getByRole("button", { name: "保存する" }))
 		expect(await savedCard.findByText("設定を保存しました。")).toBeVisible()
 		expect(method).toHaveValue("simplified")
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"save_invoice_registration",
 			expect.objectContaining({
 				input: expect.objectContaining({ taxStatus: "simplified" }),
@@ -570,9 +567,7 @@ describe("インボイスの登録と期限", () => {
 		)
 		await user.keyboard("{Escape}")
 		const calls = () =>
-			mocks.callCommand.mock.calls.filter(
-				([name]) => name === "plugin:notification|notify"
-			)
+			ipc.mock.calls.filter(([name]) => name === "plugin:notification|notify")
 		expect(checkbox).not.toBeChecked()
 		expect(calls()).toHaveLength(0)
 
@@ -613,7 +608,7 @@ describe("インボイスの登録と期限", () => {
 			name: "デスクトップ通知",
 		})
 		const schedules = () =>
-			mocks.callCommand.mock.calls
+			ipc.mock.calls
 				.filter(([name]) => name === "sync_filing_notifications")
 				.map(([, args]) => args.notifications)
 		await user.click(desktop)
@@ -631,7 +626,7 @@ describe("インボイスの登録と期限", () => {
 			expect(reserved[index].at).toBe(scheduled.getTime())
 		}
 		expect(reserved[2].body).toBe(`申告期限は明日（${today(due)}）です。`)
-		expect(mocks.callCommand).toHaveBeenCalledWith("filing_deadlines", {
+		expect(ipc).toHaveBeenCalledWith("filing_deadlines", {
 			today: today(),
 			includeFuture: true,
 		})
@@ -681,12 +676,12 @@ describe("インボイスの登録と期限", () => {
 		expect(
 			outlook.getByRole("button", { name: "連携する" })
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+		expect(ipc).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "google",
 			today: today(),
 			locale: "ja",
 		})
-		expect(mocks.callCommand).not.toHaveBeenCalledWith("sync_filing_calendar", {
+		expect(ipc).not.toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
 			today: today(),
 			locale: "ja",
@@ -700,7 +695,7 @@ describe("インボイスの登録と期限", () => {
 		expect(
 			await outlook.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("sync_filing_calendar", {
+		expect(ipc).toHaveBeenCalledWith("sync_filing_calendar", {
 			provider: "outlook",
 			today: today(),
 			locale: "ja",
@@ -735,7 +730,7 @@ describe("インボイスの登録と期限", () => {
 			await outlook.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		const syncs = (provider: string) =>
-			mocks.callCommand.mock.calls.filter(
+			ipc.mock.calls.filter(
 				([command, args]) =>
 					command === "sync_filing_calendar" && args?.provider === provider
 			).length
@@ -748,10 +743,10 @@ describe("インボイスの登録と期限", () => {
 		expect(google.getByText("連携済み")).toBeInTheDocument()
 		expect(google.getByRole("button", { name: "今すぐ同期" })).toBeDisabled()
 		expect(outlook.getByRole("switch", { name: "予定を同期" })).toBeChecked()
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"set_filing_calendar_sync_enabled",
-			{ provider: "google", enabled: false }
-		)
+		expect(ipc).toHaveBeenCalledWith("set_filing_calendar_sync_enabled", {
+			provider: "google",
+			enabled: false,
+		})
 		unmount()
 
 		renderAt("/settings?view=external")
@@ -766,14 +761,14 @@ describe("インボイスの登録と期限", () => {
 			await reopened.findByText("カレンダーの同期が完了しました。")
 		).toBeInTheDocument()
 		expect(syncs("google")).toBeGreaterThan(previousGoogleSyncs)
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"set_filing_calendar_sync_enabled",
-			{ provider: "google", enabled: true }
-		)
-		expect(mocks.callCommand).not.toHaveBeenCalledWith(
-			"connect_filing_calendar",
-			{ provider: "google", locale: "ja" }
-		)
+		expect(ipc).toHaveBeenCalledWith("set_filing_calendar_sync_enabled", {
+			provider: "google",
+			enabled: true,
+		})
+		expect(ipc).not.toHaveBeenCalledWith("connect_filing_calendar", {
+			provider: "google",
+			locale: "ja",
+		})
 	})
 
 	it("予定の種類と月締め日を保存すると、連携中のカレンダーに同期する", async () => {
@@ -799,23 +794,18 @@ describe("インボイスの登録と期限", () => {
 		await user.selectOptions(group.getByLabelText("月締めの予定日"), "15")
 		await user.click(group.getByRole("button", { name: "同期する予定を保存" }))
 		expect(await group.findByText("保存しました。")).toBeVisible()
-		expect(mocks.callCommand).toHaveBeenCalledWith(
-			"save_filing_calendar_options",
-			{
-				options: {
-					invoiceDue: true,
-					estimateExpiry: true,
-					monthlyClose: true,
-					monthlyCloseDay: 15,
-					receivedBillDue: true,
-				},
-			}
-		)
+		expect(ipc).toHaveBeenCalledWith("save_filing_calendar_options", {
+			options: {
+				invoiceDue: true,
+				estimateExpiry: true,
+				monthlyClose: true,
+				monthlyCloseDay: 15,
+				receivedBillDue: true,
+			},
+		})
 		await waitFor(() =>
 			expect(
-				mocks.callCommand.mock.calls.filter(
-					([command]) => command === "sync_filing_calendar"
-				)
+				ipc.mock.calls.filter(([command]) => command === "sync_filing_calendar")
 			).toHaveLength(2)
 		)
 	})
@@ -847,9 +837,8 @@ describe("インボイスの登録と期限", () => {
 			name: "申告書を出した",
 		})
 		const syncCount = () =>
-			mocks.callCommand.mock.calls.filter(
-				([command]) => command === "sync_filing_calendar"
-			).length
+			ipc.mock.calls.filter(([command]) => command === "sync_filing_calendar")
+				.length
 		await waitFor(() => expect(syncCount()).toBe(1))
 		await user.click(submitted)
 		await waitFor(() => expect(syncCount()).toBe(2))
@@ -893,7 +882,7 @@ describe("インボイスの登録と期限", () => {
 				"保存しました。カレンダーでファイルを取り込んでください。"
 			)
 		).toBeInTheDocument()
-		expect(mocks.callCommand).toHaveBeenCalledWith("export_filing_calendar", {
+		expect(ipc).toHaveBeenCalledWith("export_filing_calendar", {
 			today: today(),
 			locale: "ja",
 		})

@@ -356,13 +356,13 @@ function AssetForm({
 				{asset ? t("editAsset", { name: asset.name }) : t("addAsset")}
 			</p>
 			<div className="grid gap-4 sm:grid-cols-2">
-				<Field label={t("assetName")} error={error("name")}>
+				<Field required label={t("assetName")} error={error("name")}>
 					<Input
 						value={form.name}
 						onChange={(e) => set({ name: e.target.value })}
 					/>
 				</Field>
-				<Field label={t("assetAccount")} error={error("accountId")}>
+				<Field required label={t("assetAccount")} error={error("accountId")}>
 					<NativeSelect
 						value={form.accountId}
 						onChange={(e) => set({ accountId: Number(e.target.value) })}
@@ -375,6 +375,7 @@ function AssetForm({
 					</NativeSelect>
 				</Field>
 				<Field
+					required
 					label={t("acquiredOn")}
 					hint={t("acquiredOnHint")}
 					error={error("acquiredOn")}
@@ -385,7 +386,7 @@ function AssetForm({
 						onChange={(e) => set({ acquiredOn: e.target.value })}
 					/>
 				</Field>
-				<Field label={t("cost")} error={error("cost")}>
+				<Field required label={t("cost")} error={error("cost")}>
 					<Input
 						inputMode="numeric"
 						className="num"
@@ -395,6 +396,7 @@ function AssetForm({
 				</Field>
 				{!asset && !form.laterStart && (
 					<Field
+						optional
 						label={t("purchasePayment")}
 						hint={t("purchasePaymentHint")}
 						error={error("paymentAccountId")}
@@ -433,6 +435,7 @@ function AssetForm({
 				</Field>
 				{needsLife && (
 					<Field
+						required
 						label={t("usefulLife")}
 						hint={t("usefulLifeHint")}
 						error={error("usefulLife")}
@@ -446,6 +449,7 @@ function AssetForm({
 					</Field>
 				)}
 				<Field
+					required
 					term="allocation"
 					label={t("businessPercent")}
 					hint={t("businessPercentHint")}
@@ -459,6 +463,7 @@ function AssetForm({
 					/>
 				</Field>
 				<Field
+					optional
 					label={t("disposedOn")}
 					hint={t("disposedOnHint")}
 					error={error("disposedOn")}
@@ -500,7 +505,11 @@ function AssetForm({
 			/>
 			{form.laterStart && (
 				<div className="grid gap-4 sm:grid-cols-2">
-					<Field label={t("bookValueYear")} error={error("bookValueYear")}>
+					<Field
+						required
+						label={t("bookValueYear")}
+						error={error("bookValueYear")}
+					>
 						<Input
 							inputMode="numeric"
 							className="num"
@@ -509,6 +518,7 @@ function AssetForm({
 						/>
 					</Field>
 					<Field
+						required
 						label={t("bookValue")}
 						hint={t("bookValueHint")}
 						error={error("bookValue")}
@@ -522,7 +532,7 @@ function AssetForm({
 					</Field>
 				</div>
 			)}
-			<Field label={t("memo")} error={error("memo")}>
+			<Field optional label={t("memo")} error={error("memo")}>
 				<Input
 					value={form.memo}
 					onChange={(e) => set({ memo: e.target.value })}

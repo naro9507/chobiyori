@@ -34,6 +34,7 @@ make dev     # アプリを起動
 |---|---|
 | `make dev` | アプリを起動する。画面の変更はすぐ反映され、Rust の変更は再ビルドされる |
 | `make dev-web` | 画面だけをブラウザで開く。Rust のコマンドは呼べない |
+| `make dev-mock` | 画面をモックの帳簿でブラウザに開く。Rust を起動せずに見た目と流れを確かめる（[モックの環境](#モックの環境)） |
 | `make build` | いまの OS 用のインストーラを作る（`src-tauri/target/release/bundle/`）。配布用は GitHub Actions で作る（[リリースと自動アップデート](./RELEASE.md)） |
 | `make test` | 画面（Vitest）と Rust（cargo test）のテスト |
 | `make lint` | Biome と Clippy |
@@ -88,6 +89,75 @@ chobiyori/
 3. 新しいメニュー項目なら `src/app/navigation.ts` に足し、`i18n/messages/ja.json` と `en.json` の `nav` と `descriptions` に文言を足す。
 
 文言は日本語と英語で同じキーを持つ必要がある。そろっていないとテストが失敗する。
+
+## モックの環境
+
+`src/mock/` に、Rust 側のコマンドの偽物を置いている。Tauri の `mockIPC`（`@tauri-apps/api/mocks`）に渡すハンドラーと、場面ごとの偽の帳簿で、ブラウザで画面を見るとき（`make dev-mock`）とテストの両方で使う。本番のビルドには入らない。
+
+| ファイル | 中身 |
+|---|---|
+| `data.ts` | 場面（`scenarios`）と偽の帳簿（`createBook`）。日付は今日の年を基準に作る |
+| `book.ts` | いまの場面の帳簿（`currentBook`）と作り直し（`resetBook`） |
+| `handlers.ts` | `mockIPC` に渡すハンドラー（`handleCommand`）。コマンドごとに帳簿を読み書きして返す |
+| `install.ts` | `pnpm dev:mock` で読み込む入口 |
+
+### ブラウザで見る
+
+`make dev-mock`（`pnpm dev:mock`）で開く。
+
+- 場面は URL の `?scenario=` で選ぶ（例: `http://localhost:5173/?scenario=newYear#/`）。
+- 画面から保存・確定すると、偽の帳簿が書き変わる。ページを読み直すと元に戻る。
+
+### テストで使う
+
+画面のテストは、Rust 側のコマンドを `mockIPC` で返す。`callCommand` は `@tauri-apps/api` の `isTauri()` でアプリの中かを見るが、`mockIPC` はその印（`globalThis.isTauri`）を立てない。そこで `src/test/setup.ts` がテストごとに印を立て、終わったら `clearMocks()` を呼ぶので、各テストは `mockIPC` で返し方を決めるだけでよい。
+
+コマンドごとに返す値を書くとき（多くのテスト）:
+
+```ts
+const ipc = vi.fn()
+beforeEach(() => {
+	mockIPC(ipc)
+	ipc.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+		switch (command) {
+			case "list_accounts":
+				return accounts
+			default:
+				// アプリの更新の確認など、プラグインのコマンドは「なし」
+				return command.startsWith("plugin:") ? null : []
+		}
+	})
+})
+
+expect(ipc).toHaveBeenCalledWith("confirm_inbox_item", { id: 1, input: … })
+expect(ipc).toHaveBeenCalledWith("open_with_login", {}) // 引数のないコマンドは {} で届く
+```
+
+その他のコマンドに `[]` を返すと、アプリの更新の確認（`plugin:updater|check`）が「更新あり」になり、更新のダイアログが画面を覆う。プラグインのコマンドには `null` を返す。
+
+モックの帳簿をそのまま使うとき（例: `src/pages/inbox-mock.test.tsx`）:
+
+```ts
+import { currentBook, resetBook } from "@/mock/book"
+import { handleCommand } from "@/mock/handlers"
+
+beforeEach(() => {
+	resetBook("default")
+	mockIPC(handleCommand)
+})
+
+// 一部のコマンドだけ変える
+mockIPC((cmd, args) =>
+	cmd === "confirm_inbox_item" ? Promise.reject({ code: "yearClosed" }) : handleCommand(cmd, args)
+)
+// 呼び出しを確かめるときは vi.fn で包む: const handler = vi.fn(handleCommand); mockIPC(handler)
+// 帳簿を確かめる・変えるときは currentBook()
+```
+
+### コマンドを足すとき
+
+- 用意していないコマンドは、一覧（`list_*`）なら空、それ以外は「うまくいきませんでした」になり、コンソールに `[mock] 用意していないコマンド` と出る。画面を見るのに要るものから `handlers.ts` に足す。
+- 返す形は、画面の型（`features/*/…-api.ts`）を使って書く。Rust 側の型と画面の型がずれていないかは、ここでは確かめられないので、アプリでも確かめる。
 
 ## Rust のコマンドを足すとき
 

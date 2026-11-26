@@ -1,4 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
+import { mockIPC } from "@tauri-apps/api/mocks"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -21,13 +22,12 @@ import { useReceiptReading } from "@/features/inbox/receipt-reading-store"
 import type { Account } from "@/features/master/master-api"
 import { useSettingsStore } from "@/stores/settings-store"
 
-const mocks = vi.hoisted(() => ({ callCommand: vi.fn() }))
+// Rust 側のコマンドの返し方。各テストの mockImplementation で決める
+const ipc = vi.fn()
 
-vi.mock("@/lib/tauri", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@/lib/tauri")>()),
-	callCommand: mocks.callCommand,
-	isTauri: () => true,
-}))
+beforeEach(() => {
+	mockIPC(ipc)
+})
 
 function account(
 	id: number,
@@ -162,8 +162,8 @@ beforeEach(() => {
 	reads = 0
 	useReceiptReading.setState({ progress: { kind: "idle" }, interrupted: false })
 	useSettingsStore.setState({ locale: "ja", theme: "light" })
-	mocks.callCommand.mockReset()
-	mocks.callCommand.mockImplementation(
+	ipc.mockReset()
+	ipc.mockImplementation(
 		async (command: string, args?: Record<string, unknown>) => {
 			switch (command) {
 				case "setup_status":
@@ -204,7 +204,8 @@ beforeEach(() => {
 				case "attachment_content":
 					return { attachment, data: "AA==" }
 				default:
-					return []
+					// アプリの更新の確認など、プラグインのコマンドは「なし」
+					return command.startsWith("plugin:") ? null : []
 			}
 		}
 	)
@@ -255,7 +256,7 @@ describe("レシート", () => {
 				"上の説明を読み、レシートの画像を送ることに同意します"
 			)
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("save_receipt_settings", {
+		expect(ipc).toHaveBeenCalledWith("save_receipt_settings", {
 			input: {
 				model: "gemini-2.5-flash",
 				cashAccountId: 1,
@@ -267,7 +268,7 @@ describe("レシート", () => {
 		expect(keyInput).toHaveAttribute("type", "password")
 		await user.type(keyInput, "AIza-test")
 		await user.click(screen.getByRole("button", { name: "キーを登録する" }))
-		expect(mocks.callCommand).toHaveBeenCalledWith("set_gemini_key", {
+		expect(ipc).toHaveBeenCalledWith("set_gemini_key", {
 			key: "AIza-test",
 		})
 		// 登録したかどうかだけを出し、替える・消すができる
@@ -306,9 +307,9 @@ describe("レシート", () => {
 			consentedAt: "2026-11-16T00:00:00Z",
 			hasKey: true,
 		}
-		const base = mocks.callCommand.getMockImplementation()
+		const base = ipc.getMockImplementation()
 		let limited = false
-		mocks.callCommand.mockImplementation(
+		ipc.mockImplementation(
 			async (command: string, args?: Record<string, unknown>) => {
 				if (command === "read_next_receipt" && !limited) {
 					limited = true
@@ -376,8 +377,8 @@ describe("レシート", () => {
 		const held = new Promise<void>((resolve) => {
 			release = resolve
 		})
-		const base = mocks.callCommand.getMockImplementation()
-		mocks.callCommand.mockImplementation(
+		const base = ipc.getMockImplementation()
+		ipc.mockImplementation(
 			async (command: string, args?: Record<string, unknown>) => {
 				if (command === "read_next_receipt" && reads === 0) await held
 				return base?.(command, args)
@@ -425,7 +426,7 @@ describe("レシート", () => {
 				name: "この取引に紐付ける（新しく作らない）",
 			})
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith("link_inbox_item", {
+		expect(ipc).toHaveBeenCalledWith("link_inbox_item", {
 			id: 9,
 			transactionId: 77,
 		})
@@ -512,7 +513,7 @@ describe("レシート", () => {
 		await user.click(
 			within(fields).getByRole("button", { name: "確認待ちに入れる" })
 		)
-		expect(mocks.callCommand).toHaveBeenCalledWith(
+		expect(ipc).toHaveBeenCalledWith(
 			"save_receipt_fields",
 			expect.objectContaining({
 				id: 2,
@@ -533,9 +534,7 @@ it("レシートの削除を取り消すと画像は残る", async () => {
 	expect(within(dialog).getByRole("button", { name: "やめる" })).toHaveFocus()
 	await user.click(within(dialog).getByRole("button", { name: "やめる" }))
 	expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
-	expect(
-		mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
-	).toBe(false)
+	expect(ipc.mock.calls.some(([name]) => name === "delete_receipt")).toBe(false)
 	await user.click(buttons[0])
 	await user.click(
 		within(await screen.findByRole("dialog")).getByRole("button", {
@@ -543,8 +542,8 @@ it("レシートの削除を取り消すと画像は残る", async () => {
 		})
 	)
 	await waitFor(() =>
-		expect(
-			mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
-		).toBe(true)
+		expect(ipc.mock.calls.some(([name]) => name === "delete_receipt")).toBe(
+			true
+		)
 	)
 })

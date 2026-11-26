@@ -32,6 +32,7 @@ chobiyori/
 │   ├── features/               # 機能ごとの Rust 呼び出しとフック
 │   ├── i18n/                   # 日本語・英語の文言
 │   ├── lib/                    # 共通の関数（Tauri 呼び出しなど）
+│   ├── mock/                   # モックの環境（pnpm dev:mock）の偽の帳簿
 │   ├── pages/                  # 画面
 │   ├── stores/                 # 画面の状態（Zustand）
 │   └── styles/                 # 配色とフォント
