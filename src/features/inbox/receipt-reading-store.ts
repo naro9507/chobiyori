@@ -3,13 +3,16 @@ import { createJSONStorage, persist } from "zustand/middleware"
 import { isAppError } from "@/lib/errors"
 import { readNextReceipt } from "./inbox-api"
 
-/** 回数の上限に達したとき、読み直すまで待つ時間 */
+/** 回数の上限・混雑のとき、読み直すまで待つ時間 */
 const RATE_LIMIT_WAIT_MS = 30_000
+/** 続けて上限・混雑と言われたら、ここで止めて理由を出す（待ち続けないため） */
+const RATE_LIMIT_MAX_WAITS = 4
 
 export type ReadingProgress =
 	| { kind: "idle" }
 	| { kind: "reading"; done: number; remaining: number }
-	| { kind: "waiting"; done: number }
+	/** `busy` はサービスの混雑（503）、そうでなければ回数の上限 */
+	| { kind: "waiting"; done: number; busy: boolean }
 	| { kind: "finished"; done: number }
 	| { kind: "stopped"; done: number; error: unknown }
 
@@ -51,6 +54,7 @@ export const useReceiptReading = create<ReadingState>()(
 			readAll: async (remaining, afterEach) => {
 				if (isReading(get().progress)) return
 				let done = 0
+				let waits = 0
 				set({
 					progress: { kind: "reading", done, remaining },
 					interrupted: true,
@@ -59,6 +63,7 @@ export const useReceiptReading = create<ReadingState>()(
 					try {
 						const outcome = await readNextReceipt()
 						if (!outcome.receipt) break
+						waits = 0
 						done += 1
 						set({
 							progress: {
@@ -70,8 +75,19 @@ export const useReceiptReading = create<ReadingState>()(
 						await afterEach()
 						if (outcome.remaining === 0) break
 					} catch (error) {
-						if (isAppError(error) && error.code === "rateLimited") {
-							set({ progress: { kind: "waiting", done } })
+						if (
+							isAppError(error) &&
+							(error.code === "rateLimited" || error.code === "serviceBusy") &&
+							waits < RATE_LIMIT_MAX_WAITS
+						) {
+							waits += 1
+							set({
+								progress: {
+									kind: "waiting",
+									done,
+									busy: error.code === "serviceBusy",
+								},
+							})
 							await new Promise((resolve) =>
 								setTimeout(resolve, RATE_LIMIT_WAIT_MS)
 							)

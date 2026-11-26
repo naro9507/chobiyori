@@ -44,7 +44,10 @@ export function ReceiptReadingStatus() {
 						done: progress.done,
 						total: progress.done + progress.remaining,
 					})}
-				{progress.kind === "waiting" && t("sideWaiting", progress)}
+				{progress.kind === "waiting" &&
+					t(progress.busy ? "sideBusy" : "sideWaiting", {
+						done: progress.done,
+					})}
 				{finished && t("sideFinished", progress)}
 				{stopped && t("sideStopped", { done: progress.done })}
 			</span>

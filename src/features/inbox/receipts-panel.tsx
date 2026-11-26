@@ -111,7 +111,10 @@ export function ReceiptsPanel() {
 				{manualAdded && t("manualAdded")}
 				{add.data && t("added", add.data)}
 				{progress.kind === "reading" && t("reading", progress)}
-				{progress.kind === "waiting" && t("rateLimitWait", progress)}
+				{progress.kind === "waiting" &&
+					t(progress.busy ? "busyWait" : "rateLimitWait", {
+						done: progress.done,
+					})}
 				{progress.kind === "finished" && t("readFinished", progress)}
 			</p>
 			{(manualAdded || progress.kind === "finished") && (
