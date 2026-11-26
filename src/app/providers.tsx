@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { type ReactNode, useEffect, useState } from "react"
+import { ConfirmProvider } from "@/components/ui/confirm-dialog"
 import { I18nProvider } from "@/i18n/i18n-context"
 import { resolveDark, useSettingsStore } from "@/stores/settings-store"
 
@@ -35,7 +36,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
 	return (
 		<QueryClientProvider client={queryClient}>
-			<I18nProvider locale={locale}>{children}</I18nProvider>
+			<I18nProvider locale={locale}>
+				<ConfirmProvider>{children}</ConfirmProvider>
+			</I18nProvider>
 		</QueryClientProvider>
 	)
 }

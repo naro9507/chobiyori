@@ -33,6 +33,7 @@ const blank: RuleInput = {
 /** 自動仕訳ルールの一覧と編集。確定のときに保存したルールもここに並ぶ。 */
 export function RulesPanel() {
 	const t = useTranslations("inbox")
+	const tApp = useTranslations("app")
 	const errorMessage = useErrorMessage()
 	const masters = useJournalMasters()
 	const rules = useRules()
@@ -45,7 +46,10 @@ export function RulesPanel() {
 	const amountRange = (r: Rule) =>
 		r.minAmount === null && r.maxAmount === null
 			? ""
-			: `${r.minAmount === null ? "" : formatAmount(r.minAmount)} 〜 ${r.maxAmount === null ? "" : formatAmount(r.maxAmount)}`
+			: tApp("range", {
+					from: r.minAmount === null ? "" : formatAmount(r.minAmount),
+					to: r.maxAmount === null ? "" : formatAmount(r.maxAmount),
+				})
 
 	return (
 		<div className="flex flex-col gap-4">

@@ -214,7 +214,7 @@ describe("書類の画面", () => {
 		await user.type(screen.getByLabelText("金額（円・任意）"), "12,345")
 		await user.click(screen.getByRole("button", { name: /^保存$/ }))
 		expect(await screen.findByText("株式会社サンプル")).toBeVisible()
-		expect(screen.getByText("12,345円")).toBeVisible()
+		expect(screen.getByText("12,345 円")).toBeVisible()
 		expect(screen.getByText("未払い")).toBeVisible()
 		await user.click(screen.getByRole("button", { name: "支払済みにする" }))
 		expect(await screen.findByText("支払済み")).toBeVisible()
@@ -431,14 +431,18 @@ it("単価の空欄を示し、一覧に戻るときは破棄を選べる", asyn
 	expect(
 		mocks.callCommand.mock.calls.some(([cmd]) => cmd === "create_document")
 	).toBe(false)
-	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
-	try {
-		await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
-		expect(screen.getByLabelText(/^品名/)).toHaveValue("制作")
-		confirm.mockReturnValue(true)
-		await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
-		expect(await screen.findByRole("button", { name: "請求書" })).toBeVisible()
-	} finally {
-		confirm.mockRestore()
-	}
+	await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
+	await user.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "やめる",
+		})
+	)
+	expect(screen.getByLabelText(/^品名/)).toHaveValue("制作")
+	await user.click(screen.getByRole("button", { name: "一覧に戻る" }))
+	await user.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "破棄する",
+		})
+	)
+	expect(await screen.findByRole("button", { name: "請求書" })).toBeVisible()
 })

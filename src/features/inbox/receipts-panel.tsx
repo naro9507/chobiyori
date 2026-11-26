@@ -11,6 +11,7 @@ import { useState } from "react"
 import { navItems } from "@/app/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
 import {
@@ -201,6 +202,8 @@ function ReceiptRow({
 	onSelect: () => void
 }) {
 	const t = useTranslations("receipts")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const send = useSetReceiptSendAllowed()
 	const retry = useRetryReceipt()
 	const remove = useDeleteReceipt()
@@ -261,11 +264,15 @@ function ReceiptRow({
 					size="sm"
 					variant="ghost"
 					disabled={remove.isPending}
-					onClick={() => {
+					onClick={async () => {
 						if (
-							window.confirm(
-								t("deleteConfirm", { name: receipt.attachment.fileName })
-							)
+							await confirm({
+								message: t("deleteConfirm", {
+									name: receipt.attachment.fileName,
+								}),
+								confirmLabel: tApp("delete"),
+								destructive: true,
+							})
 						)
 							remove.mutate(receipt.id)
 					}}

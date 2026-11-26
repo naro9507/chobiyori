@@ -1,5 +1,5 @@
-import { Check, Copy, Eye, EyeOff, KeyRound } from "lucide-react"
-import { type ComponentProps, type FormEvent, useState } from "react"
+import { Check, Copy, KeyRound } from "lucide-react"
+import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Card,
@@ -9,7 +9,8 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input, LabeledCheckbox, NativeSelect } from "@/components/ui/input"
+import { LabeledCheckbox, NativeSelect } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useJournalMasters } from "@/features/journal/use-master-items"
 import { useTranslations } from "@/i18n/use-translations"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -112,7 +113,11 @@ export function ReceiptSettingsCard() {
 									hint={t("apiKeyHint")}
 									className="w-96"
 								>
-									<SecretInput
+									<PasswordInput
+										autoComplete="off"
+										autoCapitalize="off"
+										autoCorrect="off"
+										spellCheck={false}
 										value={key}
 										onChange={(e) => setKeyText(e.target.value)}
 									/>
@@ -247,38 +252,6 @@ function KeyGuide() {
 				<li>{t("noteData")}</li>
 			</ul>
 		</section>
-	)
-}
-
-/** 目のマークで表示と非表示を切り替えられる入力欄（API キー用）。 */
-function SecretInput(props: ComponentProps<"input">) {
-	const t = useTranslations("receiptSettings")
-	const [visible, setVisible] = useState(false)
-	return (
-		<div className="relative">
-			<Input
-				{...props}
-				type={visible ? "text" : "password"}
-				autoComplete="off"
-				autoCapitalize="off"
-				autoCorrect="off"
-				spellCheck={false}
-				className="pr-10"
-			/>
-			<button
-				type="button"
-				aria-label={visible ? t("hideKey") : t("showKey")}
-				aria-pressed={visible}
-				onClick={() => setVisible((v) => !v)}
-				className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-			>
-				{visible ? (
-					<EyeOff aria-hidden="true" className="size-4" />
-				) : (
-					<Eye aria-hidden="true" className="size-4" />
-				)}
-			</button>
-		</div>
 	)
 }
 

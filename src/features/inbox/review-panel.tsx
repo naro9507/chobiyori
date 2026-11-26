@@ -705,6 +705,7 @@ function DepositPicker({
 	onChange: (key: string) => void
 }) {
 	const t = useTranslations("deposits")
+	const tApp = useTranslations("app")
 	const masters = useJournalMasters()
 	const hasTargets =
 		(targets?.invoices.length ?? 0) > 0 || (targets?.planMonths.length ?? 0) > 0
@@ -730,8 +731,12 @@ function DepositPicker({
 									<span>
 										{s.partnerId !== null &&
 											`${masters.partnerLabel(s.partnerId)} `}
-										{s.label}（
-										{t("remaining", { amount: formatAmount(s.remaining) })}）
+										{s.label}
+										{tApp("parenthesized", {
+											text: t("remaining", {
+												amount: formatAmount(s.remaining),
+											}),
+										})}
 									</span>
 									{s.exactAmount && (
 										<span className="text-success text-xs">

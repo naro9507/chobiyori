@@ -526,16 +526,25 @@ it("レシートの削除を取り消すと画像は残る", async () => {
 	const user = userEvent.setup()
 	renderPage("/inbox?view=receipts")
 	const buttons = await screen.findAllByRole("button", { name: "消す" })
-	const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
-	try {
-		await user.click(buttons[0])
-		expect(confirm).toHaveBeenCalledWith(
-			expect.stringContaining(receipts[0].attachment.fileName)
-		)
+	await user.click(buttons[0])
+	const dialog = await screen.findByRole("dialog", { name: "確認してください" })
+	expect(dialog).toHaveTextContent(receipts[0].attachment.fileName)
+	// 開いたときの選択は「やめる」
+	expect(within(dialog).getByRole("button", { name: "やめる" })).toHaveFocus()
+	await user.click(within(dialog).getByRole("button", { name: "やめる" }))
+	expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+	expect(
+		mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
+	).toBe(false)
+	await user.click(buttons[0])
+	await user.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "削除する",
+		})
+	)
+	await waitFor(() =>
 		expect(
 			mocks.callCommand.mock.calls.some(([name]) => name === "delete_receipt")
-		).toBe(false)
-	} finally {
-		confirm.mockRestore()
-	}
+		).toBe(true)
+	)
 })

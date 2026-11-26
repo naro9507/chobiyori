@@ -11,7 +11,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { callCommand } from "@/lib/tauri"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -86,8 +86,7 @@ export function DeviceLoginSettings() {
 					<>
 						<p className="text-muted-foreground text-sm">{t("deviceNote")}</p>
 						<Field label={t("devicePassword")} hint={t("devicePasswordHint")}>
-							<Input
-								type="password"
+							<PasswordInput
 								autoComplete="current-password"
 								disabled={change.isPending}
 								value={password}

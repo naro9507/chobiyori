@@ -421,6 +421,8 @@ export function GridEditor({
 		if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) {
 			return
 		}
+		// 日本語入力の変換を決める Enter では、欄を移ったり保存したりしない
+		if (event.nativeEvent.isComposing || event.keyCode === 229) return
 		event.preventDefault()
 		const inputs = Array.from(
 			rowRef.current?.querySelectorAll<HTMLInputElement>("input") ?? []

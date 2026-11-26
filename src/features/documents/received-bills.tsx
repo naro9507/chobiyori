@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Field } from "@/components/ui/field"
 import { Input, NativeSelect } from "@/components/ui/input"
 import { calendarPlanKey } from "@/features/filing/calendar-query"
@@ -72,6 +73,9 @@ function useChangeBill(onSaved?: () => void) {
 
 export function ReceivedBills() {
 	const t = useTranslations("receivedBills")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
+	const navigate = useNavigate()
 	const errorMessage = useErrorMessage()
 	const today = useFilingDay()
 	const year = useFiscalYear()
@@ -200,23 +204,34 @@ export function ReceivedBills() {
 											onClick={(e) => {
 												const prior =
 													useSimpleEntryDrafts.getState().forms[String(year)]
+												const start = () => {
+													useTransactionsTab.getState().setTab("simple")
+													useEntryIntent.getState().transaction({
+														kind: "expense",
+														accountCode: "",
+														paymentCode: "",
+														memo: bill.payee,
+														billId: bill.id,
+														amount: bill.amount?.toString() ?? "",
+													})
+												}
 												if (
 													prior &&
-													(prior.amount || prior.memo || prior.billId) &&
-													!window.confirm(t("replaceDraft"))
+													(prior.amount || prior.memo || prior.billId)
 												) {
+													// 入力中の経費があるときは、確認してから移る
 													e.preventDefault()
+													void confirm({
+														message: t("replaceDraft"),
+														confirmLabel: tApp("replace"),
+													}).then((ok) => {
+														if (!ok) return
+														start()
+														void navigate({ to: "/transactions" })
+													})
 													return
 												}
-												useTransactionsTab.getState().setTab("simple")
-												useEntryIntent.getState().transaction({
-													kind: "expense",
-													accountCode: "",
-													paymentCode: "",
-													memo: bill.payee,
-													billId: bill.id,
-													amount: bill.amount?.toString() ?? "",
-												})
+												start()
 											}}
 										>
 											{t("enterExpense")}
@@ -252,6 +267,8 @@ function BillEditor({
 	onClose: () => void
 }) {
 	const t = useTranslations("receivedBills")
+	const tApp = useTranslations("app")
+	const confirm = useConfirm()
 	const errorMessage = useErrorMessage()
 	const [payee, setPayee] = useState(bill?.payee ?? "")
 	const [dueDate, setDueDate] = useState(bill?.dueDate ?? "")
@@ -314,8 +331,14 @@ function BillEditor({
 						<Button
 							type="button"
 							variant="destructive"
-							onClick={() => {
-								if (window.confirm(t("deleteConfirm"))) {
+							onClick={async () => {
+								if (
+									await confirm({
+										message: t("deleteConfirm"),
+										confirmLabel: tApp("delete"),
+										destructive: true,
+									})
+								) {
 									change.mutate({ type: "delete", id: bill.id })
 								}
 							}}

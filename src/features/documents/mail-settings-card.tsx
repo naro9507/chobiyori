@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card"
 import { Field } from "@/components/ui/field"
 import { Input, NativeSelect } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useTranslations } from "@/i18n/use-translations"
 import { fieldError } from "@/lib/errors"
 import { useErrorMessage } from "@/lib/use-error-message"
@@ -289,8 +290,7 @@ function MailForm({
 						hint={t("passwordHint")}
 						className="w-96"
 					>
-						<Input
-							type="password"
+						<PasswordInput
 							autoComplete="off"
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}

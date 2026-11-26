@@ -492,6 +492,7 @@ export function PreviewSummary({
 	showSample?: boolean
 }) {
 	const t = useTranslations("inbox")
+	const tApp = useTranslations("app")
 	const listSeparator = useTranslations("app")("listSeparator")
 	return (
 		<div className="flex flex-col gap-2 text-sm">
@@ -502,7 +503,11 @@ export function PreviewSummary({
 				<dt className="text-muted-foreground">{t("ignoredCount")}</dt>
 				<dd className="num">{p.ignoredCount}</dd>
 				<dt className="text-muted-foreground">{t("dateRange")}</dt>
-				<dd>{p.firstDate ? `${p.firstDate} 〜 ${p.lastDate}` : "-"}</dd>
+				<dd>
+					{p.firstDate
+						? tApp("range", { from: p.firstDate, to: p.lastDate ?? "" })
+						: "—"}
+				</dd>
 				<dt className="text-muted-foreground">{t("totals")}</dt>
 				<dd className="num">
 					{t("totalsValue", {
