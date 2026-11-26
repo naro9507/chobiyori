@@ -299,6 +299,42 @@ describe("レシート", () => {
 		expect(reads).toBe(2)
 	})
 
+	it("回数の上限に達したら、サービスが返した秒数だけ待って続ける", async () => {
+		const user = userEvent.setup()
+		settings = {
+			...settings,
+			consentedAt: "2026-11-16T00:00:00Z",
+			hasKey: true,
+		}
+		const base = mocks.callCommand.getMockImplementation()
+		let limited = false
+		mocks.callCommand.mockImplementation(
+			async (command: string, args?: Record<string, unknown>) => {
+				if (command === "read_next_receipt" && !limited) {
+					limited = true
+					throw { code: "rateLimited", retryAfter: 1 }
+				}
+				return base?.(command, args)
+			}
+		)
+		renderPage("/inbox?view=receipts")
+		await user.click(
+			await screen.findByRole("button", { name: "読み取る（2 枚）" })
+		)
+		const nav = screen.getByRole("navigation", { name: "メインメニュー" })
+		expect(
+			await within(nav).findByText(/1 秒待ってからレシートの読み取りを続けます/)
+		).toBeInTheDocument()
+		expect(
+			await within(nav).findByRole(
+				"link",
+				{ name: /レシートを 2 枚読み取りました/ },
+				{ timeout: 3000 }
+			)
+		).toBeInTheDocument()
+		expect(reads).toBe(2)
+	})
+
 	it("読んでいる途中でアプリが閉じられていたら、起動したときに続きから読む", async () => {
 		settings = {
 			...settings,

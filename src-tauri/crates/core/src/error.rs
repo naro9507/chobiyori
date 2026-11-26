@@ -137,6 +137,9 @@ pub struct AppError {
     /// 問題のある明細行（0 から数える）。仕訳の明細のエラーのときだけ
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line: Option<usize>,
+    /// 回数の上限のとき、読み直すまで待つ秒数（サービスが教えてくれたときだけ）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_after: Option<u64>,
 }
 
 impl AppError {
@@ -145,6 +148,7 @@ impl AppError {
             code,
             field: None,
             line: None,
+            retry_after: None,
         }
     }
 
@@ -153,6 +157,7 @@ impl AppError {
             code,
             field: Some(field),
             line: None,
+            retry_after: None,
         }
     }
 
@@ -162,6 +167,15 @@ impl AppError {
             code,
             field: Some(field),
             line: Some(line),
+            retry_after: None,
+        }
+    }
+
+    /// 回数の上限に達した。`retry_after` 秒たてば読み直せる（分からなければ None）。
+    pub fn rate_limited(retry_after: Option<u64>) -> Self {
+        Self {
+            retry_after,
+            ..Self::new(ErrorCode::RateLimited)
         }
     }
 }
